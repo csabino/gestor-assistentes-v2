@@ -36,6 +36,11 @@
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-100 min-h-screen flex flex-col overflow-hidden" x-data="{
         theme: '{{ $effectiveTheme }}',
+        logoLightUrl: @js($branding['logo_light_url']),
+        logoDarkUrl: @js($branding['logo_dark_url']),
+        get headerLogo() {
+            return this.theme === 'dark' ? (this.logoDarkUrl || this.logoLightUrl) : (this.logoLightUrl || this.logoDarkUrl);
+        },
         toggleTheme() {
             this.theme = this.theme === 'dark' ? 'light' : 'dark';
             document.documentElement.classList.toggle('dark', this.theme === 'dark');
@@ -315,6 +320,8 @@
                 this.envLogoLightUrl = json.logo_light_url;
                 this.envLogoDarkUrl = json.logo_dark_url;
                 this.envLoginBgUrl = json.login_bg_url;
+                this.logoLightUrl = json.logo_light_url;
+                this.logoDarkUrl = json.logo_dark_url;
                 this.envLogoLightFile = null;
                 this.envLogoLightPreview = null;
                 this.envLogoDarkFile = null;
@@ -333,10 +340,9 @@
     <header class="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 sm:px-6 shrink-0 z-40 shadow-sm">
         <div class="flex items-center gap-6 min-w-0">
             <a href="/" class="flex items-center gap-2 font-bold text-indigo-700 dark:text-indigo-400 shrink-0">
-                @php $headerLogo = $effectiveTheme === 'dark' ? ($branding['logo_dark_url'] ?? $branding['logo_light_url']) : ($branding['logo_light_url'] ?? $branding['logo_dark_url']); @endphp
-                @if($headerLogo)
-                    <img src="{{ $headerLogo }}" alt="Logotipo" class="h-11 w-11 object-contain">
-                @endif
+                <template x-if="headerLogo">
+                    <img :src="headerLogo" alt="Logotipo" class="h-11 w-11 object-contain">
+                </template>
                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
                 </svg>
@@ -358,43 +364,43 @@
             <svg x-show="theme === 'dark'" x-cloak class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-6.364-.386 1.591-1.591M3 12h2.25m.386-6.364 1.591 1.591M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
         </button>
         <div class="relative" x-on:click.away="userMenuOpen = false">
-            <button type="button" @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full hover:bg-gray-100 transition">
+            <button type="button" @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                 <template x-if="user.avatarUrl">
-                    <img :src="user.avatarUrl" alt="Avatar" class="w-8 h-8 rounded-full object-cover border border-gray-200">
+                    <img :src="user.avatarUrl" alt="Avatar" class="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-600">
                 </template>
                 <template x-if="!user.avatarUrl">
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0" x-text="user.initials"></span>
                 </template>
-                <span class="hidden md:inline text-sm font-semibold text-gray-700 max-w-[140px] truncate" x-text="user.name"></span>
+                <span class="hidden md:inline text-sm font-semibold text-gray-700 dark:text-gray-200 max-w-[140px] truncate" x-text="user.name"></span>
                 <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
             </button>
 
-            <div x-show="userMenuOpen" x-cloak x-transition class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 text-sm z-50">
-                <div class="px-4 py-2 border-b border-gray-100">
-                    <p class="font-bold text-gray-800 truncate" x-text="user.name"></p>
-                    <p class="text-xs text-gray-500 truncate" x-text="user.email"></p>
+            <div x-show="userMenuOpen" x-cloak x-transition class="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg py-1.5 text-sm z-50">
+                <div class="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                    <p class="font-bold text-gray-800 dark:text-gray-100 truncate" x-text="user.name"></p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="user.email"></p>
                 </div>
 
-                <button type="button" @click="openProfileModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 text-left transition">
+                <button type="button" @click="openProfileModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition">
                     <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
                     Meu perfil
                 </button>
 
                 @if(auth()->user()->isAdmin())
-                    <button type="button" @click="openUsersModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 text-left transition">
+                    <button type="button" @click="openUsersModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition">
                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
                         Usuários
                     </button>
 
-                    <button type="button" @click="openEnvModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 text-left transition">
+                    <button type="button" @click="openEnvModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition">
                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" /></svg>
                         Ambiente
                     </button>
                 @endif
 
-                <form action="/logout" method="POST" class="border-t border-gray-100 mt-1 pt-1">
+                <form action="/logout" method="POST" class="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">
                     @csrf
-                    <button type="submit" class="w-full flex items-center gap-2.5 px-4 py-2 text-red-600 hover:bg-red-50 text-left transition">
+                    <button type="submit" class="w-full flex items-center gap-2.5 px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 text-left transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
                         Sair
                     </button>
@@ -616,36 +622,36 @@
 
             <div x-show="envError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-4 shrink-0" x-text="envError"></div>
 
-            <div class="overflow-y-auto flex-1 min-h-0 space-y-4 pr-1 custom-scroll">
-                <div class="flex items-center gap-4">
-                    <template x-if="envLogoLightPreview || envLogoLightUrl">
-                        <img :src="envLogoLightPreview || envLogoLightUrl" alt="Logotipo (tema claro)" class="w-14 h-14 rounded-lg object-contain border border-gray-200 dark:border-gray-600 bg-white p-1">
-                    </template>
-                    <template x-if="!envLogoLightPreview && !envLogoLightUrl">
-                        <span class="w-14 h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[10px] text-center">Sem logo</span>
-                    </template>
-                    <div>
-                        <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
-                            Logotipo (tema claro)
-                            <input type="file" accept="image/*" class="hidden" @change="onEnvLogoLightFile">
-                        </label>
-                        <p class="text-[11px] text-gray-400 mt-0.5">Usado no menu e no login quando o tema é claro.</p>
+            <div class="flex-1 min-h-0 space-y-3 pr-1">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="flex items-center gap-2">
+                        <template x-if="envLogoLightPreview || envLogoLightUrl">
+                            <img :src="envLogoLightPreview || envLogoLightUrl" alt="Logotipo (tema claro)" class="w-10 h-10 rounded-lg object-contain border border-gray-200 dark:border-gray-600 bg-white p-1 shrink-0">
+                        </template>
+                        <template x-if="!envLogoLightPreview && !envLogoLightUrl">
+                            <span class="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[9px] text-center shrink-0">Sem logo</span>
+                        </template>
+                        <div class="min-w-0">
+                            <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
+                                Logo (claro)
+                                <input type="file" accept="image/*" class="hidden" @change="onEnvLogoLightFile">
+                            </label>
+                        </div>
                     </div>
-                </div>
 
-                <div class="flex items-center gap-4">
-                    <template x-if="envLogoDarkPreview || envLogoDarkUrl">
-                        <img :src="envLogoDarkPreview || envLogoDarkUrl" alt="Logotipo (tema escuro)" class="w-14 h-14 rounded-lg object-contain border border-gray-200 dark:border-gray-600 bg-gray-800 p-1">
-                    </template>
-                    <template x-if="!envLogoDarkPreview && !envLogoDarkUrl">
-                        <span class="w-14 h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[10px] text-center">Sem logo</span>
-                    </template>
-                    <div>
-                        <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
-                            Logotipo (tema escuro)
-                            <input type="file" accept="image/*" class="hidden" @change="onEnvLogoDarkFile">
-                        </label>
-                        <p class="text-[11px] text-gray-400 mt-0.5">Usado no menu e no login quando o tema é escuro.</p>
+                    <div class="flex items-center gap-2">
+                        <template x-if="envLogoDarkPreview || envLogoDarkUrl">
+                            <img :src="envLogoDarkPreview || envLogoDarkUrl" alt="Logotipo (tema escuro)" class="w-10 h-10 rounded-lg object-contain border border-gray-200 dark:border-gray-600 bg-gray-800 p-1 shrink-0">
+                        </template>
+                        <template x-if="!envLogoDarkPreview && !envLogoDarkUrl">
+                            <span class="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[9px] text-center shrink-0">Sem logo</span>
+                        </template>
+                        <div class="min-w-0">
+                            <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
+                                Logo (escuro)
+                                <input type="file" accept="image/*" class="hidden" @change="onEnvLogoDarkFile">
+                            </label>
+                        </div>
                     </div>
                 </div>
 

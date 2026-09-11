@@ -15,14 +15,14 @@
             <div class="text-center mb-2">
                 @php $loginLogo = $branding['theme_default'] === 'dark' ? ($branding['logo_dark_url'] ?? $branding['logo_light_url']) : ($branding['logo_light_url'] ?? $branding['logo_dark_url']); @endphp
                 @if($loginLogo)
-                    <img src="{{ $loginLogo }}" alt="Logotipo" class="w-24 h-24 object-contain mx-auto mb-3">
+                    <img src="{{ $loginLogo }}" alt="Logotipo" class="w-[134px] h-[134px] object-contain mx-auto mb-2">
                 @endif
-                <div class="w-14 h-14 bg-indigo-700 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
-                    <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <div class="flex items-center justify-center gap-1.5">
+                    <svg class="w-4 h-4 shrink-0 text-indigo-700 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
                     </svg>
+                    <h1 class="text-lg font-bold text-gray-800 dark:text-gray-100">Painel IA</h1>
                 </div>
-                <h1 class="text-lg font-bold text-gray-800 dark:text-gray-100">Painel IA</h1>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Acesso restrito à equipe</p>
             </div>
 
@@ -54,11 +54,11 @@
             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-sm">
                 Entrar
             </button>
-        </form>
 
-        <p class="text-center text-[11px] mt-4 {{ $branding['login_bg_url'] ? 'text-white/80 drop-shadow' : 'text-gray-400 dark:text-gray-500' }}">
-            {{ $branding['footer_name'] }} {{ $branding['footer_version'] }} &middot; &copy; {{ $branding['footer_year'] }} {{ $branding['footer_company'] }}
-        </p>
+            <p class="text-center text-[11px] text-gray-400 dark:text-gray-500">
+                {{ $branding['footer_name'] }} {{ $branding['footer_version'] }} &middot; &copy; {{ $branding['footer_year'] }} {{ $branding['footer_company'] }}
+            </p>
+        </form>
     </div>
 </body>
 </html>
