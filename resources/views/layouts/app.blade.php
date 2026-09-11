@@ -106,8 +106,8 @@
         usersLoading: false,
         usersError: null,
         usersList: [],
-        humanAgentsOptions: [],
-        userForm: { id: null, name: '', email: '', password: '', password_confirmation: '', role: 'agente', human_agent_id: '' },
+        departmentOptions: [],
+        userForm: { id: null, name: '', email: '', password: '', password_confirmation: '', role: 'agente', is_active: true, department_ids: [] },
         userFormMode: 'create',
         openUsersModal() {
             this.usersModalOpen = true;
@@ -116,14 +116,19 @@
             this.loadUsers();
         },
         resetUserForm() {
-            this.userForm = { id: null, name: '', email: '', password: '', password_confirmation: '', role: 'agente', human_agent_id: '' };
+            this.userForm = { id: null, name: '', email: '', password: '', password_confirmation: '', role: 'agente', is_active: true, department_ids: [] };
             this.userFormMode = 'create';
             this.usersError = null;
         },
         editUser(u) {
-            this.userForm = { id: u.id, name: u.name, email: u.email, password: '', password_confirmation: '', role: u.role, human_agent_id: u.human_agent_id || '' };
+            this.userForm = { id: u.id, name: u.name, email: u.email, password: '', password_confirmation: '', role: u.role, is_active: !!u.is_active, department_ids: [...(u.department_ids || [])] };
             this.userFormMode = 'edit';
             this.usersError = null;
+        },
+        toggleDept(id) {
+            const idx = this.userForm.department_ids.indexOf(id);
+            if (idx === -1) this.userForm.department_ids.push(id);
+            else this.userForm.department_ids.splice(idx, 1);
         },
         async loadUsers() {
             this.usersLoading = true;
@@ -133,7 +138,7 @@
                 const json = await res.json();
                 if (!res.ok) throw new Error(json.message || 'Erro ao carregar usuários.');
                 this.usersList = json.users;
-                this.humanAgentsOptions = json.human_agents;
+                this.departmentOptions = json.departments;
             } catch (e) {
                 this.usersError = e.message || 'Erro ao carregar usuários.';
             } finally {
@@ -148,7 +153,8 @@
                 name: this.userForm.name,
                 email: this.userForm.email,
                 role: this.userForm.role,
-                human_agent_id: this.userForm.role === 'agente' ? this.userForm.human_agent_id : null,
+                is_active: this.userForm.is_active,
+                department_ids: this.userForm.role === 'admin' ? [] : this.userForm.department_ids,
             };
             if (this.userForm.password || !isEdit) {
                 payload.password = this.userForm.password;
@@ -173,6 +179,34 @@
                 this.resetUserForm();
             } catch (e) {
                 this.usersError = 'Erro de conexão. Tente novamente.';
+            } finally {
+                this.usersLoading = false;
+            }
+        },
+        async toggleActive(u) {
+            this.usersLoading = true;
+            try {
+                const res = await fetch('/settings/users/' + u.id, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                    body: JSON.stringify({
+                        name: u.name,
+                        email: u.email,
+                        role: u.role,
+                        is_active: !u.is_active,
+                        department_ids: u.department_ids,
+                    }),
+                });
+                const json = await res.json();
+                if (!res.ok || json.success === false) {
+                    alert(json.message || 'Erro ao atualizar usuário.');
+                    return;
+                }
+                await this.loadUsers();
             } finally {
                 this.usersLoading = false;
             }
@@ -327,7 +361,7 @@
 
     <!-- MODAL USUÁRIOS -->
     <div x-show="usersModalOpen" x-cloak x-transition @keydown.escape.window="usersModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-        <div @click.away="usersModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 relative border border-slate-200 max-h-[90vh] flex flex-col">
+        <div @click.away="usersModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-5xl w-full p-6 relative border border-slate-200 max-h-[90vh] flex flex-col">
             <div class="flex items-center justify-between mb-5 shrink-0">
                 <div>
                     <h3 class="text-base font-bold text-gray-800">Usuários</h3>
@@ -340,90 +374,112 @@
 
             <div x-show="usersError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-4 shrink-0" x-text="usersError"></div>
 
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 shrink-0">
-                <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3" x-text="userFormMode === 'edit' ? 'Editar Usuário' : 'Novo Usuário'"></h4>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Nome</label>
-                        <input type="text" x-model="userForm.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            <div class="flex flex-col md:flex-row gap-5 flex-1 min-h-0">
+                <!-- FORMULÁRIO: ESQUERDA -->
+                <div class="md:w-96 shrink-0 bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-y-auto">
+                    <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3" x-text="userFormMode === 'edit' ? 'Editar Usuário' : 'Novo Usuário'"></h4>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Nome</label>
+                            <input type="text" x-model="userForm.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">E-mail</label>
+                            <input type="email" x-model="userForm.email" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1" x-text="userFormMode === 'edit' ? 'Nova Senha' : 'Senha'"></label>
+                                <input type="password" x-model="userForm.password" autocomplete="new-password" :placeholder="userFormMode === 'edit' ? 'Manter atual' : ''" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Confirmar</label>
+                                <input type="password" x-model="userForm.password_confirmation" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Perfil</label>
+                            <select x-model="userForm.role" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                                <option value="admin">Admin</option>
+                                <option value="gestor">Gestor</option>
+                                <option value="agente">Agente</option>
+                            </select>
+                        </div>
+                        <div x-show="userForm.role !== 'admin'" x-cloak>
+                            <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">
+                                Assistentes / Departamentos <span x-show="userForm.role === 'agente'" class="text-red-500">*</span>
+                            </label>
+                            <div class="border border-gray-300 rounded-lg max-h-36 overflow-y-auto p-2 space-y-1 bg-white">
+                                <template x-for="dept in departmentOptions" :key="dept.id">
+                                    <label class="flex items-center gap-2 text-xs text-gray-700 py-0.5 cursor-pointer">
+                                        <input type="checkbox" :checked="userForm.department_ids.includes(dept.id)" @change="toggleDept(dept.id)" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                        <span x-text="dept.label"></span>
+                                    </label>
+                                </template>
+                                <p x-show="departmentOptions.length === 0" class="text-[11px] text-gray-400">Nenhum departamento cadastrado.</p>
+                            </div>
+                            <p class="text-[11px] text-gray-400 mt-1">Um usuário pode estar em um ou mais departamentos/assistentes.</p>
+                        </div>
+                        <div class="flex items-center gap-2 pt-1">
+                            <input type="checkbox" x-model="userForm.is_active" id="userActiveToggle" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <label for="userActiveToggle" class="text-xs font-semibold text-gray-700 cursor-pointer">Usuário ativo</label>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">E-mail</label>
-                        <input type="email" x-model="userForm.email" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1" x-text="userFormMode === 'edit' ? 'Nova Senha' : 'Senha'"></label>
-                        <input type="password" x-model="userForm.password" autocomplete="new-password" :placeholder="userFormMode === 'edit' ? 'Deixe em branco para manter' : ''" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Confirmar Senha</label>
-                        <input type="password" x-model="userForm.password_confirmation" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Perfil</label>
-                        <select x-model="userForm.role" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                            <option value="admin">Admin</option>
-                            <option value="gestor">Gestor</option>
-                            <option value="agente">Agente</option>
-                        </select>
-                    </div>
-                    <div x-show="userForm.role === 'agente'" x-cloak>
-                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Vincular ao Agente</label>
-                        <select x-model="userForm.human_agent_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                            <option value="">Selecione...</option>
-                            <template x-for="ag in humanAgentsOptions" :key="ag.id">
-                                <option :value="ag.id" x-text="ag.label"></option>
-                            </template>
-                        </select>
+                    <div class="flex justify-end gap-2 mt-4">
+                        <button type="button" x-show="userFormMode === 'edit'" x-cloak @click="resetUserForm()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
+                        <button type="button" @click="saveUser()" :disabled="usersLoading" :class="usersLoading ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
+                            <span x-text="userFormMode === 'edit' ? 'Salvar Alterações' : '+ Adicionar Usuário'"></span>
+                        </button>
                     </div>
                 </div>
-                <div class="flex justify-end gap-2 mt-4">
-                    <button type="button" x-show="userFormMode === 'edit'" x-cloak @click="resetUserForm()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
-                    <button type="button" @click="saveUser()" :disabled="usersLoading" :class="usersLoading ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
-                        <span x-text="userFormMode === 'edit' ? 'Salvar Alterações' : '+ Adicionar Usuário'"></span>
-                    </button>
-                </div>
-            </div>
 
-            <div class="border border-gray-200 rounded-lg overflow-y-auto flex-1 min-h-0">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead class="sticky top-0">
-                        <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
-                            <th class="py-2.5 px-4 font-semibold">Nome</th>
-                            <th class="py-2.5 px-4 font-semibold">Perfil</th>
-                            <th class="py-2.5 px-4 font-semibold text-right">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        <template x-for="u in usersList" :key="u.id">
-                            <tr class="hover:bg-gray-50 transition">
-                                <td class="py-2.5 px-4">
-                                    <p class="font-bold text-gray-800" x-text="u.name"></p>
-                                    <p class="text-[11px] text-gray-500 font-mono" x-text="u.email"></p>
-                                </td>
-                                <td class="py-2.5 px-4">
-                                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold"
-                                        :class="{
-                                            'bg-indigo-100 text-indigo-700': u.role === 'admin',
-                                            'bg-emerald-100 text-emerald-700': u.role === 'gestor',
-                                            'bg-amber-100 text-amber-700': u.role === 'agente'
-                                        }"
-                                        x-text="u.role === 'admin' ? 'Admin' : (u.role === 'gestor' ? 'Gestor' : 'Agente')"></span>
-                                    <span class="block text-[11px] text-gray-400 mt-0.5" x-show="u.human_agent_name" x-text="u.human_agent_name"></span>
-                                </td>
-                                <td class="py-2.5 px-4 text-right">
-                                    <div class="flex justify-end items-center gap-2">
-                                        <button type="button" @click="editUser(u)" class="text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-md text-xs font-bold transition">Editar</button>
-                                        <button type="button" @click="deleteUser(u)" class="text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-md text-xs font-bold transition">Excluir</button>
-                                    </div>
-                                </td>
+                <!-- LISTA: DIREITA -->
+                <div class="flex-1 min-w-0 border border-gray-200 rounded-lg overflow-y-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="sticky top-0">
+                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
+                                <th class="py-2.5 px-4 font-semibold">Nome</th>
+                                <th class="py-2.5 px-4 font-semibold">Perfil</th>
+                                <th class="py-2.5 px-4 font-semibold">Status</th>
+                                <th class="py-2.5 px-4 font-semibold text-right">Ações</th>
                             </tr>
-                        </template>
-                        <tr x-show="!usersLoading && usersList.length === 0">
-                            <td colspan="3" class="text-center py-8 text-gray-400">Nenhum usuário cadastrado.</td>
-                        </tr>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <template x-for="u in usersList" :key="u.id">
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="py-2.5 px-4">
+                                        <p class="font-bold text-gray-800" x-text="u.name"></p>
+                                        <p class="text-[11px] text-gray-500 font-mono" x-text="u.email"></p>
+                                        <p class="text-[11px] text-gray-400 mt-0.5" x-show="u.department_names" x-text="u.department_names"></p>
+                                    </td>
+                                    <td class="py-2.5 px-4">
+                                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold"
+                                            :class="{
+                                                'bg-indigo-100 text-indigo-700': u.role === 'admin',
+                                                'bg-emerald-100 text-emerald-700': u.role === 'gestor',
+                                                'bg-amber-100 text-amber-700': u.role === 'agente'
+                                            }"
+                                            x-text="u.role === 'admin' ? 'Admin' : (u.role === 'gestor' ? 'Gestor' : 'Agente')"></span>
+                                    </td>
+                                    <td class="py-2.5 px-4">
+                                        <button type="button" @click="toggleActive(u)" class="px-2 py-0.5 rounded-full text-[11px] font-bold transition"
+                                            :class="u.is_active ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'"
+                                            x-text="u.is_active ? 'Ativo' : 'Inativo'"></button>
+                                    </td>
+                                    <td class="py-2.5 px-4 text-right">
+                                        <div class="flex justify-end items-center gap-2">
+                                            <button type="button" @click="editUser(u)" class="text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-md text-xs font-bold transition">Editar</button>
+                                            <button type="button" @click="deleteUser(u)" class="text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-md text-xs font-bold transition">Excluir</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr x-show="!usersLoading && usersList.length === 0">
+                                <td colspan="4" class="text-center py-8 text-gray-400">Nenhum usuário cadastrado.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

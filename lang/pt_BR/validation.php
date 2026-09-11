@@ -194,6 +194,7 @@ return [
         'password_confirmation' => 'confirmação de senha',
         'avatar' => 'avatar',
         'role' => 'perfil',
+        'department_ids' => 'departamentos',
         'assistant_id' => 'assistente',
         'timezone' => 'fuso horário',
         'omni_webhook_url' => 'URL do webhook',

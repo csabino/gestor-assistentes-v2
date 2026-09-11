@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Assistant;
-use App\Models\HumanAgent;
+use App\Models\Department;
 use App\Models\Appointment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CalendarController extends Controller
 {
@@ -32,7 +33,7 @@ class CalendarController extends Controller
         $statusFilter = $request->input('status', 'ativo');
 
         // 2. Busca assistentes com base no status
-        $assistantsQuery = Assistant::with(['departments.agents'])->orderBy('name', 'asc');
+        $assistantsQuery = Assistant::orderBy('name', 'asc');
 
         if ($statusFilter === 'ativo') {
             $assistantsQuery->where('is_active', 1);
@@ -40,44 +41,61 @@ class CalendarController extends Controller
             $assistantsQuery->where('is_active', 0);
         }
 
-        $assistants = $assistantsQuery->get();
+        $allAssistants = $assistantsQuery->get();
 
-        // 3. Define o Assistente atual. Para o Agente, é sempre o assistente do seu próprio setor.
+        // Agente só enxerga os assistentes dos departamentos aos quais está vinculado.
         if ($isAgente) {
-            $currentAssistant = $user->humanAgent?->department?->assistant;
-            $currentAssistantId = $currentAssistant?->id;
+            $myAssistantIds = DB::table('department_user')
+                ->join('departments', 'department_user.department_id', '=', 'departments.id')
+                ->where('department_user.user_id', $user->id)
+                ->pluck('departments.assistant_id')
+                ->unique();
+
+            $assistants = $allAssistants->whereIn('id', $myAssistantIds)->values();
         } else {
-            $currentAssistantId = $request->input('assistant_id');
-
-            if (!$currentAssistantId || !$assistants->contains('id', $currentAssistantId)) {
-                $currentAssistantId = $assistants->isNotEmpty() ? $assistants->first()->id : null;
-            }
-
-            $currentAssistant = $assistants->firstWhere('id', $currentAssistantId);
+            $assistants = $allAssistants;
         }
 
-        // 4. Popula os Agentes. Para o Agente, a lista contém apenas ele mesmo.
+        // 3. Define o Assistente atual
+        $currentAssistantId = $request->input('assistant_id');
+
+        if (!$currentAssistantId || !$assistants->contains('id', $currentAssistantId)) {
+            $currentAssistantId = $assistants->isNotEmpty() ? $assistants->first()->id : null;
+        }
+
+        $currentAssistant = $assistants->firstWhere('id', $currentAssistantId);
+
+        // 4. Popula os Agentes (usuários vinculados a departamentos do assistente atual).
+        //    Para o Agente, a lista contém apenas ele mesmo.
         $agents = collect();
         if ($isAgente) {
-            if ($user->humanAgent) {
-                $ag = $user->humanAgent;
-                $ag->department_name = $ag->department->name ?? '';
-                $agents->push($ag);
-            }
+            $myDept = $currentAssistantId
+                ? $user->departments()->where('departments.assistant_id', $currentAssistantId)->first()
+                : null;
+
+            $agents->push((object) [
+                'id' => $user->id,
+                'name' => $user->name,
+                'department_name' => $myDept->name ?? '',
+            ]);
         } elseif ($currentAssistant) {
-            foreach ($currentAssistant->departments as $dept) {
-                foreach ($dept->agents as $ag) {
-                    $ag->department_name = $dept->name;
-                    $agents->push($ag);
+            $depts = Department::where('assistant_id', $currentAssistantId)->with('users')->get();
+            foreach ($depts as $dept) {
+                foreach ($dept->users as $u) {
+                    $agents->push((object) [
+                        'id' => $u->id,
+                        'name' => $u->name,
+                        'department_name' => $dept->name,
+                    ]);
                 }
             }
         }
 
         $agents = $agents->sortBy('name')->values();
 
-        // 5. Agente selecionado. Para o Agente, é sempre o seu próprio, sem opção de "todos".
+        // 5. Agente selecionado. Para o Agente, é sempre ele mesmo, sem opção de "todos".
         if ($isAgente) {
-            $currentAgentId = $user->human_agent_id ?: 'all';
+            $currentAgentId = $user->id;
         } else {
             $currentAgentId = $request->input('agent_id', 'all');
             if ($currentAgentId !== 'all' && !$agents->contains('id', $currentAgentId)) {
@@ -97,49 +115,55 @@ class CalendarController extends Controller
 
         if ($user->isAgente()) {
             // Agente só pode ver os próprios compromissos, ignora qualquer filtro enviado.
-            $agentId = $user->human_agent_id;
-            if (!$agentId) {
-                return response()->json([]);
-            }
+            $agentId = $user->id;
         } else {
             $agentId = $request->input('agent_id', 'all');
         }
 
         // Puxa o assistente_id diretamente da URL para não depender só da sessão
         $astId = $request->input('assistant_id') ?: session('last_agenda_ast_id');
-        
-        // Retornamos ao uso do Appointment::query() para evitar bugs de conversão do Laravel
+
         $query = Appointment::query()
-            ->leftJoin('human_agents', 'appointments.human_agent_id', '=', 'human_agents.id')
-            ->leftJoin('departments', 'human_agents.department_id', '=', 'departments.id')
+            ->leftJoin('users', 'appointments.user_id', '=', 'users.id')
             ->select(
                 'appointments.*',
-                'human_agents.name as agent_name',
-                'departments.name as department_name'
+                'users.name as agent_name',
+                'users.id as agent_user_id'
             )
             ->where('appointments.status', '!=', 'cancelled');
-        
+
         if ($agentId !== 'all' && $agentId) {
-            $query->where('appointments.human_agent_id', $agentId);
+            $query->where('appointments.user_id', $agentId);
         } else {
             if ($astId) {
-                $agentIds = \Illuminate\Support\Facades\DB::table('human_agents')
-                    ->join('departments', 'human_agents.department_id', '=', 'departments.id')
+                $userIds = DB::table('department_user')
+                    ->join('departments', 'department_user.department_id', '=', 'departments.id')
                     ->where('departments.assistant_id', $astId)
-                    ->pluck('human_agents.id')
+                    ->pluck('department_user.user_id')
+                    ->unique()
                     ->toArray();
 
-                $query->whereIn('appointments.human_agent_id', $agentIds);
+                $query->whereIn('appointments.user_id', $userIds);
             } else {
                 return response()->json([]);
             }
         }
 
         $appointments = $query->get();
-        
-        $events = $appointments->map(function($app) {
+
+        // Nome do departamento do agente dentro do assistente atual (evita duplicar linhas com JOIN direto).
+        $departmentNameByUserId = [];
+        if ($astId) {
+            $departmentNameByUserId = DB::table('department_user')
+                ->join('departments', 'department_user.department_id', '=', 'departments.id')
+                ->where('departments.assistant_id', $astId)
+                ->pluck('departments.name', 'department_user.user_id')
+                ->toArray();
+        }
+
+        $events = $appointments->map(function($app) use ($departmentNameByUserId) {
             $isBlock = ($app->client_name === 'BLOQUEIO_MANUAL');
-            
+
             // Garante a conversão blindada da data para o calendário ler sem dar erro
             $startTime = $app->start_time instanceof \Carbon\Carbon ? $app->start_time : \Carbon\Carbon::parse($app->start_time);
             $endTime = $app->end_time instanceof \Carbon\Carbon ? $app->end_time : \Carbon\Carbon::parse($app->end_time);
@@ -157,7 +181,7 @@ class CalendarController extends Controller
                     'client_email' => $app->client_email ?? '-',
                     'client_phone' => $app->client_phone ?? '-',
                     'agent_name' => $app->agent_name ?? 'Não atribuído',
-                    'department_name' => $app->department_name ?? 'Geral',
+                    'department_name' => $departmentNameByUserId[$app->agent_user_id] ?? 'Geral',
                     'status' => $app->status === 'rescheduled' ? 'Reagendada' : 'Agendada',
                     'start_formatted' => $startTime->format('d/m/Y \à\s H:i'),
                     'end_formatted' => $endTime->format('H:i')
@@ -174,20 +198,20 @@ class CalendarController extends Controller
             abort(403, 'Agentes têm acesso somente para consulta da agenda.');
         }
 
-        if ($request->human_agent_id === 'all') {
+        if ($request->user_id === 'all') {
             return response()->json(['success' => false, 'message' => 'Selecione um Agente específico no filtro para poder agendar ou bloquear horário.']);
         }
 
         $request->validate([
-            'human_agent_id' => 'required|exists:human_agents,id',
+            'user_id' => 'required|exists:users,id',
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
         ]);
 
         $type = $request->input('type', 'block');
-        
+
         Appointment::create([
-            'human_agent_id' => $request->human_agent_id,
+            'user_id' => $request->user_id,
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
             'client_name' => $type === 'block' ? 'BLOQUEIO_MANUAL' : $request->client_name,

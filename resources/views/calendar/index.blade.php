@@ -281,7 +281,7 @@
                             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
                             body: JSON.stringify({
                                 action: 'store_event',
-                                human_agent_id: agentId,
+                                user_id: agentId,
                                 start_time: info.startStr,
                                 end_time: info.endStr,
                                 type: 'block'

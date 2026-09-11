@@ -6,9 +6,7 @@
         <div class="container mx-auto px-6 max-w-7xl py-8"
             x-data="{
                 editDeptModal: false,
-                editDeptData: { id: null, name: '' },
-                editAgentModal: false,
-                editAgentData: { id: null, department_id: null, name: '', email: '' }
+                editDeptData: { id: null, name: '' }
             }"
         >
 
@@ -117,26 +115,33 @@
 
                                     <!-- DIREITA: CARDS DOS AGENTES -->
                                     <div class="md:w-3/4 p-5 flex flex-wrap gap-4 items-start bg-slate-50/30">
-                                        
-                                        <!-- CARD 1: ADICIONAR NOVO AGENTE (Sempre na esquerda) -->
+
+                                        <!-- CARD 1: VINCULAR USUÁRIO EXISTENTE (Sempre na esquerda) -->
                                         <div class="bg-white border border-slate-200 border-dashed hover:border-indigo-400 rounded-lg p-3 w-auto min-w-[240px] shadow-sm relative transition group">
                                             <form action="/?view=equipe" method="POST" class="flex flex-col gap-2">
                                                 @csrf
-                                                <input type="hidden" name="action" value="store_agent">
+                                                <input type="hidden" name="action" value="link_user">
                                                 <input type="hidden" name="department_id" value="{{ $dept->id }}">
                                                 <input type="hidden" name="assistant_id" value="{{ $selectedAssistantId }}">
                                                 <input type="hidden" name="status" value="{{ $statusFilter }}">
-                                                <input type="text" name="name" required placeholder="Nome do Agente" class="w-full border border-slate-300 rounded text-[11px] px-2.5 py-1.5 outline-none focus:border-indigo-500 font-medium text-gray-800">
-                                                <input type="email" name="email" required placeholder="E-mail corporativo" class="w-full border border-slate-300 rounded text-[11px] px-2.5 py-1.5 outline-none focus:border-indigo-500 font-mono text-gray-600">
-                                                <button type="submit" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-1.5 rounded border border-indigo-200 text-[10px] transition uppercase tracking-wide mt-1">+ Salvar</button>
+                                                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Vincular Usuário</label>
+                                                <select name="user_id" required class="w-full border border-slate-300 rounded text-[11px] px-2.5 py-1.5 outline-none focus:border-indigo-500 text-gray-700 bg-white">
+                                                    <option value="">Selecione...</option>
+                                                    @foreach($eligibleUsers as $eu)
+                                                        @if(!in_array($eu->id, $linkedUserIdsByDept[$dept->id] ?? []))
+                                                            <option value="{{ $eu->id }}">{{ $eu->name }} ({{ $eu->role === 'gestor' ? 'Gestor' : 'Agente' }})</option>
+                                                        @endif
+                                                    @endforeach
+                                                </select>
+                                                <button type="submit" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-1.5 rounded border border-indigo-200 text-[10px] transition uppercase tracking-wide mt-1">+ Vincular</button>
                                             </form>
                                         </div>
 
-                                        <!-- CARDS 2...N: AGENTES EXISTENTES -->
+                                        <!-- CARDS 2...N: AGENTES VINCULADOS -->
                                         @foreach($agents as $agent)
                                             @if($agent->department_id == $dept->id)
                                                 <div class="bg-white border border-gray-200 rounded-lg p-3 w-auto max-w-sm shadow-sm relative group hover:border-indigo-300 transition flex flex-col justify-between">
-                                                    
+
                                                     <div class="flex items-center gap-3">
                                                         <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm flex items-center justify-center shrink-0 border border-indigo-200 uppercase">
                                                             {{ substr($agent->name, 0, 1) }}
@@ -146,20 +151,18 @@
                                                             <p class="text-[11px] text-gray-500 font-mono whitespace-nowrap mt-0.5">{{ $agent->email }}</p>
                                                         </div>
                                                     </div>
-                                                    
+
                                                     <!-- FOOTER DO CARD: Controles aparecem no hover -->
                                                     <div class="mt-3 pt-2 border-t border-gray-50 flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                                        <button @click="editAgentData = { id: {{ $agent->id }}, department_id: {{ $dept->id }}, name: '{{ $agent->name }}', email: '{{ $agent->email }}' }; editAgentModal = true" class="text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition">
-                                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg> Editar
-                                                        </button>
-                                                        <form action="/?view=equipe" method="POST" onsubmit="return confirm('Remover este agente?');">
-                                                            @csrf 
-                                                            <input type="hidden" name="action" value="delete_agent">
-                                                            <input type="hidden" name="agent_id" value="{{ $agent->id }}">
+                                                        <form action="/?view=equipe" method="POST" onsubmit="return confirm('Desvincular este usuário do departamento?');">
+                                                            @csrf
+                                                            <input type="hidden" name="action" value="unlink_user">
+                                                            <input type="hidden" name="user_id" value="{{ $agent->id }}">
+                                                            <input type="hidden" name="department_id" value="{{ $dept->id }}">
                                                             <input type="hidden" name="assistant_id" value="{{ $selectedAssistantId }}">
                                                             <input type="hidden" name="status" value="{{ $statusFilter }}">
                                                             <button type="submit" class="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition">
-                                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg> Excluir
+                                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" /></svg> Desvincular
                                                             </button>
                                                         </form>
                                                     </div>
@@ -191,32 +194,6 @@
                         <div class="flex justify-end gap-2">
                             <button type="button" @click="editDeptModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
                             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">Atualizar</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- MODAL EDITAR AGENTE -->
-            <div x-show="editAgentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" x-transition>
-                <div @click.away="editAgentModal = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200">
-                    <h3 class="text-base font-bold text-gray-800 mb-4">Editar Agente</h3>
-                    <form action="/?view=equipe" method="POST">
-                        @csrf
-                        <input type="hidden" name="action" value="update_agent">
-                        <input type="hidden" name="assistant_id" value="{{ $selectedAssistantId }}">
-                        <input type="hidden" name="status" value="{{ $statusFilter }}">
-                        <input type="hidden" name="agent_id" :value="editAgentData.id">
-                        <input type="hidden" name="department_id" :value="editAgentData.department_id">
-                        
-                        <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nome</label>
-                        <input type="text" name="name" x-model="editAgentData.name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-xs mb-3 outline-none focus:border-indigo-500">
-
-                        <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">E-mail</label>
-                        <input type="email" name="email" x-model="editAgentData.email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-xs mb-5 outline-none focus:border-indigo-500">
-
-                        <div class="flex justify-end gap-2">
-                            <button type="button" @click="editAgentModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
-                            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">Salvar</button>
                         </div>
                     </form>
                 </div>

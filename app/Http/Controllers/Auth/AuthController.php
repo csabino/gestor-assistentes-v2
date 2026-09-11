@@ -25,6 +25,11 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            if (!Auth::user()->is_active) {
+                Auth::logout();
+                return back()->withErrors(['email' => 'Este usuário está inativo. Fale com um administrador.'])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
             return redirect()->intended('/');
         }

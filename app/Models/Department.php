@@ -17,4 +17,9 @@ class Department extends Model
     {
         return $this->hasMany(HumanAgent::class);
     }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
+    }
 }

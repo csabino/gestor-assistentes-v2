@@ -18,9 +18,8 @@ class AgentController extends Controller
 
         if ($request->isMethod('post')) {
             $action = $request->input('action');
-            if ($action === 'store_agent') return $this->storeAgent($request);
-            if ($action === 'update_agent') return $this->updateAgent($request);
-            if ($action === 'delete_agent') return $this->deleteAgent($request);
+            if ($action === 'link_user') return $this->linkUser($request);
+            if ($action === 'unlink_user') return $this->unlinkUser($request);
 
             if ($action === 'store_department') return $this->storeDepartment($request);
             if ($action === 'update_department') return $this->updateDepartment($request);
@@ -38,7 +37,7 @@ class AgentController extends Controller
             $assistantsQuery->where('is_active', 0);
         }
         $assistants = $assistantsQuery->get();
-        
+
         // Pega o ID do assistente na URL, se não tiver ou não existir na lista atual, pega o primeiro
         $selectedAssistantId = (int) $request->query('assistant_id');
         if (!$selectedAssistantId || !$assistants->contains('id', $selectedAssistantId)) {
@@ -50,17 +49,28 @@ class AgentController extends Controller
             ->where('assistant_id', $selectedAssistantId)
             ->orderBy('name', 'asc')
             ->get();
-        
-        // Busca apenas os agentes que pertencem aos departamentos carregados
+
         $deptIds = $departments->pluck('id');
-        $agents = DB::table('human_agents')
-            ->whereIn('department_id', $deptIds)
+
+        // Usuários (perfil Agente/Gestor) vinculados aos departamentos carregados
+        $agents = DB::table('department_user')
+            ->join('users', 'department_user.user_id', '=', 'users.id')
+            ->whereIn('department_user.department_id', $deptIds)
+            ->select('users.id', 'users.name', 'users.email', 'users.role', 'department_user.department_id')
+            ->orderBy('users.name', 'asc')
+            ->get();
+
+        $linkedUserIdsByDept = $agents->groupBy('department_id')->map(fn ($g) => $g->pluck('id')->all());
+
+        // Usuários elegíveis pra vincular (perfil Gestor ou Agente)
+        $eligibleUsers = DB::table('users')
+            ->whereIn('role', ['agente', 'gestor'])
             ->orderBy('name', 'asc')
             ->get();
-        
+
         $currentView = 'equipe';
 
-        return view('agents.index', compact('departments', 'agents', 'assistants', 'currentView', 'selectedAssistantId', 'statusFilter'));
+        return view('agents.index', compact('departments', 'agents', 'assistants', 'currentView', 'selectedAssistantId', 'statusFilter', 'eligibleUsers', 'linkedUserIdsByDept'));
     }
 
     private function storeDepartment(Request $request)
@@ -78,7 +88,7 @@ class AgentController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        
+
         return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('success', 'Departamento criado com sucesso!');
     }
 
@@ -90,7 +100,7 @@ class AgentController extends Controller
             'department_id' => 'required|integer',
             'name' => 'required|string|max:255'
         ]);
-        
+
         // Força maiúscula na atualização
         $departmentName = mb_strtoupper(trim($request->name), 'UTF-8');
 
@@ -98,7 +108,7 @@ class AgentController extends Controller
             'name' => $departmentName,
             'updated_at' => now(),
         ]);
-        
+
         return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('success', 'Departamento atualizado!');
     }
 
@@ -107,82 +117,46 @@ class AgentController extends Controller
         $assistantId = (int)$request->input('assistant_id');
         $statusFilter = $request->input('status', 'ativo');
         $deptId = (int)$request->input('department_id');
-        
-        DB::table('human_agents')->where('department_id', $deptId)->delete();
+
+        DB::table('department_user')->where('department_id', $deptId)->delete();
         DB::table('departments')->where('id', $deptId)->delete();
-        
+
         return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('success', 'Departamento excluído!');
     }
 
-    private function storeAgent(Request $request)
+    private function linkUser(Request $request)
     {
         $assistantId = (int)$request->input('assistant_id');
         $statusFilter = $request->input('status', 'ativo');
         $departmentId = (int) $request->input('department_id');
-        $email = strtolower(trim((string)$request->input('email')));
-        $name = trim((string)$request->input('name'));
+        $userId = (int) $request->input('user_id');
 
-        if (!$departmentId || !$email || !$name) {
-            return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('error', 'Preencha todos os campos do agente.');
+        if (!$departmentId || !$userId) {
+            return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('error', 'Selecione um usuário para vincular.');
         }
 
-        $duplicate = DB::table('human_agents')
-            ->where('department_id', $departmentId)
-            ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
-            ->first();
-
-        if ($duplicate) {
-            return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('error', "Bloqueado: O e-mail '{$email}' já está em uso por '{$duplicate->name}'.");
-        }
-
-        DB::table('human_agents')->insert([
+        DB::table('department_user')->insertOrIgnore([
             'department_id' => $departmentId,
-            'name' => $name,
-            'email' => $email,
-            'is_active' => true,
+            'user_id' => $userId,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('success', "Agente '{$name}' adicionado com sucesso!");
+        return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('success', 'Usuário vinculado ao departamento!');
     }
 
-    private function updateAgent(Request $request)
+    private function unlinkUser(Request $request)
     {
         $assistantId = (int)$request->input('assistant_id');
         $statusFilter = $request->input('status', 'ativo');
-        $agentId = (int)$request->input('agent_id');
-        $departmentId = (int)$request->input('department_id');
-        $name = trim((string)$request->input('name'));
-        $email = strtolower(trim((string)$request->input('email')));
+        $departmentId = (int) $request->input('department_id');
+        $userId = (int) $request->input('user_id');
 
-        $duplicate = DB::table('human_agents')
+        DB::table('department_user')
             ->where('department_id', $departmentId)
-            ->where('id', '!=', $agentId)
-            ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
-            ->first();
+            ->where('user_id', $userId)
+            ->delete();
 
-        if ($duplicate) {
-            return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('error', "Bloqueado: O e-mail '{$email}' já pertence a outro agente.");
-        }
-
-        DB::table('human_agents')->where('id', $agentId)->update([
-            'name' => $name,
-            'email' => $email,
-            'updated_at' => now(),
-        ]);
-
-        return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('success', "Agente '{$name}' atualizado!");
-    }
-
-    private function deleteAgent(Request $request)
-    {
-        $assistantId = (int)$request->input('assistant_id');
-        $statusFilter = $request->input('status', 'ativo');
-        $agentId = (int)$request->input('agent_id');
-        
-        DB::table('human_agents')->where('id', $agentId)->delete();
-        
-        return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('success', 'Agente excluído com sucesso!');
+        return redirect("/?view=equipe&status={$statusFilter}&assistant_id={$assistantId}")->with('success', 'Usuário desvinculado do departamento!');
     }
 }

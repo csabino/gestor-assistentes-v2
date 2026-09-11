@@ -127,9 +127,11 @@ class AssistantController extends Controller
 
     private function allocateAgentRoundRobin(int $assistantId, int $departmentId, string $startDateTime, string $endDateTime)
     {
-        $agents = DB::table('human_agents')
-            ->where('department_id', $departmentId)
-            ->where('is_active', 1)
+        $agents = DB::table('department_user')
+            ->join('users', 'department_user.user_id', '=', 'users.id')
+            ->where('department_user.department_id', $departmentId)
+            ->where('users.is_active', 1)
+            ->select('users.*')
             ->get();
 
         if ($agents->isEmpty()) {
@@ -140,7 +142,7 @@ class AssistantController extends Controller
 
         foreach ($agents as $agent) {
             $hasConflict = DB::table('appointments')
-                ->where('human_agent_id', $agent->id)
+                ->where('user_id', $agent->id)
                 ->where('status', '!=', 'cancelled')
                 ->where(function ($q) use ($startDateTime, $endDateTime) {
                     $q->where('start_time', '<', $endDateTime)
@@ -150,7 +152,7 @@ class AssistantController extends Controller
 
             if (!$hasConflict) {
                 $appointmentCount = DB::table('appointments')
-                    ->where('human_agent_id', $agent->id)
+                    ->where('user_id', $agent->id)
                     ->where('status', '!=', 'cancelled')
                     ->count();
 
@@ -396,7 +398,7 @@ class AssistantController extends Controller
                 }
 
                 DB::table('appointments')->where('id', $existingAppointment->id)->update([
-                    'human_agent_id' => $allocatedAgent->id,
+                    'user_id' => $allocatedAgent->id,
                     'google_event_id' => $meetingResult['event_id'] ?? $existingAppointment->google_event_id,
                     'start_time' => $newStartTime->toDateTimeString(),
                     'end_time' => $newEndTime->toDateTimeString(),
@@ -498,7 +500,7 @@ class AssistantController extends Controller
                 }
 
                 DB::table('appointments')->insert([
-                    'human_agent_id' => $allocatedAgent->id,
+                    'user_id' => $allocatedAgent->id,
                     'google_event_id' => $meetingResult['event_id'] ?? null,
                     'start_time' => $startTime->toDateTimeString(),
                     'end_time' => $endTime->toDateTimeString(),
