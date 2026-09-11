@@ -51,7 +51,7 @@
                     </div>
                     <div class="sm:col-span-1">
                         <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Senha</label>
-                        <input type="password" name="password" required minlength="8" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <input type="password" name="password" required minlength="8" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                     </div>
                     <div class="sm:col-span-1">
                         <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-sm transition shadow-sm">
@@ -109,7 +109,7 @@
                         <input type="email" name="email" x-model="editData.email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-xs mb-3 outline-none focus:border-indigo-500">
 
                         <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nova Senha (opcional)</label>
-                        <input type="password" name="password" minlength="8" placeholder="Deixe em branco para manter a atual" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-xs mb-5 outline-none focus:border-indigo-500">
+                        <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Deixe em branco para manter a atual" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-xs mb-5 outline-none focus:border-indigo-500">
 
                         <div class="flex justify-end gap-2">
                             <button type="button" @click="editModal = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>

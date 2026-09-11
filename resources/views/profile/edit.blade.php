@@ -59,18 +59,18 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">E-mail</label>
-                        <input type="email" name="email" value="{{ old('email', $user->email) }}" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <input type="email" name="email" value="{{ old('email', $user->email) }}" required autocomplete="username" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-6">
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Nova Senha</label>
-                        <input type="password" name="password" placeholder="Deixe em branco para manter a atual" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <input type="password" name="password" autocomplete="new-password" placeholder="Deixe em branco para manter a atual" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Confirmar Nova Senha</label>
-                        <input type="password" name="password_confirmation" placeholder="Repita a nova senha" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <input type="password" name="password_confirmation" autocomplete="new-password" placeholder="Repita a nova senha" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                     </div>
                 </div>
 
