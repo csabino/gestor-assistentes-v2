@@ -555,14 +555,8 @@ class AssistantController extends Controller
 
         $currentView = $request->input('view', 'robots');
 
-        if ($request->has('chat_id')) {
-            $assistant = Assistant::findOrFail($request->chat_id);
-            return view('assistants.chat', compact('assistant'));
-        }
-
         if ($request->isMethod('post') && $request->input('action') === 'store_agent') return $this->storeAgent($request);
         if ($request->isMethod('post') && $request->input('action') === 'store_department') return $this->storeDepartment($request);
-        if ($request->isMethod('post') && $request->input('action') === 'chat') return $this->chat($request);
         if ($request->isMethod('post') && $request->input('action') === 'test_ai') return $this->testAi($request);
         
         if ($request->isMethod('post') && $request->input('action') === 'status_whatsapp') return $this->checkWhatsappStatus($request, false);
@@ -1401,6 +1395,19 @@ class AssistantController extends Controller
         $clean = @mb_convert_encoding($text, 'UTF-8', 'UTF-8');
         $clean = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $clean);
         return trim(mb_substr($clean, 0, 8000));
+    }
+
+    public function showChatWidget(Request $request, $id)
+    {
+        $this->configureTimezone($id);
+        $assistant = Assistant::findOrFail($id);
+        return view('assistants.chat', compact('assistant'));
+    }
+
+    public function chatWidgetSend(Request $request, $id)
+    {
+        $request->merge(['assistant_id' => $id]);
+        return $this->chat($request);
     }
 
     private function chat(Request $request)

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat - {{ $assistant->name }}</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -86,15 +87,14 @@
             sendBtn.disabled = true;
 
             try {
-                const response = await fetch('/', {
+                const response = await fetch(`/chat/${assistantId}/send`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
                     body: JSON.stringify({
-                        action: 'chat',
-                        assistant_id: assistantId,
                         message: messageText,
                         history: conversationHistory
                     })

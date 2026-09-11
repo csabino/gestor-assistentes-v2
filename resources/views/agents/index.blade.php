@@ -69,7 +69,14 @@
             </nav>
         </div>
 
-        <div class="p-4 border-t border-indigo-600/80 mt-auto">
+        <div class="p-4 border-t border-indigo-600/80 mt-auto space-y-2">
+            <form action="/logout" method="POST">
+                @csrf
+                <button type="submit" class="w-full flex items-center rounded-lg text-indigo-100 hover:bg-indigo-600 transition text-sm font-semibold" :class="sidebarOpen ? 'gap-2.5 px-3 py-2 justify-start' : 'justify-center p-2'" title="Sair">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
+                    <span x-show="sidebarOpen">Sair</span>
+                </button>
+            </form>
             <span x-show="sidebarOpen" class="text-[11px] bg-indigo-800 text-indigo-200 px-3 py-1.5 rounded-full font-bold border border-indigo-500 block text-center shadow-inner tracking-wider">Multiagents v6.0</span>
             <span x-show="!sidebarOpen" class="text-[10px] text-indigo-300 font-bold block text-center tracking-widest">v2.0</span>
         </div>
