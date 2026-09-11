@@ -7,11 +7,6 @@ use Illuminate\Support\Facades\Hash;
 
 class ProfileController extends Controller
 {
-    public function edit(Request $request)
-    {
-        return view('profile.edit', ['user' => $request->user()]);
-    }
-
     public function update(Request $request)
     {
         $user = $request->user();
@@ -35,6 +30,19 @@ class ProfileController extends Controller
         }
 
         $user->save();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Perfil atualizado com sucesso!',
+                'user' => [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'avatar_url' => $user->avatar_path ? '/?view_file=' . $user->avatar_path : null,
+                    'initials' => collect(explode(' ', $user->name))->map(fn ($p) => mb_substr($p, 0, 1))->take(2)->implode(''),
+                ],
+            ]);
+        }
 
         return back()->with('success', 'Perfil atualizado com sucesso!');
     }

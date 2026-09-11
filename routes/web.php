@@ -35,7 +35,6 @@ Route::middleware('auth')->group(function () {
         return app(AssistantController::class)->index($request);
     });
 
-    Route::get('/profile', [ProfileController::class, 'edit']);
     Route::post('/profile', [ProfileController::class, 'update']);
 
     Route::get('/settings/users', [UserController::class, 'index']);

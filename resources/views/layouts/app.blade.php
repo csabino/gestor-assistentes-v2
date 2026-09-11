@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Painel IA')</title>
 
     @php $navView = request()->query('view', 'robots'); @endphp
@@ -28,7 +29,79 @@
 
     @stack('head')
 </head>
-<body class="bg-gray-50 font-sans text-gray-900 min-h-screen flex flex-col overflow-hidden" x-data="{ userMenuOpen: false }">
+<body class="bg-gray-50 font-sans text-gray-900 min-h-screen flex flex-col overflow-hidden" x-data="{
+        userMenuOpen: false,
+        profileModalOpen: false,
+        profileSaving: false,
+        profileError: null,
+        user: {
+            name: @js(auth()->user()->name),
+            email: @js(auth()->user()->email),
+            avatarUrl: @js(auth()->user()->avatar_path ? '/?view_file=' . auth()->user()->avatar_path : null),
+            initials: @js(collect(explode(' ', auth()->user()->name))->map(fn($p) => mb_substr($p, 0, 1))->take(2)->implode(''))
+        },
+        profileForm: { name: '', email: '', password: '', password_confirmation: '' },
+        profileInitial: { name: '', email: '' },
+        avatarPreview: null,
+        avatarFile: null,
+        get profileChanged() {
+            return this.profileForm.name !== this.profileInitial.name
+                || this.profileForm.email !== this.profileInitial.email
+                || this.profileForm.password !== ''
+                || this.profileForm.password_confirmation !== ''
+                || this.avatarFile !== null;
+        },
+        openProfileModal() {
+            this.profileForm = { name: this.user.name, email: this.user.email, password: '', password_confirmation: '' };
+            this.profileInitial = { name: this.user.name, email: this.user.email };
+            this.avatarPreview = null;
+            this.avatarFile = null;
+            this.profileError = null;
+            this.profileModalOpen = true;
+            this.userMenuOpen = false;
+        },
+        onAvatarFile(e) {
+            const f = e.target.files[0];
+            if (f) { this.avatarFile = f; this.avatarPreview = URL.createObjectURL(f); }
+        },
+        async saveProfile() {
+            if (!this.profileChanged || this.profileSaving) return;
+            this.profileSaving = true;
+            this.profileError = null;
+            const fd = new FormData();
+            fd.append('name', this.profileForm.name);
+            fd.append('email', this.profileForm.email);
+            if (this.profileForm.password) {
+                fd.append('password', this.profileForm.password);
+                fd.append('password_confirmation', this.profileForm.password_confirmation);
+            }
+            if (this.avatarFile) fd.append('avatar', this.avatarFile);
+            try {
+                const res = await fetch('/profile', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                    body: fd,
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    this.profileError = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message || 'Erro ao salvar.');
+                    return;
+                }
+                this.user.name = json.user.name;
+                this.user.email = json.user.email;
+                this.user.avatarUrl = json.user.avatar_url;
+                this.user.initials = json.user.initials;
+                this.profileModalOpen = false;
+            } catch (e) {
+                this.profileError = 'Erro de conexão. Tente novamente.';
+            } finally {
+                this.profileSaving = false;
+            }
+        }
+    }">
 
     <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-40 shadow-sm">
         <div class="flex items-center gap-6 min-w-0">
@@ -48,27 +121,26 @@
 
         <div class="relative shrink-0" x-on:click.away="userMenuOpen = false">
             <button type="button" @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full hover:bg-gray-100 transition">
-                @if(auth()->user()->avatar_path ?? null)
-                    <img src="/?view_file={{ auth()->user()->avatar_path }}" alt="Avatar" class="w-8 h-8 rounded-full object-cover border border-gray-200">
-                @else
-                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
-                        {{ collect(explode(' ', auth()->user()->name))->map(fn($p) => mb_substr($p, 0, 1))->take(2)->implode('') }}
-                    </span>
-                @endif
-                <span class="hidden md:inline text-sm font-semibold text-gray-700 max-w-[140px] truncate">{{ auth()->user()->name }}</span>
+                <template x-if="user.avatarUrl">
+                    <img :src="user.avatarUrl" alt="Avatar" class="w-8 h-8 rounded-full object-cover border border-gray-200">
+                </template>
+                <template x-if="!user.avatarUrl">
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center shrink-0" x-text="user.initials"></span>
+                </template>
+                <span class="hidden md:inline text-sm font-semibold text-gray-700 max-w-[140px] truncate" x-text="user.name"></span>
                 <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
             </button>
 
             <div x-show="userMenuOpen" x-cloak x-transition class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 text-sm z-50">
                 <div class="px-4 py-2 border-b border-gray-100">
-                    <p class="font-bold text-gray-800 truncate">{{ auth()->user()->name }}</p>
-                    <p class="text-xs text-gray-500 truncate">{{ auth()->user()->email }}</p>
+                    <p class="font-bold text-gray-800 truncate" x-text="user.name"></p>
+                    <p class="text-xs text-gray-500 truncate" x-text="user.email"></p>
                 </div>
 
-                <a href="/profile" class="flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 transition">
+                <button type="button" @click="openProfileModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 text-left transition">
                     <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
                     Meu perfil
-                </a>
+                </button>
 
                 <a href="/settings/users" class="flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 transition">
                     <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -89,6 +161,68 @@
     <main id="mainContent" class="flex-1 min-w-0 overflow-y-auto">
         @yield('content')
     </main>
+
+    <!-- MODAL MEU PERFIL -->
+    <div x-show="profileModalOpen" x-cloak x-transition @keydown.escape.window="profileModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.away="profileModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative border border-slate-200">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-base font-bold text-gray-800">Meu Perfil</h3>
+                <button type="button" @click="profileModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div x-show="profileError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-4" x-text="profileError"></div>
+
+            <div class="flex items-center gap-4 mb-5">
+                <template x-if="!avatarPreview && user.avatarUrl">
+                    <img :src="user.avatarUrl" alt="Avatar" class="w-14 h-14 rounded-full object-cover border border-gray-200">
+                </template>
+                <template x-if="!avatarPreview && !user.avatarUrl">
+                    <span class="w-14 h-14 rounded-full bg-indigo-600 text-white text-lg font-bold flex items-center justify-center" x-text="user.initials"></span>
+                </template>
+                <template x-if="avatarPreview">
+                    <img :src="avatarPreview" alt="Avatar" class="w-14 h-14 rounded-full object-cover border border-gray-200">
+                </template>
+                <div>
+                    <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
+                        Alterar foto
+                        <input type="file" accept="image/*" class="hidden" @change="onAvatarFile">
+                    </label>
+                    <p class="text-[11px] text-gray-400 mt-0.5">JPG, PNG ou WEBP, até 2MB.</p>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Nome</label>
+                    <input type="text" x-model="profileForm.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">E-mail</label>
+                    <input type="email" x-model="profileForm.email" autocomplete="username" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Nova Senha</label>
+                        <input type="password" x-model="profileForm.password" autocomplete="new-password" placeholder="Manter atual" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Confirmar</label>
+                        <input type="password" x-model="profileForm.password_confirmation" autocomplete="new-password" placeholder="Repita a senha" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" @click="profileModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Voltar</button>
+                <button type="button" @click="saveProfile()" :disabled="!profileChanged || profileSaving" :class="(!profileChanged || profileSaving) ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
+                    <span x-show="!profileSaving">Salvar</span>
+                    <span x-show="profileSaving">Salvando...</span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     @stack('scripts')
 </body>
