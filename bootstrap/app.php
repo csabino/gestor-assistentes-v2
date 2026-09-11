@@ -20,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);
+
+        // O cookie "theme" é gravado em texto puro pelo JS (document.cookie) e lido de volta
+        // no servidor sem passar por decriptação, senão a leitura falha e cai sempre no padrão.
+        $middleware->encryptCookies(except: ['theme']);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
