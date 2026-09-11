@@ -3,7 +3,7 @@
 @section('title', 'Gestão de Equipe & Agentes')
 
 @section('content')
-        <div class="container mx-auto px-6 max-w-7xl py-8"
+        <div class="container mx-auto px-6 max-w-7xl py-8 flex flex-col h-[calc(100vh-8rem)]"
             x-data="{
                 editDeptModal: false,
                 editDeptData: { id: null, name: '' }
@@ -24,10 +24,10 @@
                 </div>
             @endif
 
-            <div class="space-y-6">
+            <div class="flex-1 min-h-0 flex flex-col">
                 <!-- CABEÇALHO COM O FILTRO GLOBAL (STATUS E ASSISTENTE) -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 border-b border-gray-100 pb-4">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex-1 min-h-0 flex flex-col">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4 border-b border-gray-100 pb-4 shrink-0">
                         <div>
                             <h1 class="text-xl font-bold text-gray-800">Gestão de Departamentos & Agentes</h1>
                             <p class="text-xs text-gray-500 mt-1">Organize os setores corporativos e os agentes humanos de suporte.</p>
@@ -66,12 +66,12 @@
                         <div class="text-center py-10 text-gray-500 font-medium">Nenhum Assistente IA disponível neste filtro. Crie um assistente ou altere o status.</div>
                     @else
                         <!-- CRIAR DEPARTAMENTO -->
-                        <form action="/?view=equipe" method="POST" class="mb-8 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <form action="/?view=equipe" method="POST" class="mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200 shrink-0">
                             @csrf
                             <input type="hidden" name="action" value="store_department">
                             <input type="hidden" name="assistant_id" value="{{ $selectedAssistantId }}">
                             <input type="hidden" name="status" value="{{ $statusFilter }}">
-                            <label class="block text-[11px] font-bold text-gray-700 uppercase tracking-wide mb-2">Novo Departamento</label>
+                            <label class="block text-[11px] font-bold text-gray-700 uppercase tracking-wide mb-1.5">Novo Departamento</label>
                             <div class="flex flex-col sm:flex-row gap-3">
                                 <!-- INPUT ONINPUT FORÇANDO MAIÚSCULA NA VIEW -->
                                 <input type="text" name="name" required placeholder="Ex: COMERCIAL, TECNOLOGIA..." oninput="this.value = this.value.toUpperCase()" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none uppercase">
@@ -80,7 +80,7 @@
                         </form>
 
                         <!-- LISTA DE CARDS DE DEPARTAMENTOS (rolagem interna do quadro, não da página) -->
-                        <div class="border border-gray-200 rounded-xl bg-gray-50/40 p-4 max-h-[560px] overflow-y-auto custom-scroll">
+                        <div class="border border-gray-200 rounded-xl bg-gray-50/40 p-4 flex-1 min-h-0 overflow-y-auto custom-scroll">
                         <div class="space-y-6">
                             @forelse($departments as $dept)
                                 <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row transition hover:border-indigo-200">

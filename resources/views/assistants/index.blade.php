@@ -955,13 +955,13 @@
                 }" x-init="
                     $watch('filter', value => localStorage.setItem('assistant_filter', value));
                     $watch('view', value => localStorage.setItem('assistant_view', value));
-                ">
-                <div class="mb-6">
+                " class="flex flex-col h-[calc(100vh-8rem)]">
+                <div class="mb-3 shrink-0">
                     <h1 class="text-xl font-bold text-gray-800">Gestão de Assistentes IA</h1>
                     <p class="text-xs text-gray-500 mt-1">Crie, configure e monitore seus assistentes virtuais multimodais integrados ao WhatsApp e canais de atendimento.</p>
                 </div>
 
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-200 mb-3 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
                     <form action="/" method="POST" class="flex items-center gap-2 w-full md:w-auto flex-1 max-w-lg">
                         @csrf
                         <input type="text" name="name" placeholder="Nome do assistente (ex: Vânia - Vendas)" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -970,8 +970,8 @@
                         </button>
                     </form>
                 </div>
-                
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 shrink-0">
                     <h2 class="text-base font-bold text-gray-700">Assistentes Cadastrados (<span x-text="currentCount"></span>/<span x-text="total"></span>)</h2>
                     
                     <div class="flex items-center gap-3">
@@ -997,7 +997,7 @@
                     </div>
                 </div>
 
-                <div class="border border-gray-200 rounded-xl bg-gray-50/40 p-4 max-h-[600px] overflow-y-auto custom-scroll">
+                <div class="border border-gray-200 rounded-xl bg-gray-50/40 p-4 flex-1 min-h-0 overflow-y-auto custom-scroll">
                 <div x-show="view === 'card'" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     @forelse($assistants as $assistant)
                         <div x-show="(filter === 'all') || (filter === 'active' && {{ $assistant->is_active ? 'true' : 'false' }}) || (filter === 'inactive' && {{ !$assistant->is_active ? 'true' : 'false' }})"
