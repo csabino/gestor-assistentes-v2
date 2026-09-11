@@ -7,6 +7,8 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\OmniController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\UserController;
 
 // Webhook do WhatsApp: chamado pelo provedor externo (Evolution/UazAPI), sem sessão de navegador.
 Route::match(['get', 'post', 'patch', 'put', 'delete'], '/webhook/whatsapp/{id}', [AssistantController::class, 'webhook'])
@@ -32,4 +34,12 @@ Route::middleware('auth')->group(function () {
 
         return app(AssistantController::class)->index($request);
     });
+
+    Route::get('/profile', [ProfileController::class, 'edit']);
+    Route::post('/profile', [ProfileController::class, 'update']);
+
+    Route::get('/settings/users', [UserController::class, 'index']);
+    Route::post('/settings/users', [UserController::class, 'store']);
+    Route::put('/settings/users/{user}', [UserController::class, 'update']);
+    Route::delete('/settings/users/{user}', [UserController::class, 'destroy']);
 });
