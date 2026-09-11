@@ -9,6 +9,8 @@ use App\Http\Controllers\OmniController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\EnvironmentController;
+use App\Http\Controllers\ThemeController;
 
 // Webhook do WhatsApp: chamado pelo provedor externo (Evolution/UazAPI), sem sessão de navegador.
 Route::match(['get', 'post', 'patch', 'put', 'delete'], '/webhook/whatsapp/{id}', [AssistantController::class, 'webhook'])
@@ -21,6 +23,9 @@ Route::post('/omni/send', [OmniController::class, 'forwardToOmni'])
 // Widget de chat de teste: página pública compartilhável (link "Abrir chat"/"Copiar link"), sem login.
 Route::get('/chat/{id}', [AssistantController::class, 'showChatWidget']);
 Route::post('/chat/{id}/send', [AssistantController::class, 'chatWidgetSend']);
+
+// Arquivos públicos (logotipo, fundo do login, anexos enviados a contatos externos via WhatsApp/Google Calendar), sem login.
+Route::get('/files/{path}', [AssistantController::class, 'servePublicFileRoute'])->where('path', '.*');
 
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
@@ -46,11 +51,15 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::post('/profile', [ProfileController::class, 'update']);
+    Route::post('/theme', [ThemeController::class, 'update']);
 
     Route::middleware('admin')->group(function () {
         Route::get('/settings/users', [UserController::class, 'index']);
         Route::post('/settings/users', [UserController::class, 'store']);
         Route::put('/settings/users/{user}', [UserController::class, 'update']);
         Route::delete('/settings/users/{user}', [UserController::class, 'destroy']);
+
+        Route::get('/settings/environment', [EnvironmentController::class, 'index']);
+        Route::post('/settings/environment', [EnvironmentController::class, 'update']);
     });
 });

@@ -1,5 +1,9 @@
+@php
+    $branding = \App\Models\Setting::branding();
+    $effectiveTheme = auth()->user()->theme ?? $branding['theme_default'];
+@endphp
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="{{ $effectiveTheme === 'dark' ? 'dark' : '' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,6 +23,7 @@
     @endif
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
@@ -29,7 +34,21 @@
 
     @stack('head')
 </head>
-<body class="bg-gray-50 font-sans text-gray-900 min-h-screen flex flex-col overflow-hidden" x-data="{
+<body class="bg-gray-50 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-100 min-h-screen flex flex-col overflow-hidden" x-data="{
+        theme: '{{ $effectiveTheme }}',
+        toggleTheme() {
+            this.theme = this.theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.classList.toggle('dark', this.theme === 'dark');
+            fetch('/theme', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                },
+                body: JSON.stringify({ theme: this.theme }),
+            });
+        },
         userMenuOpen: false,
         profileModalOpen: false,
         profileSaving: false,
@@ -231,12 +250,83 @@
             } finally {
                 this.usersLoading = false;
             }
+        },
+
+        envModalOpen: false,
+        envLoading: false,
+        envError: null,
+        envLogoUrl: @js($branding['logo_url']),
+        envLoginBgUrl: @js($branding['login_bg_url']),
+        envLogoFile: null,
+        envLogoPreview: null,
+        envLoginBgFile: null,
+        envLoginBgPreview: null,
+        envForm: {
+            theme_default: @js($branding['theme_default']),
+            footer_name: @js($branding['footer_name']),
+            footer_version: @js($branding['footer_version']),
+            footer_company: @js($branding['footer_company']),
+            footer_year: @js($branding['footer_year']),
+        },
+        openEnvModal() {
+            this.envModalOpen = true;
+            this.userMenuOpen = false;
+            this.envError = null;
+        },
+        onEnvLogoFile(e) {
+            const f = e.target.files[0];
+            if (f) { this.envLogoFile = f; this.envLogoPreview = URL.createObjectURL(f); }
+        },
+        onEnvLoginBgFile(e) {
+            const f = e.target.files[0];
+            if (f) { this.envLoginBgFile = f; this.envLoginBgPreview = URL.createObjectURL(f); }
+        },
+        async saveEnvironment() {
+            this.envLoading = true;
+            this.envError = null;
+            const fd = new FormData();
+            fd.append('theme_default', this.envForm.theme_default);
+            fd.append('footer_name', this.envForm.footer_name);
+            fd.append('footer_version', this.envForm.footer_version);
+            fd.append('footer_company', this.envForm.footer_company);
+            fd.append('footer_year', this.envForm.footer_year);
+            if (this.envLogoFile) fd.append('logo', this.envLogoFile);
+            if (this.envLoginBgFile) fd.append('login_bg', this.envLoginBgFile);
+            try {
+                const res = await fetch('/settings/environment', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                    body: fd,
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    this.envError = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message || 'Erro ao salvar.');
+                    return;
+                }
+                this.envLogoUrl = json.logo_url;
+                this.envLoginBgUrl = json.login_bg_url;
+                this.envLogoFile = null;
+                this.envLogoPreview = null;
+                this.envLoginBgFile = null;
+                this.envLoginBgPreview = null;
+                this.envModalOpen = false;
+            } catch (e) {
+                this.envError = 'Erro de conexão. Tente novamente.';
+            } finally {
+                this.envLoading = false;
+            }
         }
     }">
 
-    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-40 shadow-sm">
+    <header class="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 sm:px-6 shrink-0 z-40 shadow-sm">
         <div class="flex items-center gap-6 min-w-0">
-            <a href="/" class="flex items-center gap-2 font-bold text-indigo-700 shrink-0">
+            <a href="/" class="flex items-center gap-2 font-bold text-indigo-700 dark:text-indigo-400 shrink-0">
+                @if($branding['logo_url'])
+                    <img src="{{ $branding['logo_url'] }}" alt="Logotipo" class="h-7 w-7 object-contain rounded">
+                @endif
                 <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
                 </svg>
@@ -245,14 +335,19 @@
 
             <nav class="flex items-center gap-1 text-sm font-semibold overflow-x-auto">
                 @if(auth()->user()->isAdmin())
-                    <a href="/" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'robots' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100' }}">Assistentes</a>
-                    <a href="/?view=equipe" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'equipe' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100' }}">Equipe & Agendas</a>
+                    <a href="/" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'robots' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">Assistentes</a>
+                    <a href="/?view=equipe" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'equipe' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">Equipe & Agendas</a>
                 @endif
-                <a href="/?view=agenda" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'agenda' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100' }}">Calendário</a>
+                <a href="/?view=agenda" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'agenda' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">Calendário</a>
             </nav>
         </div>
 
-        <div class="relative shrink-0" x-on:click.away="userMenuOpen = false">
+        <div class="flex items-center gap-2 shrink-0">
+        <button type="button" @click="toggleTheme()" title="Alternar tema claro/escuro" class="p-2 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+            <svg x-show="theme === 'light'" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" /></svg>
+            <svg x-show="theme === 'dark'" x-cloak class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-6.364-.386 1.591-1.591M3 12h2.25m.386-6.364 1.591 1.591M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
+        </button>
+        <div class="relative" x-on:click.away="userMenuOpen = false">
             <button type="button" @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full hover:bg-gray-100 transition">
                 <template x-if="user.avatarUrl">
                     <img :src="user.avatarUrl" alt="Avatar" class="w-8 h-8 rounded-full object-cover border border-gray-200">
@@ -280,6 +375,11 @@
                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
                         Usuários
                     </button>
+
+                    <button type="button" @click="openEnvModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 text-left transition">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" /></svg>
+                        Ambiente
+                    </button>
                 @endif
 
                 <form action="/logout" method="POST" class="border-t border-gray-100 mt-1 pt-1">
@@ -291,11 +391,16 @@
                 </form>
             </div>
         </div>
+        </div>
     </header>
 
     <main id="mainContent" class="flex-1 min-w-0 overflow-y-auto">
         @yield('content')
     </main>
+
+    <footer class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-center text-[11px] text-gray-400 dark:text-gray-500 py-2 px-4">
+        {{ $branding['footer_name'] }} {{ $branding['footer_version'] }} &middot; &copy; {{ $branding['footer_year'] }} {{ $branding['footer_company'] }}
+    </footer>
 
     <!-- MODAL MEU PERFIL -->
     <div x-show="profileModalOpen" x-cloak x-transition @keydown.escape.window="profileModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
@@ -482,6 +587,95 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL AMBIENTE -->
+    <div x-show="envModalOpen" x-cloak x-transition @keydown.escape.window="envModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.away="envModalOpen = false" class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full p-6 relative border border-slate-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between mb-5 shrink-0">
+                <div>
+                    <h3 class="text-base font-bold text-gray-800 dark:text-gray-100">Ambiente</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Identidade visual e informações do sistema.</p>
+                </div>
+                <button type="button" @click="envModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div x-show="envError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-4 shrink-0" x-text="envError"></div>
+
+            <div class="overflow-y-auto flex-1 min-h-0 space-y-4 pr-1 custom-scroll">
+                <div class="flex items-center gap-4">
+                    <template x-if="envLogoPreview || envLogoUrl">
+                        <img :src="envLogoPreview || envLogoUrl" alt="Logotipo" class="w-14 h-14 rounded-lg object-contain border border-gray-200 dark:border-gray-600 bg-white p-1">
+                    </template>
+                    <template x-if="!envLogoPreview && !envLogoUrl">
+                        <span class="w-14 h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[10px] text-center">Sem logo</span>
+                    </template>
+                    <div>
+                        <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
+                            Alterar logotipo
+                            <input type="file" accept="image/*" class="hidden" @change="onEnvLogoFile">
+                        </label>
+                        <p class="text-[11px] text-gray-400 mt-0.5">Aparece no menu superior e na tela de login.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <template x-if="envLoginBgPreview || envLoginBgUrl">
+                        <img :src="envLoginBgPreview || envLoginBgUrl" alt="Fundo do login" class="w-24 h-14 rounded-lg object-cover border border-gray-200 dark:border-gray-600">
+                    </template>
+                    <template x-if="!envLoginBgPreview && !envLoginBgUrl">
+                        <span class="w-24 h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[10px] text-center">Sem imagem</span>
+                    </template>
+                    <div>
+                        <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
+                            Alterar fundo do login
+                            <input type="file" accept="image/*" class="hidden" @change="onEnvLoginBgFile">
+                        </label>
+                        <p class="text-[11px] text-gray-400 mt-0.5">Imagem de fundo da tela de login.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Tema padrão (tela de login)</label>
+                    <select x-model="envForm.theme_default" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="light">Claro</option>
+                        <option value="dark">Escuro</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Nome do sistema</label>
+                        <input type="text" x-model="envForm.footer_name" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Versão</label>
+                        <input type="text" x-model="envForm.footer_version" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Empresa (copyright)</label>
+                        <input type="text" x-model="envForm.footer_company" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Ano (copyright)</label>
+                        <input type="text" maxlength="4" x-model="envForm.footer_year" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-[11px] text-gray-500 dark:text-gray-400 text-center">
+                    Pré-visualização: <span x-text="envForm.footer_name"></span> <span x-text="envForm.footer_version"></span> &middot; &copy; <span x-text="envForm.footer_year"></span> <span x-text="envForm.footer_company"></span>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
+                <button type="button" @click="envModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-lg transition">Cancelar</button>
+                <button type="button" @click="saveEnvironment()" :disabled="envLoading" :class="envLoading ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
+                    <span x-text="envLoading ? 'Salvando...' : 'Salvar'"></span>
+                </button>
             </div>
         </div>
     </div>

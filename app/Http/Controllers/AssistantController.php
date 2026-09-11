@@ -638,6 +638,11 @@ class AssistantController extends Controller
         ));
     }
 
+    public function servePublicFileRoute(string $path)
+    {
+        return $this->servePublicFile($path);
+    }
+
     private function servePublicFile($relativePath)
     {
         $cleanPath = ltrim(str_replace(['..', '\\'], ['', '/'], (string)$relativePath), '/');
@@ -1819,7 +1824,7 @@ class AssistantController extends Controller
                             }
 
                             if (file_exists($fullFilePath) && filesize($fullFilePath) > 100) {
-                                $mediaUrlPublic = $request->getSchemeAndHttpHost() . '/?view_file=' . $relativePath;
+                                $mediaUrlPublic = $request->getSchemeAndHttpHost() . '/files/' . $relativePath;
                                 $savePath = $fullFilePath;
                                 $mediaSaved = true;
 
