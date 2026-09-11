@@ -113,19 +113,19 @@
                                         </div>
                                     </div>
 
-                                    <!-- DIREITA: CARDS DOS AGENTES -->
-                                    <div class="md:w-3/4 p-5 flex flex-wrap gap-4 items-start bg-slate-50/30">
+                                    <!-- DIREITA: CARDS DOS AGENTES (rolagem interna do quadro, não da página) -->
+                                    <div class="md:w-3/4 p-4 flex flex-wrap content-start gap-3 items-start bg-slate-50/30 max-h-64 overflow-y-auto custom-scroll">
 
                                         <!-- CARD 1: VINCULAR USUÁRIO EXISTENTE (Sempre na esquerda) -->
-                                        <div class="bg-white border border-slate-200 border-dashed hover:border-indigo-400 rounded-lg p-3 w-auto min-w-[240px] shadow-sm relative transition group">
-                                            <form action="/?view=equipe" method="POST" class="flex flex-col gap-2">
+                                        <div class="bg-white border border-slate-200 border-dashed hover:border-indigo-400 rounded-lg p-2 w-36 shrink-0 shadow-sm relative transition group">
+                                            <form action="/?view=equipe" method="POST" class="flex flex-col gap-1.5">
                                                 @csrf
                                                 <input type="hidden" name="action" value="link_user">
                                                 <input type="hidden" name="department_id" value="{{ $dept->id }}">
                                                 <input type="hidden" name="assistant_id" value="{{ $selectedAssistantId }}">
                                                 <input type="hidden" name="status" value="{{ $statusFilter }}">
-                                                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Vincular Usuário</label>
-                                                <select name="user_id" required class="w-full border border-slate-300 rounded text-[11px] px-2.5 py-1.5 outline-none focus:border-indigo-500 text-gray-700 bg-white">
+                                                <label class="block text-[9px] font-bold text-gray-500 uppercase mb-0.5">Vincular</label>
+                                                <select name="user_id" required class="w-full border border-slate-300 rounded text-[10px] px-1.5 py-1 outline-none focus:border-indigo-500 text-gray-700 bg-white">
                                                     <option value="">Selecione...</option>
                                                     @foreach($eligibleUsers as $eu)
                                                         @if(!in_array($eu->id, $linkedUserIdsByDept[$dept->id] ?? []))
@@ -133,27 +133,27 @@
                                                         @endif
                                                     @endforeach
                                                 </select>
-                                                <button type="submit" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-1.5 rounded border border-indigo-200 text-[10px] transition uppercase tracking-wide mt-1">+ Vincular</button>
+                                                <button type="submit" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-1 rounded border border-indigo-200 text-[9px] transition uppercase tracking-wide">+ Vincular</button>
                                             </form>
                                         </div>
 
                                         <!-- CARDS 2...N: AGENTES VINCULADOS -->
                                         @foreach($agents as $agent)
                                             @if($agent->department_id == $dept->id)
-                                                <div class="bg-white border border-gray-200 rounded-lg p-3 w-auto max-w-sm shadow-sm relative group hover:border-indigo-300 transition flex flex-col justify-between">
+                                                <div class="bg-white border border-gray-200 rounded-lg p-2 w-52 shrink-0 shadow-sm relative group hover:border-indigo-300 transition flex flex-col justify-between">
 
-                                                    <div class="flex items-center gap-3">
-                                                        <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm flex items-center justify-center shrink-0 border border-indigo-200 uppercase">
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 border border-indigo-200 uppercase">
                                                             {{ substr($agent->name, 0, 1) }}
                                                         </div>
-                                                        <div class="pr-2">
-                                                            <h4 class="font-bold text-gray-800 text-sm whitespace-nowrap">{{ $agent->name }}</h4>
-                                                            <p class="text-[11px] text-gray-500 font-mono whitespace-nowrap mt-0.5">{{ $agent->email }}</p>
+                                                        <div class="pr-1 min-w-0">
+                                                            <h4 class="font-bold text-gray-800 text-xs truncate">{{ $agent->name }}</h4>
+                                                            <p class="text-[10px] text-gray-500 font-mono truncate mt-0.5">{{ $agent->email }}</p>
                                                         </div>
                                                     </div>
 
                                                     <!-- FOOTER DO CARD: Controles aparecem no hover -->
-                                                    <div class="mt-3 pt-2 border-t border-gray-50 flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                    <div class="mt-2 pt-1.5 border-t border-gray-50 flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                                         <form action="/?view=equipe" method="POST" onsubmit="return confirm('Desvincular este usuário do departamento?');">
                                                             @csrf
                                                             <input type="hidden" name="action" value="unlink_user">
