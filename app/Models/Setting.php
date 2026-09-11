@@ -29,12 +29,15 @@ class Setting extends Model
      */
     public static function branding(): array
     {
-        $logoPath = self::getGlobal('app_logo_path');
+        $logoLightPath = self::getGlobal('app_logo_light_path');
+        $logoDarkPath = self::getGlobal('app_logo_dark_path');
         $loginBgPath = self::getGlobal('app_login_bg_path');
 
         return [
-            'logo_url' => $logoPath ? '/files/' . $logoPath : null,
+            'logo_light_url' => $logoLightPath ? '/files/' . $logoLightPath : null,
+            'logo_dark_url' => $logoDarkPath ? '/files/' . $logoDarkPath : null,
             'login_bg_url' => $loginBgPath ? '/files/' . $loginBgPath : null,
+            // Não é configurado manualmente: reflete o último tema escolhido por alguém no sistema, usado na tela de login.
             'theme_default' => self::getGlobal('app_theme_default', 'light'),
             'footer_name' => self::getGlobal('app_footer_name', 'MultiAgents'),
             'footer_version' => self::getGlobal('app_footer_version', 'v1.0'),

@@ -255,14 +255,16 @@
         envModalOpen: false,
         envLoading: false,
         envError: null,
-        envLogoUrl: @js($branding['logo_url']),
+        envLogoLightUrl: @js($branding['logo_light_url']),
+        envLogoDarkUrl: @js($branding['logo_dark_url']),
         envLoginBgUrl: @js($branding['login_bg_url']),
-        envLogoFile: null,
-        envLogoPreview: null,
+        envLogoLightFile: null,
+        envLogoLightPreview: null,
+        envLogoDarkFile: null,
+        envLogoDarkPreview: null,
         envLoginBgFile: null,
         envLoginBgPreview: null,
         envForm: {
-            theme_default: @js($branding['theme_default']),
             footer_name: @js($branding['footer_name']),
             footer_version: @js($branding['footer_version']),
             footer_company: @js($branding['footer_company']),
@@ -273,9 +275,13 @@
             this.userMenuOpen = false;
             this.envError = null;
         },
-        onEnvLogoFile(e) {
+        onEnvLogoLightFile(e) {
             const f = e.target.files[0];
-            if (f) { this.envLogoFile = f; this.envLogoPreview = URL.createObjectURL(f); }
+            if (f) { this.envLogoLightFile = f; this.envLogoLightPreview = URL.createObjectURL(f); }
+        },
+        onEnvLogoDarkFile(e) {
+            const f = e.target.files[0];
+            if (f) { this.envLogoDarkFile = f; this.envLogoDarkPreview = URL.createObjectURL(f); }
         },
         onEnvLoginBgFile(e) {
             const f = e.target.files[0];
@@ -285,12 +291,12 @@
             this.envLoading = true;
             this.envError = null;
             const fd = new FormData();
-            fd.append('theme_default', this.envForm.theme_default);
             fd.append('footer_name', this.envForm.footer_name);
             fd.append('footer_version', this.envForm.footer_version);
             fd.append('footer_company', this.envForm.footer_company);
             fd.append('footer_year', this.envForm.footer_year);
-            if (this.envLogoFile) fd.append('logo', this.envLogoFile);
+            if (this.envLogoLightFile) fd.append('logo_light', this.envLogoLightFile);
+            if (this.envLogoDarkFile) fd.append('logo_dark', this.envLogoDarkFile);
             if (this.envLoginBgFile) fd.append('login_bg', this.envLoginBgFile);
             try {
                 const res = await fetch('/settings/environment', {
@@ -306,10 +312,13 @@
                     this.envError = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message || 'Erro ao salvar.');
                     return;
                 }
-                this.envLogoUrl = json.logo_url;
+                this.envLogoLightUrl = json.logo_light_url;
+                this.envLogoDarkUrl = json.logo_dark_url;
                 this.envLoginBgUrl = json.login_bg_url;
-                this.envLogoFile = null;
-                this.envLogoPreview = null;
+                this.envLogoLightFile = null;
+                this.envLogoLightPreview = null;
+                this.envLogoDarkFile = null;
+                this.envLogoDarkPreview = null;
                 this.envLoginBgFile = null;
                 this.envLoginBgPreview = null;
                 this.envModalOpen = false;
@@ -324,10 +333,11 @@
     <header class="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 sm:px-6 shrink-0 z-40 shadow-sm">
         <div class="flex items-center gap-6 min-w-0">
             <a href="/" class="flex items-center gap-2 font-bold text-indigo-700 dark:text-indigo-400 shrink-0">
-                @if($branding['logo_url'])
-                    <img src="{{ $branding['logo_url'] }}" alt="Logotipo" class="h-7 w-7 object-contain rounded">
+                @php $headerLogo = $effectiveTheme === 'dark' ? ($branding['logo_dark_url'] ?? $branding['logo_light_url']) : ($branding['logo_light_url'] ?? $branding['logo_dark_url']); @endphp
+                @if($headerLogo)
+                    <img src="{{ $headerLogo }}" alt="Logotipo" class="h-11 w-11 object-contain">
                 @endif
-                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
                 </svg>
                 <span class="hidden sm:inline tracking-wide">Painel IA</span>
@@ -608,18 +618,34 @@
 
             <div class="overflow-y-auto flex-1 min-h-0 space-y-4 pr-1 custom-scroll">
                 <div class="flex items-center gap-4">
-                    <template x-if="envLogoPreview || envLogoUrl">
-                        <img :src="envLogoPreview || envLogoUrl" alt="Logotipo" class="w-14 h-14 rounded-lg object-contain border border-gray-200 dark:border-gray-600 bg-white p-1">
+                    <template x-if="envLogoLightPreview || envLogoLightUrl">
+                        <img :src="envLogoLightPreview || envLogoLightUrl" alt="Logotipo (tema claro)" class="w-14 h-14 rounded-lg object-contain border border-gray-200 dark:border-gray-600 bg-white p-1">
                     </template>
-                    <template x-if="!envLogoPreview && !envLogoUrl">
+                    <template x-if="!envLogoLightPreview && !envLogoLightUrl">
                         <span class="w-14 h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[10px] text-center">Sem logo</span>
                     </template>
                     <div>
                         <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
-                            Alterar logotipo
-                            <input type="file" accept="image/*" class="hidden" @change="onEnvLogoFile">
+                            Logotipo (tema claro)
+                            <input type="file" accept="image/*" class="hidden" @change="onEnvLogoLightFile">
                         </label>
-                        <p class="text-[11px] text-gray-400 mt-0.5">Aparece no menu superior e na tela de login.</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">Usado no menu e no login quando o tema é claro.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <template x-if="envLogoDarkPreview || envLogoDarkUrl">
+                        <img :src="envLogoDarkPreview || envLogoDarkUrl" alt="Logotipo (tema escuro)" class="w-14 h-14 rounded-lg object-contain border border-gray-200 dark:border-gray-600 bg-gray-800 p-1">
+                    </template>
+                    <template x-if="!envLogoDarkPreview && !envLogoDarkUrl">
+                        <span class="w-14 h-14 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[10px] text-center">Sem logo</span>
+                    </template>
+                    <div>
+                        <label class="inline-block text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer">
+                            Logotipo (tema escuro)
+                            <input type="file" accept="image/*" class="hidden" @change="onEnvLogoDarkFile">
+                        </label>
+                        <p class="text-[11px] text-gray-400 mt-0.5">Usado no menu e no login quando o tema é escuro.</p>
                     </div>
                 </div>
 
@@ -639,13 +665,7 @@
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Tema padrão (tela de login)</label>
-                    <select x-model="envForm.theme_default" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                        <option value="light">Claro</option>
-                        <option value="dark">Escuro</option>
-                    </select>
-                </div>
+                <p class="text-[11px] text-gray-400 -mt-2">O tema da tela de login acompanha automaticamente a última escolha de claro/escuro feita por alguém no sistema.</p>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
