@@ -1,6 +1,6 @@
 @php
     $branding = \App\Models\Setting::branding();
-    $effectiveTheme = auth()->user()->theme ?? $branding['theme_default'];
+    $effectiveTheme = request()->cookie('theme') ?? auth()->user()->theme ?? $branding['theme_default'];
 @endphp
 <!DOCTYPE html>
 <html lang="pt-BR" class="{{ $effectiveTheme === 'dark' ? 'dark' : '' }}">
@@ -44,6 +44,9 @@
         toggleTheme() {
             this.theme = this.theme === 'dark' ? 'light' : 'dark';
             document.documentElement.classList.toggle('dark', this.theme === 'dark');
+            // Grava num cookie na hora (garante que a próxima página, incluindo o login, já carregue no tema certo
+            // mesmo que a navegação aconteça antes da gravação abaixo terminar no servidor).
+            document.cookie = 'theme=' + this.theme + '; path=/; max-age=31536000; SameSite=Lax';
             fetch('/theme', {
                 method: 'POST',
                 headers: {

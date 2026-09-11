@@ -1,6 +1,9 @@
-@php $branding = \App\Models\Setting::branding(); @endphp
+@php
+    $branding = \App\Models\Setting::branding();
+    $loginTheme = request()->cookie('theme') ?? $branding['theme_default'];
+@endphp
 <!DOCTYPE html>
-<html lang="pt-BR" class="{{ $branding['theme_default'] === 'dark' ? 'dark' : '' }}">
+<html lang="pt-BR" class="{{ $loginTheme === 'dark' ? 'dark' : '' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,7 +16,7 @@
     <div class="w-full max-w-sm">
         <form action="/login" method="POST" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
             <div class="text-center mb-2">
-                @php $loginLogo = $branding['theme_default'] === 'dark' ? ($branding['logo_dark_url'] ?? $branding['logo_light_url']) : ($branding['logo_light_url'] ?? $branding['logo_dark_url']); @endphp
+                @php $loginLogo = $loginTheme === 'dark' ? ($branding['logo_dark_url'] ?? $branding['logo_light_url']) : ($branding['logo_light_url'] ?? $branding['logo_dark_url']); @endphp
                 @if($loginLogo)
                     <img src="{{ $loginLogo }}" alt="Logotipo" class="w-[134px] h-[134px] object-contain mx-auto mb-2">
                 @endif
