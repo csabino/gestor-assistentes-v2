@@ -997,6 +997,7 @@
                     </div>
                 </div>
 
+                <div class="border border-gray-200 rounded-xl bg-gray-50/40 p-4 max-h-[600px] overflow-y-auto custom-scroll">
                 <div x-show="view === 'card'" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     @forelse($assistants as $assistant)
                         <div x-show="(filter === 'all') || (filter === 'active' && {{ $assistant->is_active ? 'true' : 'false' }}) || (filter === 'inactive' && {{ !$assistant->is_active ? 'true' : 'false' }})"
@@ -1119,6 +1120,7 @@
                             @endforelse
                         </tbody>
                     </table>
+                </div>
                 </div>
                 </div>
             @endif

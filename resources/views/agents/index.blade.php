@@ -79,7 +79,8 @@
                             </div>
                         </form>
 
-                        <!-- LISTA DE CARDS DE DEPARTAMENTOS -->
+                        <!-- LISTA DE CARDS DE DEPARTAMENTOS (rolagem interna do quadro, não da página) -->
+                        <div class="border border-gray-200 rounded-xl bg-gray-50/40 p-4 max-h-[560px] overflow-y-auto custom-scroll">
                         <div class="space-y-6">
                             @forelse($departments as $dept)
                                 <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row transition hover:border-indigo-200">
@@ -174,6 +175,7 @@
                             @empty
                                 <div class="text-center py-12 text-gray-400 font-medium">Nenhum departamento cadastrado para este Assistente.</div>
                             @endforelse
+                        </div>
                         </div>
                     @endif
                 </div>

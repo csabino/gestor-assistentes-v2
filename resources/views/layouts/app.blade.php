@@ -375,8 +375,9 @@
             <div x-show="usersError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-4 shrink-0" x-text="usersError"></div>
 
             <div class="flex flex-col md:flex-row gap-5 flex-1 min-h-0">
-                <!-- FORMULÁRIO: ESQUERDA -->
-                <div class="md:w-96 shrink-0 bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-y-auto">
+                <!-- FORMULÁRIO: ESQUERDA (campos rolam, botão fica fixo no rodapé) -->
+                <div class="md:w-96 shrink-0 bg-gray-50 border border-gray-200 rounded-lg flex flex-col overflow-hidden">
+                <div class="p-4 overflow-y-auto flex-1 min-h-0 custom-scroll">
                     <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3" x-text="userFormMode === 'edit' ? 'Editar Usuário' : 'Novo Usuário'"></h4>
                     <div class="space-y-3">
                         <div>
@@ -425,7 +426,8 @@
                             <label for="userActiveToggle" class="text-xs font-semibold text-gray-700 cursor-pointer">Usuário ativo</label>
                         </div>
                     </div>
-                    <div class="flex justify-end gap-2 mt-4">
+                </div>
+                    <div class="flex justify-end gap-2 p-4 pt-3 border-t border-gray-200 shrink-0 bg-gray-50">
                         <button type="button" x-show="userFormMode === 'edit'" x-cloak @click="resetUserForm()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
                         <button type="button" @click="saveUser()" :disabled="usersLoading" :class="usersLoading ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
                             <span x-text="userFormMode === 'edit' ? 'Salvar Alterações' : '+ Adicionar Usuário'"></span>
@@ -438,7 +440,7 @@
                     <table class="w-full text-left border-collapse text-sm">
                         <thead class="sticky top-0">
                             <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
-                                <th class="py-2.5 px-4 font-semibold">Nome</th>
+                                <th class="py-2.5 px-4 font-semibold">Nome <span class="font-bold text-gray-700" x-text="'(' + usersList.length + ')'"></span></th>
                                 <th class="py-2.5 px-4 font-semibold">Perfil</th>
                                 <th class="py-2.5 px-4 font-semibold">Status</th>
                                 <th class="py-2.5 px-4 font-semibold text-right">Ações</th>
