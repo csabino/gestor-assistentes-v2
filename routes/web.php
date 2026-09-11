@@ -28,6 +28,16 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware('auth')->group(function () {
     Route::match(['get', 'post', 'patch', 'put', 'delete'], '/', function (\Illuminate\Http\Request $request) {
+        // Servir arquivos públicos (avatares etc.) independe do papel do usuário.
+        if ($request->has('view_file')) {
+            return app(AssistantController::class)->index($request);
+        }
+
+        // Gestor e Agente só têm acesso ao módulo de calendário, qualquer que seja a view pedida.
+        if (!$request->user()->isAdmin()) {
+            return app(CalendarController::class)->handle($request);
+        }
+
         if ($request->input('view') === 'equipe') return app(AgentController::class)->handle($request);
         if ($request->input('view') === 'agenda') return app(CalendarController::class)->handle($request);
         if ($request->input('view') === 'settings') return app(SettingController::class)->handle($request);
@@ -37,8 +47,10 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/profile', [ProfileController::class, 'update']);
 
-    Route::get('/settings/users', [UserController::class, 'index']);
-    Route::post('/settings/users', [UserController::class, 'store']);
-    Route::put('/settings/users/{user}', [UserController::class, 'update']);
-    Route::delete('/settings/users/{user}', [UserController::class, 'destroy']);
+    Route::middleware('admin')->group(function () {
+        Route::get('/settings/users', [UserController::class, 'index']);
+        Route::post('/settings/users', [UserController::class, 'store']);
+        Route::put('/settings/users/{user}', [UserController::class, 'update']);
+        Route::delete('/settings/users/{user}', [UserController::class, 'destroy']);
+    });
 });

@@ -55,9 +55,18 @@
                     <p class="text-xs text-slate-500 mt-1">Gerencie a disponibilidade e as reuniões agendadas de cada membro.</p>
                 </div>
 
+                @if($lockedAgent)
+                    <div class="bg-white border border-slate-200 rounded-lg px-4 py-2 text-xs flex items-center gap-2 shadow-sm">
+                        <span class="font-bold text-indigo-600 uppercase text-[10px]">Sua Agenda:</span>
+                        <span class="font-bold text-slate-700">{{ $agents->first()->name ?? auth()->user()->name }}</span>
+                        @if($agents->first())
+                            <span class="text-slate-400">({{ $agents->first()->department_name }})</span>
+                        @endif
+                    </div>
+                @else
                 <form id="calendarFilter" method="GET" action="/" class="flex flex-wrap items-center gap-3">
                     <input type="hidden" name="view" value="agenda">
-                    
+
                     <div class="flex items-center gap-2 border-r border-slate-200 pr-3">
                         <span class="font-bold text-indigo-600 uppercase text-[10px] tracking-wide">Status:</span>
                         <select name="status" onchange="document.querySelector('[name=assistant_id]').value=''; document.querySelector('[name=agent_id]').value='all'; this.form.submit()" class="font-bold text-slate-700 bg-transparent focus:outline-none cursor-pointer text-xs">
@@ -88,6 +97,7 @@
                         </select>
                     </div>
                 </form>
+                @endif
             </div>
 
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-0">
@@ -176,10 +186,12 @@
                     </div>
                 </template>
 
-                <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-                    <button type="button" @click="deleteCurrentEvent(modalData.id)" class="px-3.5 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition border border-red-200">
-                        Excluir Registro
-                    </button>
+                <div class="pt-3 border-t border-slate-100 flex items-center {{ $readOnly ? 'justify-end' : 'justify-between' }} gap-3">
+                    @if(!$readOnly)
+                        <button type="button" @click="deleteCurrentEvent(modalData.id)" class="px-3.5 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition border border-red-200">
+                            Excluir Registro
+                        </button>
+                    @endif
                     <button type="button" @click="showModal = false" class="px-4 py-2 text-xs font-bold bg-slate-800 text-white hover:bg-slate-900 rounded-xl transition shadow-sm">
                         Fechar
                     </button>
@@ -196,6 +208,7 @@
             const agentId = '{{ $currentAgentId }}';
             const assistantId = '{{ $currentAssistantId }}';
             const csrfToken = '{{ csrf_token() }}';
+            const readOnly = {{ $readOnly ? 'true' : 'false' }};
 
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 locale: 'pt-br',
@@ -205,8 +218,8 @@
                 allDaySlot: false,
                 slotMinTime: '00:00:00',
                 slotMaxTime: '24:00:00',
-                editable: true,
-                selectable: true,
+                editable: !readOnly,
+                selectable: !readOnly,
                 nowIndicator: true, 
                 scrollTimeReset: false,
                 eventDisplay: 'block', // Força renderização em bloco sólido na visão mensal

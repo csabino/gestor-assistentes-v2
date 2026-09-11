@@ -23,32 +23,48 @@ class CalendarController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
+        $isAgente = $user->isAgente();
+        $readOnly = $isAgente;
+        $lockedAgent = $isAgente;
+
         // 1. Filtro de Status (Padrão: ativo)
         $statusFilter = $request->input('status', 'ativo');
 
         // 2. Busca assistentes com base no status
         $assistantsQuery = Assistant::with(['departments.agents'])->orderBy('name', 'asc');
-        
+
         if ($statusFilter === 'ativo') {
             $assistantsQuery->where('is_active', 1);
         } elseif ($statusFilter === 'inativo') {
             $assistantsQuery->where('is_active', 0);
         }
-        
+
         $assistants = $assistantsQuery->get();
 
-        // 3. Define o Assistente atual (Se vier vazio, pega o primeiro)
-        $currentAssistantId = $request->input('assistant_id');
-        
-        if (!$currentAssistantId || !$assistants->contains('id', $currentAssistantId)) {
-            $currentAssistantId = $assistants->isNotEmpty() ? $assistants->first()->id : null;
+        // 3. Define o Assistente atual. Para o Agente, é sempre o assistente do seu próprio setor.
+        if ($isAgente) {
+            $currentAssistant = $user->humanAgent?->department?->assistant;
+            $currentAssistantId = $currentAssistant?->id;
+        } else {
+            $currentAssistantId = $request->input('assistant_id');
+
+            if (!$currentAssistantId || !$assistants->contains('id', $currentAssistantId)) {
+                $currentAssistantId = $assistants->isNotEmpty() ? $assistants->first()->id : null;
+            }
+
+            $currentAssistant = $assistants->firstWhere('id', $currentAssistantId);
         }
 
-        $currentAssistant = $assistants->firstWhere('id', $currentAssistantId);
-
-        // 4. Popula os Agentes baseados no Assistente selecionado
+        // 4. Popula os Agentes. Para o Agente, a lista contém apenas ele mesmo.
         $agents = collect();
-        if ($currentAssistant) {
+        if ($isAgente) {
+            if ($user->humanAgent) {
+                $ag = $user->humanAgent;
+                $ag->department_name = $ag->department->name ?? '';
+                $agents->push($ag);
+            }
+        } elseif ($currentAssistant) {
             foreach ($currentAssistant->departments as $dept) {
                 foreach ($dept->agents as $ag) {
                     $ag->department_name = $dept->name;
@@ -59,21 +75,36 @@ class CalendarController extends Controller
 
         $agents = $agents->sortBy('name')->values();
 
-        // 5. O padrão absoluto é 'all' (Todos os Agentes).
-        $currentAgentId = $request->input('agent_id', 'all');
-        if ($currentAgentId !== 'all' && !$agents->contains('id', $currentAgentId)) {
-            $currentAgentId = 'all';
+        // 5. Agente selecionado. Para o Agente, é sempre o seu próprio, sem opção de "todos".
+        if ($isAgente) {
+            $currentAgentId = $user->human_agent_id ?: 'all';
+        } else {
+            $currentAgentId = $request->input('agent_id', 'all');
+            if ($currentAgentId !== 'all' && !$agents->contains('id', $currentAgentId)) {
+                $currentAgentId = 'all';
+            }
         }
 
         // Guarda o assistente selecionado pra API de eventos saber qual buscar se for "all"
         session(['last_agenda_ast_id' => $currentAssistantId]);
 
-        return view('calendar.index', compact('assistants', 'currentAssistantId', 'agents', 'currentAgentId', 'statusFilter'));
+        return view('calendar.index', compact('assistants', 'currentAssistantId', 'agents', 'currentAgentId', 'statusFilter', 'readOnly', 'lockedAgent'));
     }
 
     private function getEvents(Request $request)
     {
-        $agentId = $request->input('agent_id', 'all');
+        $user = $request->user();
+
+        if ($user->isAgente()) {
+            // Agente só pode ver os próprios compromissos, ignora qualquer filtro enviado.
+            $agentId = $user->human_agent_id;
+            if (!$agentId) {
+                return response()->json([]);
+            }
+        } else {
+            $agentId = $request->input('agent_id', 'all');
+        }
+
         // Puxa o assistente_id diretamente da URL para não depender só da sessão
         $astId = $request->input('assistant_id') ?: session('last_agenda_ast_id');
         
@@ -139,6 +170,10 @@ class CalendarController extends Controller
 
     private function storeEvent(Request $request)
     {
+        if ($request->user()->isAgente()) {
+            abort(403, 'Agentes têm acesso somente para consulta da agenda.');
+        }
+
         if ($request->human_agent_id === 'all') {
             return response()->json(['success' => false, 'message' => 'Selecione um Agente específico no filtro para poder agendar ou bloquear horário.']);
         }
@@ -166,6 +201,10 @@ class CalendarController extends Controller
 
     private function updateEvent(Request $request)
     {
+        if ($request->user()->isAgente()) {
+            abort(403, 'Agentes têm acesso somente para consulta da agenda.');
+        }
+
         $app = Appointment::findOrFail($request->id);
         $app->update([
             'start_time' => $request->start_time,
@@ -176,6 +215,10 @@ class CalendarController extends Controller
 
     private function destroyEvent(Request $request)
     {
+        if ($request->user()->isAgente()) {
+            abort(403, 'Agentes têm acesso somente para consulta da agenda.');
+        }
+
         Appointment::findOrFail($request->id)->delete();
         return response()->json(['success' => true]);
     }

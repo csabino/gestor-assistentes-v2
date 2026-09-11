@@ -193,6 +193,7 @@ return [
         'password' => 'senha',
         'password_confirmation' => 'confirmação de senha',
         'avatar' => 'avatar',
+        'role' => 'perfil',
         'assistant_id' => 'assistente',
         'timezone' => 'fuso horário',
         'omni_webhook_url' => 'URL do webhook',

@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Painel IA')</title>
 
-    @php $navView = request()->query('view', 'robots'); @endphp
+    @php $navView = auth()->user()->isAdmin() ? request()->query('view', 'robots') : 'agenda'; @endphp
 
     @if($navView === 'settings')
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234F46E5' stroke-width='2'><path stroke-linecap='round' stroke-linejoin='round' d='M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z'/><path stroke-linecap='round' stroke-linejoin='round' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/></svg>">
@@ -100,6 +100,103 @@
             } finally {
                 this.profileSaving = false;
             }
+        },
+
+        usersModalOpen: false,
+        usersLoading: false,
+        usersError: null,
+        usersList: [],
+        humanAgentsOptions: [],
+        userForm: { id: null, name: '', email: '', password: '', password_confirmation: '', role: 'agente', human_agent_id: '' },
+        userFormMode: 'create',
+        openUsersModal() {
+            this.usersModalOpen = true;
+            this.userMenuOpen = false;
+            this.resetUserForm();
+            this.loadUsers();
+        },
+        resetUserForm() {
+            this.userForm = { id: null, name: '', email: '', password: '', password_confirmation: '', role: 'agente', human_agent_id: '' };
+            this.userFormMode = 'create';
+            this.usersError = null;
+        },
+        editUser(u) {
+            this.userForm = { id: u.id, name: u.name, email: u.email, password: '', password_confirmation: '', role: u.role, human_agent_id: u.human_agent_id || '' };
+            this.userFormMode = 'edit';
+            this.usersError = null;
+        },
+        async loadUsers() {
+            this.usersLoading = true;
+            this.usersError = null;
+            try {
+                const res = await fetch('/settings/users', { headers: { 'Accept': 'application/json' } });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.message || 'Erro ao carregar usuários.');
+                this.usersList = json.users;
+                this.humanAgentsOptions = json.human_agents;
+            } catch (e) {
+                this.usersError = e.message || 'Erro ao carregar usuários.';
+            } finally {
+                this.usersLoading = false;
+            }
+        },
+        async saveUser() {
+            this.usersLoading = true;
+            this.usersError = null;
+            const isEdit = this.userFormMode === 'edit';
+            const payload = {
+                name: this.userForm.name,
+                email: this.userForm.email,
+                role: this.userForm.role,
+                human_agent_id: this.userForm.role === 'agente' ? this.userForm.human_agent_id : null,
+            };
+            if (this.userForm.password || !isEdit) {
+                payload.password = this.userForm.password;
+                payload.password_confirmation = this.userForm.password_confirmation;
+            }
+            try {
+                const res = await fetch(isEdit ? ('/settings/users/' + this.userForm.id) : '/settings/users', {
+                    method: isEdit ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    this.usersError = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message || 'Erro ao salvar usuário.');
+                    return;
+                }
+                await this.loadUsers();
+                this.resetUserForm();
+            } catch (e) {
+                this.usersError = 'Erro de conexão. Tente novamente.';
+            } finally {
+                this.usersLoading = false;
+            }
+        },
+        async deleteUser(u) {
+            if (!confirm('Remover o usuário ' + u.name + '?')) return;
+            this.usersLoading = true;
+            try {
+                const res = await fetch('/settings/users/' + u.id, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    },
+                });
+                const json = await res.json();
+                if (!res.ok || json.success === false) {
+                    alert(json.message || 'Erro ao excluir usuário.');
+                    return;
+                }
+                await this.loadUsers();
+            } finally {
+                this.usersLoading = false;
+            }
         }
     }">
 
@@ -113,8 +210,10 @@
             </a>
 
             <nav class="flex items-center gap-1 text-sm font-semibold overflow-x-auto">
-                <a href="/" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'robots' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100' }}">Assistentes</a>
-                <a href="/?view=equipe" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'equipe' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100' }}">Equipe & Agendas</a>
+                @if(auth()->user()->isAdmin())
+                    <a href="/" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'robots' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100' }}">Assistentes</a>
+                    <a href="/?view=equipe" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'equipe' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100' }}">Equipe & Agendas</a>
+                @endif
                 <a href="/?view=agenda" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'agenda' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100' }}">Calendário</a>
             </nav>
         </div>
@@ -142,10 +241,12 @@
                     Meu perfil
                 </button>
 
-                <a href="/settings/users" class="flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 transition">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    Configurações gerais
-                </a>
+                @if(auth()->user()->isAdmin())
+                    <button type="button" @click="openUsersModal()" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 hover:bg-gray-50 text-left transition">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
+                        Usuários
+                    </button>
+                @endif
 
                 <form action="/logout" method="POST" class="border-t border-gray-100 mt-1 pt-1">
                     @csrf
@@ -220,6 +321,109 @@
                     <span x-show="!profileSaving">Salvar</span>
                     <span x-show="profileSaving">Salvando...</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL USUÁRIOS -->
+    <div x-show="usersModalOpen" x-cloak x-transition @keydown.escape.window="usersModalOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div @click.away="usersModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 relative border border-slate-200 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between mb-5 shrink-0">
+                <div>
+                    <h3 class="text-base font-bold text-gray-800">Usuários</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Gerencie os usuários que têm acesso ao painel administrativo.</p>
+                </div>
+                <button type="button" @click="usersModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div x-show="usersError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-4 shrink-0" x-text="usersError"></div>
+
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 shrink-0">
+                <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3" x-text="userFormMode === 'edit' ? 'Editar Usuário' : 'Novo Usuário'"></h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Nome</label>
+                        <input type="text" x-model="userForm.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">E-mail</label>
+                        <input type="email" x-model="userForm.email" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1" x-text="userFormMode === 'edit' ? 'Nova Senha' : 'Senha'"></label>
+                        <input type="password" x-model="userForm.password" autocomplete="new-password" :placeholder="userFormMode === 'edit' ? 'Deixe em branco para manter' : ''" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Confirmar Senha</label>
+                        <input type="password" x-model="userForm.password_confirmation" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Perfil</label>
+                        <select x-model="userForm.role" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                            <option value="admin">Admin</option>
+                            <option value="gestor">Gestor</option>
+                            <option value="agente">Agente</option>
+                        </select>
+                    </div>
+                    <div x-show="userForm.role === 'agente'" x-cloak>
+                        <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Vincular ao Agente</label>
+                        <select x-model="userForm.human_agent_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                            <option value="">Selecione...</option>
+                            <template x-for="ag in humanAgentsOptions" :key="ag.id">
+                                <option :value="ag.id" x-text="ag.label"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" x-show="userFormMode === 'edit'" x-cloak @click="resetUserForm()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
+                    <button type="button" @click="saveUser()" :disabled="usersLoading" :class="usersLoading ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
+                        <span x-text="userFormMode === 'edit' ? 'Salvar Alterações' : '+ Adicionar Usuário'"></span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg overflow-y-auto flex-1 min-h-0">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead class="sticky top-0">
+                        <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
+                            <th class="py-2.5 px-4 font-semibold">Nome</th>
+                            <th class="py-2.5 px-4 font-semibold">Perfil</th>
+                            <th class="py-2.5 px-4 font-semibold text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <template x-for="u in usersList" :key="u.id">
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="py-2.5 px-4">
+                                    <p class="font-bold text-gray-800" x-text="u.name"></p>
+                                    <p class="text-[11px] text-gray-500 font-mono" x-text="u.email"></p>
+                                </td>
+                                <td class="py-2.5 px-4">
+                                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold"
+                                        :class="{
+                                            'bg-indigo-100 text-indigo-700': u.role === 'admin',
+                                            'bg-emerald-100 text-emerald-700': u.role === 'gestor',
+                                            'bg-amber-100 text-amber-700': u.role === 'agente'
+                                        }"
+                                        x-text="u.role === 'admin' ? 'Admin' : (u.role === 'gestor' ? 'Gestor' : 'Agente')"></span>
+                                    <span class="block text-[11px] text-gray-400 mt-0.5" x-show="u.human_agent_name" x-text="u.human_agent_name"></span>
+                                </td>
+                                <td class="py-2.5 px-4 text-right">
+                                    <div class="flex justify-end items-center gap-2">
+                                        <button type="button" @click="editUser(u)" class="text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-md text-xs font-bold transition">Editar</button>
+                                        <button type="button" @click="deleteUser(u)" class="text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-md text-xs font-bold transition">Excluir</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                        <tr x-show="!usersLoading && usersList.length === 0">
+                            <td colspan="3" class="text-center py-8 text-gray-400">Nenhum usuário cadastrado.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
