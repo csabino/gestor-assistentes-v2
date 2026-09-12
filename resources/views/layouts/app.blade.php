@@ -93,6 +93,24 @@
            (o hover acima já cuida de inverter pra claro/roxo, igual aos outros botões escuros). */
         .dark .light-surface .dark-btn-fix { color: #f3f4f6 !important; }
         .dark .light-surface .dark-btn-fix svg { color: #f3f4f6 !important; }
+
+        /* Botão neutro (ex: Fechar de modais): fundo escuro/letra clara em repouso,
+           inverte pra fundo claro/letra escura no hover. */
+        .dark .dark-btn-fix-neutral { background-color: #374151 !important; color: #f9fafb !important; }
+        .dark .dark-btn-fix-neutral:hover { background-color: #e5e7eb !important; color: #111827 !important; }
+
+        /* Painel lateral de conversas (modal de Histórico): força fundo escuro e texto claro,
+           já que usa tons com opacidade (bg-slate-50/50) que a regra geral não alcança. */
+        .dark .conv-sidebar { background-color: #111827 !important; }
+        .dark .conv-sidebar .bg-white { background-color: #1f2937 !important; }
+        .dark .conv-sidebar .bg-slate-100 { background-color: #374151 !important; }
+        .dark .conv-sidebar .text-slate-800 { color: #f9fafb !important; }
+        .dark .conv-sidebar .text-slate-700 { color: #f3f4f6 !important; }
+        .dark .conv-sidebar .text-slate-600 { color: #e5e7eb !important; }
+        .dark .conv-sidebar .text-slate-500 { color: #d1d5db !important; }
+        .dark .conv-sidebar .text-slate-400 { color: #d1d5db !important; }
+        .dark .conv-sidebar .border-slate-100,
+        .dark .conv-sidebar .border-slate-200 { border-color: #374151 !important; }
     </style>
 
     @stack('head')

@@ -1193,14 +1193,14 @@
                                     <p class="text-xs text-slate-500 font-medium">Veja os atendimentos e interações capturados pelo WhatsApp.</p>
                                 </div>
                             </div>
-                            <a href="/" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-200 transition">
+                            <a href="/" class="dark-btn-fix-neutral text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-200 transition">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </a>
                         </div>
 
                         <div class="flex flex-1 overflow-hidden">
-                            
-                            <div class="w-1/3 border-r border-slate-200 bg-slate-50/50 overflow-y-auto">
+
+                            <div class="conv-sidebar w-1/3 border-r border-slate-200 bg-slate-50/50 overflow-y-auto">
                                 <div class="p-3 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
                                     Atendimentos ({{ count($conversationThreads ?? []) }})
                                 </div>
