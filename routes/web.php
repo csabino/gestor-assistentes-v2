@@ -13,7 +13,11 @@ use App\Http\Controllers\EnvironmentController;
 use App\Http\Controllers\ThemeController;
 
 // Webhook do WhatsApp: chamado pelo provedor externo (Evolution/UazAPI), sem sessão de navegador.
-Route::match(['get', 'post', 'patch', 'put', 'delete'], '/webhook/whatsapp/{id}', [AssistantController::class, 'webhook'])
+// A UazAPI (uazapiGO) acrescenta um sufixo com o tipo de evento na URL configurada
+// (ex: /webhook/whatsapp/1/messages/text, /webhook/whatsapp/1/connection/update),
+// por isso a rota aceita qualquer coisa depois do {id}.
+Route::match(['get', 'post', 'patch', 'put', 'delete'], '/webhook/whatsapp/{id}/{path?}', [AssistantController::class, 'webhook'])
+    ->where('path', '.*')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 // Encaminhamento para o sistema Omni: endpoint público chamado por integração externa.
