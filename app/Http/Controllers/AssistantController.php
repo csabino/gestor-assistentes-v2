@@ -1874,7 +1874,11 @@ class AssistantController extends Controller
                 ?? $request->input('body')
                 ?? '';
 
-            $userMessage = is_array($rawMessage) ? ($rawMessage['text'] ?? $rawMessage['body'] ?? '') : (string)$rawMessage;
+            // Resposta de lista interativa (ListResponseMessage): a UazAPI manda o item escolhido
+            // dentro de content.title (ex: "Agendar uma Reunião"), não em content.text/body.
+            $userMessage = is_array($rawMessage)
+                ? ($rawMessage['text'] ?? $rawMessage['body'] ?? $rawMessage['title'] ?? '')
+                : (string)$rawMessage;
 
             $mediaErrorDetails = null;
             $mediaSaved = false;
