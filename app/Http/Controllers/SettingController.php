@@ -87,6 +87,7 @@ class SettingController extends Controller
         $schedulingEnabled = Setting::where('assistant_id', $assistantId)->where('key', 'scheduling_enabled')->value('value') ?? '1';
         $defaultDepartmentId = Setting::where('assistant_id', $assistantId)->where('key', 'default_department_id')->value('value') ?? '';
         $schedulingCustomPrompt = Setting::where('assistant_id', $assistantId)->where('key', 'scheduling_custom_prompt')->value('value') ?? '';
+        $meetingDurationMinutes = Setting::where('assistant_id', $assistantId)->where('key', 'meeting_duration_minutes')->value('value') ?? '60';
 
         // Carrega departamentos cadastrados no sistema
         $departments = DB::table('departments')->get();
@@ -106,6 +107,7 @@ class SettingController extends Controller
             'schedulingEnabled',
             'defaultDepartmentId',
             'schedulingCustomPrompt',
+            'meetingDurationMinutes',
             'departments',
             'currentView', 
             'assistant'
@@ -127,6 +129,7 @@ class SettingController extends Controller
             'scheduling_enabled' => 'required|in:0,1',
             'default_department_id' => 'nullable|string',
             'scheduling_custom_prompt' => 'nullable|string',
+            'meeting_duration_minutes' => 'required|integer|min:15|max:480',
         ]);
 
         $assistantId = $request->input('assistant_id');
@@ -192,6 +195,11 @@ class SettingController extends Controller
         Setting::updateOrCreate(
             ['assistant_id' => $assistantId, 'key' => 'scheduling_custom_prompt'],
             ['value' => trim($request->input('scheduling_custom_prompt') ?? '')]
+        );
+
+        Setting::updateOrCreate(
+            ['assistant_id' => $assistantId, 'key' => 'meeting_duration_minutes'],
+            ['value' => (string) $request->input('meeting_duration_minutes', 60)]
         );
 
         return redirect()->to('/?view=settings&assistant_id=' . $assistantId)->with('success', 'Configurações atualizadas para este assistente!');

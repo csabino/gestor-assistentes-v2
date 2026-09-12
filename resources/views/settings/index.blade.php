@@ -150,6 +150,13 @@
                             <p class="text-[11px] text-gray-400 mt-1">O setor selecionado será assumido como padrão pela IA durante o fluxo de agendamento.</p>
                         </div>
 
+                        <!-- Duração da Reunião -->
+                        <div class="md:col-span-1">
+                            <label for="meeting_duration_minutes" class="block text-xs font-semibold text-gray-700 mb-1">Duração da Reunião (minutos)</label>
+                            <input type="number" name="meeting_duration_minutes" id="meeting_duration_minutes" min="15" step="5" value="{{ $meetingDurationMinutes ?? 60 }}" class="w-full border border-gray-300 rounded-lg p-2.5 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <p class="text-[11px] text-gray-400 mt-1">Usada pra calcular o horário de término e verificar conflitos de agenda.</p>
+                        </div>
+
                         <!-- Prompt/Diretriz Customizada do Agendamento -->
                         <div class="md:col-span-3">
                             <label for="scheduling_custom_prompt" class="block text-xs font-semibold text-gray-700 mb-1">Instruções Customizadas para Agendamento (Opcional)</label>

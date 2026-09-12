@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Schema\Blueprint;
 use Carbon\Carbon;
 
@@ -104,9 +105,13 @@ class AssistantController extends Controller
     private function ensureAppointmentsTableExists()
     {
         if (!Schema::hasTable('appointments')) {
+            // Espelha o schema atual da tabela (pós-migration 2026_09_11_210000, que trocou
+            // human_agent_id por user_id). Esse método só roda numa instalação nova sem migrations
+            // aplicadas; se ficasse com human_agent_id aqui, todo o resto do código (que só usa
+            // user_id) quebraria de cara.
             Schema::create('appointments', function (Blueprint $table) {
                 $table->id();
-                $table->unsignedBigInteger('human_agent_id');
+                $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->string('google_event_id')->nullable();
                 $table->dateTime('start_time');
                 $table->dateTime('end_time');
@@ -119,7 +124,7 @@ class AssistantController extends Controller
         } else {
             if (!Schema::hasColumn('appointments', 'google_event_id')) {
                 Schema::table('appointments', function (Blueprint $table) {
-                    $table->string('google_event_id')->nullable()->after('human_agent_id');
+                    $table->string('google_event_id')->nullable();
                 });
             }
         }
@@ -227,6 +232,12 @@ class AssistantController extends Controller
         return ['status' => 'found', 'appointment' => $matches->first()];
     }
 
+    private function getMeetingDurationMinutes(int $assistantId): int
+    {
+        $minutes = (int) (Setting::where('assistant_id', $assistantId)->where('key', 'meeting_duration_minutes')->value('value') ?? 60);
+        return $minutes > 0 ? $minutes : 60;
+    }
+
     private function processAppointmentTag(Assistant $assistant, string $aiReply, string $displayName, string $cleanSender): string
     {
         // 1. CHECAGEM PRÉVIA DA AGENDA
@@ -240,7 +251,7 @@ class AssistantController extends Controller
 
             try {
                 $startTime = Carbon::parse($checkDateStr);
-                $endTime = (clone $startTime)->addMinutes(60);
+                $endTime = (clone $startTime)->addMinutes($this->getMeetingDurationMinutes($assistant->id));
 
                 $dept = null;
                 if (!empty($deptName)) {
@@ -366,7 +377,7 @@ class AssistantController extends Controller
 
             try {
                 $newStartTime = Carbon::parse($newDateStr);
-                $newEndTime = (clone $newStartTime)->addMinutes(60);
+                $newEndTime = (clone $newStartTime)->addMinutes($this->getMeetingDurationMinutes($assistant->id));
 
                 $dept = null;
                 if (!empty($deptName)) {
@@ -516,7 +527,7 @@ class AssistantController extends Controller
 
             try {
                 $startTime = Carbon::parse($startDateTimeStr);
-                $endTime = (clone $startTime)->addMinutes(60);
+                $endTime = (clone $startTime)->addMinutes($this->getMeetingDurationMinutes($assistant->id));
 
                 $dept = null;
                 if (!empty($deptName)) {
@@ -1798,6 +1809,22 @@ class AssistantController extends Controller
 
             if ($request->input('message.fromMe') === true || $request->input('data.key.fromMe') === true || $request->input('key.fromMe') === true) {
                 return response()->json(['status' => 'ignored_from_me']);
+            }
+
+            // Protege contra reentrega do mesmo webhook (retry do provedor por timeout/instabilidade):
+            // sem isso, a mesma mensagem podia gerar duas respostas de IA e ate duplicar agendamento.
+            $messageId = $request->input('message.id')
+                ?? $request->input('message.messageid')
+                ?? $request->input('data.key.id')
+                ?? $request->input('key.id')
+                ?? null;
+
+            if ($messageId) {
+                $dedupKey = 'webhook_msg_' . $id . '_' . md5((string) $messageId);
+                if (!Cache::add($dedupKey, true, now()->addHours(24))) {
+                    Log::info("Webhook duplicado ignorado (mensagem já processada): {$messageId}");
+                    return response()->json(['status' => 'duplicate_ignored']);
+                }
             }
 
             $audioService = new \App\Services\AudioService();
