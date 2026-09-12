@@ -125,13 +125,22 @@ class AssistantController extends Controller
         }
     }
 
-    private function allocateAgentRoundRobin(int $assistantId, int $departmentId, string $startDateTime, string $endDateTime)
+    /**
+     * @param bool $lock Quando true, deve ser chamado de dentro de um DB::transaction(): trava a
+     *   linha de cada agente candidato (lockForUpdate) antes de checar conflito, fechando a janela
+     *   de corrida entre "checar disponibilidade" e "gravar o agendamento" (duas conversas
+     *   simultâneas não conseguem mais reservar o mesmo agente/horário).
+     * @param int|null $excludeAppointmentId Ignora esse agendamento na checagem de conflito
+     *   (usado no reagendamento, pra não conflitar com o próprio compromisso sendo movido).
+     */
+    private function allocateAgentRoundRobin(int $assistantId, int $departmentId, string $startDateTime, string $endDateTime, bool $lock = false, ?int $excludeAppointmentId = null)
     {
         $agents = DB::table('department_user')
             ->join('users', 'department_user.user_id', '=', 'users.id')
             ->where('department_user.department_id', $departmentId)
             ->where('users.is_active', 1)
             ->select('users.*')
+            ->orderBy('users.id') // ordem estável entre chamadas concorrentes, evita deadlock nas travas
             ->get();
 
         if ($agents->isEmpty()) {
@@ -141,16 +150,21 @@ class AssistantController extends Controller
         $availableAgents = [];
 
         foreach ($agents as $agent) {
-            $hasConflict = DB::table('appointments')
+            if ($lock) {
+                DB::table('users')->where('id', $agent->id)->lockForUpdate()->first();
+            }
+
+            $conflictQuery = DB::table('appointments')
                 ->where('user_id', $agent->id)
                 ->where('status', '!=', 'cancelled')
-                ->where(function ($q) use ($startDateTime, $endDateTime) {
-                    $q->where('start_time', '<', $endDateTime)
-                      ->where('end_time', '>', $startDateTime);
-                })
-                ->exists();
+                ->where('start_time', '<', $endDateTime)
+                ->where('end_time', '>', $startDateTime);
 
-            if (!$hasConflict) {
+            if ($excludeAppointmentId) {
+                $conflictQuery->where('id', '!=', $excludeAppointmentId);
+            }
+
+            if (!$conflictQuery->exists()) {
                 $appointmentCount = DB::table('appointments')
                     ->where('user_id', $agent->id)
                     ->where('status', '!=', 'cancelled')
@@ -172,6 +186,45 @@ class AssistantController extends Controller
         });
 
         return $availableAgents[0]['agent'];
+    }
+
+    /**
+     * Busca o agendamento ativo de um cliente por telefone+e-mail, com margem de 15 minutos na
+     * data/hora informada (usado tanto no cancelamento quanto no reagendamento, pra não depender
+     * de a IA reproduzir a data original com precisão de segundo). Se mais de um agendamento bater
+     * com os critérios, não escolhe um "no achismo" - devolve a lista pra pedir confirmação.
+     */
+    private function findClientAppointment(string $phone, string $email, ?string $dateStr = null): array
+    {
+        $query = DB::table('appointments')
+            ->where('client_phone', $phone)
+            ->whereRaw('LOWER(TRIM(client_email)) = ?', [strtolower(trim($email))])
+            ->where('status', 'scheduled')
+            ->orderBy('start_time');
+
+        if (!empty($dateStr)) {
+            try {
+                $parsed = Carbon::parse($dateStr);
+                $query->whereBetween('start_time', [
+                    (clone $parsed)->subMinutes(15)->toDateTimeString(),
+                    (clone $parsed)->addMinutes(15)->toDateTimeString(),
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning("Falha ao parsear data no lookup de agendamento: " . $dateStr);
+            }
+        }
+
+        $matches = $query->get();
+
+        if ($matches->isEmpty()) {
+            return ['status' => 'not_found'];
+        }
+
+        if ($matches->count() > 1) {
+            return ['status' => 'ambiguous', 'matches' => $matches];
+        }
+
+        return ['status' => 'found', 'appointment' => $matches->first()];
     }
 
     private function processAppointmentTag(Assistant $assistant, string $aiReply, string $displayName, string $cleanSender): string
@@ -248,30 +301,20 @@ class AssistantController extends Controller
             $emailInput = trim($mEmail[1] ?? '');
             $origDateStr = trim($mDate[1] ?? '');
 
-            $query = DB::table('appointments')
-                ->where('client_phone', $cleanSender)
-                ->whereRaw('LOWER(TRIM(client_email)) = ?', [strtolower($emailInput)])
-                ->where('status', 'scheduled');
+            $lookup = $this->findClientAppointment($cleanSender, $emailInput, $origDateStr ?: null);
 
-            if (!empty($origDateStr)) {
-                try {
-                    $parsedDate = Carbon::parse($origDateStr);
-                    // Busca flexível: margem de 15 minutos para garantir o acerto do horário
-                    $query->whereBetween('start_time', [
-                        (clone $parsedDate)->subMinutes(15)->toDateTimeString(),
-                        (clone $parsedDate)->addMinutes(15)->toDateTimeString()
-                    ]);
-                } catch (\Throwable $e) {
-                    Log::warning("Falha ao parsear data_hora no cancelamento: " . $origDateStr);
-                }
-            }
-
-            $appointment = $query->first();
-
-            if (!$appointment) {
-                $msg = "\n\n⚠️ Não encontramos nenhuma reunião ativa associada ao seu e-mail *{$emailInput}* para essa data e horário exatos.";
+            if ($lookup['status'] === 'not_found') {
+                $msg = "\n\n⚠️ Não encontramos nenhuma reunião ativa associada ao seu e-mail *{$emailInput}* para essa data e horário.";
                 return trim(preg_replace('/\[(?:CANCELAR_REUNIAO|Cancelar reunião|CANCELAR_AGENDAMENTO|CANCELAR):.*?\]/is', $msg, $aiReply));
             }
+
+            if ($lookup['status'] === 'ambiguous') {
+                $list = $lookup['matches']->map(fn($a) => '• ' . Carbon::parse($a->start_time)->format('d/m/Y \à\s H:i'))->implode("\n");
+                $msg = "\n\n⚠️ Encontramos mais de uma reunião ativa com esse e-mail. Qual delas você deseja cancelar?\n\n{$list}";
+                return trim(preg_replace('/\[(?:CANCELAR_REUNIAO|Cancelar reunião|CANCELAR_AGENDAMENTO|CANCELAR):.*?\]/is', $msg, $aiReply));
+            }
+
+            $appointment = $lookup['appointment'];
 
             if (!empty($appointment->google_event_id)) {
                 $googleService = new GoogleCalendarService();
@@ -306,26 +349,20 @@ class AssistantController extends Controller
             $newDateStr = trim($mDate[1] ?? '');
             $deptName = trim($mDept[1] ?? '');
 
-            $query = DB::table('appointments')
-                ->where('client_phone', $cleanSender)
-                ->whereRaw('LOWER(TRIM(client_email)) = ?', [strtolower($emailInput)])
-                ->where('status', 'scheduled');
+            $lookup = $this->findClientAppointment($cleanSender, $emailInput, $origDateStr ?: null);
 
-            if (!empty($origDateStr)) {
-                try {
-                    $origStartTime = Carbon::parse($origDateStr)->toDateTimeString();
-                    $query->where('start_time', $origStartTime);
-                } catch (\Throwable $e) {
-                    Log::warning("Falha ao parsear data_hora_original: " . $origDateStr);
-                }
-            }
-
-            $existingAppointment = $query->first();
-
-            if (!$existingAppointment) {
+            if ($lookup['status'] === 'not_found') {
                 $msg = "\n\n⚠️ Não encontramos nenhuma reunião ativa para a data/e-mail fornecidos (*{$emailInput}*).";
                 return trim(preg_replace('/\[REAGENDAR_REUNIAO:.*?\]/s', $msg, $aiReply));
             }
+
+            if ($lookup['status'] === 'ambiguous') {
+                $list = $lookup['matches']->map(fn($a) => '• ' . Carbon::parse($a->start_time)->format('d/m/Y \à\s H:i'))->implode("\n");
+                $msg = "\n\n⚠️ Encontramos mais de uma reunião ativa com esse e-mail. Qual delas você deseja reagendar?\n\n{$list}";
+                return trim(preg_replace('/\[REAGENDAR_REUNIAO:.*?\]/s', $msg, $aiReply));
+            }
+
+            $existingAppointment = $lookup['appointment'];
 
             try {
                 $newStartTime = Carbon::parse($newDateStr);
@@ -347,32 +384,63 @@ class AssistantController extends Controller
                     $dept = DB::table('departments')->where('assistant_id', $assistant->id)->first();
                 }
 
-                $allocatedAgent = $this->allocateAgentRoundRobin(
-                    $assistant->id,
-                    $dept->id,
-                    $newStartTime->toDateTimeString(),
-                    $newEndTime->toDateTimeString()
-                );
+                // Trava o agente candidato e já grava o novo horário atomicamente, fechando a
+                // janela de corrida entre "checar disponibilidade" e "gravar o reagendamento".
+                $reservation = DB::transaction(function () use ($assistant, $dept, $newStartTime, $newEndTime, $existingAppointment) {
+                    $agent = $this->allocateAgentRoundRobin(
+                        $assistant->id,
+                        $dept->id,
+                        $newStartTime->toDateTimeString(),
+                        $newEndTime->toDateTimeString(),
+                        lock: true,
+                        excludeAppointmentId: $existingAppointment->id
+                    );
 
-                if (!$allocatedAgent) {
+                    if (!$agent) {
+                        return null;
+                    }
+
+                    DB::table('appointments')->where('id', $existingAppointment->id)->update([
+                        'user_id' => $agent->id,
+                        'start_time' => $newStartTime->toDateTimeString(),
+                        'end_time' => $newEndTime->toDateTimeString(),
+                        'updated_at' => now(),
+                    ]);
+
+                    return $agent;
+                }, 3);
+
+                if (!$reservation) {
                     $msg = "\n\n⚠️ Nossa equipe do setor *" . $dept->name . "* já está ocupada para " . $newStartTime->format('d/m/Y \à\s H:i') . ". Sua reunião original permanece mantida.";
                     return trim(preg_replace('/\[REAGENDAR_REUNIAO:.*?\]/s', $msg, $aiReply));
                 }
 
+                $allocatedAgent = $reservation;
+
                 $googleService = new GoogleCalendarService();
                 $meetingResult = null;
+                $originalEventGone = false;
 
                 if (!empty($existingAppointment->google_event_id)) {
-                    $meetingResult = $googleService->updateMeeting(
+                    $updateOutcome = $googleService->updateMeeting(
                         $assistant->id,
                         $existingAppointment->google_event_id,
                         $newStartTime->toDateTimeString(),
                         $newEndTime->toDateTimeString(),
                         $allocatedAgent->email
                     );
+
+                    // false = o evento não existe mais no Google (ex: apagado manualmente na conta
+                    // do atendente) - seguro criar um novo. null = falha real de comunicação; nesse
+                    // caso NÃO criamos um evento novo, senão duplicaríamos a reunião no calendário.
+                    if ($updateOutcome === false) {
+                        $originalEventGone = true;
+                    } else {
+                        $meetingResult = $updateOutcome;
+                    }
                 }
 
-                if (!$meetingResult) {
+                if (!$meetingResult && (empty($existingAppointment->google_event_id) || $originalEventGone)) {
                     $eventDescription = "📋 Agendamento Reagendado via WhatsApp - InHouse Contact Center\n\n" .
                                        "👤 Cliente: " . $displayName . "\n" .
                                        "📱 Telefone: " . $cleanSender . "\n" .
@@ -393,16 +461,20 @@ class AssistantController extends Controller
                 }
 
                 if (!$meetingResult) {
+                    // Desfaz a reserva de horário feita acima, mantendo a reunião original intacta
+                    // em vez de deixar o horário interno mudado sem o convite real no Google.
+                    DB::table('appointments')->where('id', $existingAppointment->id)->update([
+                        'user_id' => $existingAppointment->user_id,
+                        'start_time' => $existingAppointment->start_time,
+                        'end_time' => $existingAppointment->end_time,
+                        'updated_at' => now(),
+                    ]);
                     $msg = "\n\n⚠️ Erro técnico ao comunicar com o Google Calendar para o reagendamento. Tente em instantes.";
                     return trim(preg_replace('/\[REAGENDAR_REUNIAO:.*?\]/s', $msg, $aiReply));
                 }
 
                 DB::table('appointments')->where('id', $existingAppointment->id)->update([
-                    'user_id' => $allocatedAgent->id,
                     'google_event_id' => $meetingResult['event_id'] ?? $existingAppointment->google_event_id,
-                    'start_time' => $newStartTime->toDateTimeString(),
-                    'end_time' => $newEndTime->toDateTimeString(),
-                    'updated_at' => now()
                 ]);
 
                 $msg = "\n\n🔄 *REUNIÃO REAGENDADA COM SUCESSO!*\n\n";
@@ -462,17 +534,45 @@ class AssistantController extends Controller
                     $dept = DB::table('departments')->where('assistant_id', $assistant->id)->first();
                 }
 
-                $allocatedAgent = $this->allocateAgentRoundRobin(
-                    $assistant->id,
-                    $dept->id,
-                    $startTime->toDateTimeString(),
-                    $endTime->toDateTimeString()
-                );
+                // Trava o agente candidato e já reserva o horário atomicamente (grava a linha em
+                // appointments antes de falar com o Google), fechando a janela de corrida entre
+                // "checar disponibilidade" e "confirmar o agendamento".
+                $reservation = DB::transaction(function () use ($assistant, $dept, $startTime, $endTime, $displayName, $cleanSender, $clientEmail) {
+                    $agent = $this->allocateAgentRoundRobin(
+                        $assistant->id,
+                        $dept->id,
+                        $startTime->toDateTimeString(),
+                        $endTime->toDateTimeString(),
+                        lock: true
+                    );
 
-                if (!$allocatedAgent) {
+                    if (!$agent) {
+                        return null;
+                    }
+
+                    $appointmentId = DB::table('appointments')->insertGetId([
+                        'user_id' => $agent->id,
+                        'google_event_id' => null,
+                        'start_time' => $startTime->toDateTimeString(),
+                        'end_time' => $endTime->toDateTimeString(),
+                        'client_name' => $displayName,
+                        'client_phone' => $cleanSender,
+                        'client_email' => $clientEmail,
+                        'status' => 'scheduled',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    return ['agent' => $agent, 'appointment_id' => $appointmentId];
+                }, 3);
+
+                if (!$reservation) {
                     $msg = "\n\n⚠️ Ocorreu uma mudança de disponibilidade e esse horário não está mais livre no setor *" . $dept->name . "*. Qual outra data podemos agendar?";
                     return trim(preg_replace('/\[AGENDAR_REUNIAO:.*?\]/s', $msg, $aiReply));
                 }
+
+                $allocatedAgent = $reservation['agent'];
+                $appointmentId = $reservation['appointment_id'];
 
                 $eventDescription = "📋 Agendamento via WhatsApp - InHouse Contact Center\n\n" .
                                    "👤 Cliente: " . $displayName . "\n" .
@@ -495,21 +595,15 @@ class AssistantController extends Controller
                 );
 
                 if (!$meetingResult) {
+                    // Desfaz a reserva: sem convite real no Google, não faz sentido manter o
+                    // horário travado internamente pro cliente.
+                    DB::table('appointments')->where('id', $appointmentId)->delete();
                     $msg = "\n\n⚠️ Erro técnico ao criar a reunião no Google Calendar. Tente em instantes.";
                     return trim(preg_replace('/\[AGENDAR_REUNIAO:.*?\]/s', $msg, $aiReply));
                 }
 
-                DB::table('appointments')->insert([
-                    'user_id' => $allocatedAgent->id,
+                DB::table('appointments')->where('id', $appointmentId)->update([
                     'google_event_id' => $meetingResult['event_id'] ?? null,
-                    'start_time' => $startTime->toDateTimeString(),
-                    'end_time' => $endTime->toDateTimeString(),
-                    'client_name' => $displayName,
-                    'client_phone' => $cleanSender,
-                    'client_email' => $clientEmail,
-                    'status' => 'scheduled',
-                    'created_at' => now(),
-                    'updated_at' => now(),
                 ]);
 
                 $allEmails = array_unique(array_filter(array_merge([$clientEmail], $additionalEmails)));

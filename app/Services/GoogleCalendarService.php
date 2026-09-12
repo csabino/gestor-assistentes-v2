@@ -133,13 +133,18 @@ class GoogleCalendarService
         return null;
     }
 
+    /**
+     * @return array|false|null Array em caso de sucesso; false quando o evento não existe mais no
+     *   Google (404/410 - seguro criar um novo no lugar); null em qualquer outra falha (erro real
+     *   de comunicação, onde NÃO é seguro assumir que dá pra recriar sem duplicar a reunião).
+     */
     public function updateMeeting(
         int $assistantId,
         string $eventId,
         string $startDateTime,
         string $endDateTime,
         ?string $newAgentEmail = null
-    ): ?array {
+    ): array|false|null {
         if (empty($eventId)) return null;
 
         $accessToken = $this->getAccessToken($assistantId);
@@ -198,6 +203,11 @@ class GoogleCalendarService
                     'meet_link' => $meetLink,
                     'raw' => $data
                 ];
+            }
+
+            if (in_array($response->status(), [404, 410])) {
+                Log::warning("Evento Google Calendar não encontrado ao atualizar (provavelmente apagado manualmente): " . $eventId);
+                return false;
             }
 
             Log::error("Erro na atualização do evento Google Calendar: " . $response->body());
