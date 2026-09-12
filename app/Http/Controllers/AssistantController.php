@@ -1629,6 +1629,8 @@ class AssistantController extends Controller
 
     public function webhook(Request $request, $id)
     {
+        Log::info('WEBHOOK_DEBUG hit', ['assistant_id' => $id, 'method' => $request->method(), 'payload' => $request->all()]);
+
         $this->configureTimezone($id);
         $this->ensureWebhookLogTableExists();
         $this->ensureChatMessagesTableExists();
@@ -2147,6 +2149,8 @@ class AssistantController extends Controller
                 $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
             }
 
+            Log::info('WEBHOOK_DEBUG antes do insert final', ['assistant_id' => $assistant->id, 'sender' => $sender, 'waResult' => $waResult]);
+
             DB::table('webhook_logs')->insert([
                 'assistant_id' => $assistant->id,
                 'sender' => substr($sender, 0, 255),
@@ -2159,20 +2163,34 @@ class AssistantController extends Controller
                 'updated_at' => $nowFormatted,
             ]);
 
+            Log::info('WEBHOOK_DEBUG insert final ok', ['assistant_id' => $assistant->id]);
+
             return response()->json(['status' => 'success', 'reply' => $aiReply]);
         } catch (\Throwable $e) {
-            $nowFormatted = now()->setTimezone($this->getTimezone($id))->toDateTimeString();
-            DB::table('webhook_logs')->insert([
+            Log::error('WEBHOOK_DEBUG exception', [
                 'assistant_id' => $id,
-                'sender' => 'Erro Interno',
-                'user_message' => 'Falha Critica',
-                'ai_reply' => 'Erro: ' . $e->getMessage(),
-                'wa_send_result' => json_encode(['error' => $e->getMessage()]),
-                'raw_snippet' => json_encode($request->all(), JSON_INVALID_UTF8_IGNORE),
-                'timestamp' => $nowFormatted,
-                'created_at' => $nowFormatted,
-                'updated_at' => $nowFormatted,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
+
+            try {
+                $nowFormatted = now()->setTimezone($this->getTimezone($id))->toDateTimeString();
+                DB::table('webhook_logs')->insert([
+                    'assistant_id' => $id,
+                    'sender' => 'Erro Interno',
+                    'user_message' => 'Falha Critica',
+                    'ai_reply' => 'Erro: ' . mb_substr($e->getMessage(), 0, 500, 'UTF-8'),
+                    'wa_send_result' => json_encode(['error' => $e->getMessage()], JSON_INVALID_UTF8_IGNORE),
+                    'raw_snippet' => json_encode($request->all(), JSON_INVALID_UTF8_IGNORE),
+                    'timestamp' => $nowFormatted,
+                    'created_at' => $nowFormatted,
+                    'updated_at' => $nowFormatted,
+                ]);
+            } catch (\Throwable $e2) {
+                Log::error('WEBHOOK_DEBUG falha ao gravar log de erro', ['message' => $e2->getMessage()]);
+            }
+
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 200);
         }
     }

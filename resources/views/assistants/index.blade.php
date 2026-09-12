@@ -879,7 +879,7 @@
                             </div>
 
                             <div class="flex justify-end pt-2 border-t border-slate-100">
-                                <button type="button" x-on:click="closeWebhookModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-xs transition">
+                                <button type="button" x-on:click="closeWebhookModal()" class="dark-btn-fix-neutral bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-xs transition">
                                     Fechar
                                 </button>
                             </div>
