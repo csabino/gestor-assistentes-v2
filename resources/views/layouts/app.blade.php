@@ -80,16 +80,19 @@
            fundo escuro/letra branca em repouso, e inverte pra claro/roxo no hover (igual ao
            botão "Configurações Avançadas", que já tinha esse comportamento por padrão). */
         .dark .dark-btn-fix { background-color: #1f2937 !important; color: #f3f4f6 !important; border-color: #4b5563 !important; }
-        .dark .dark-btn-fix:hover { background-color: #eef2ff !important; color: #4f46e5 !important; border-color: #c7d2fe !important; }
-        .dark .dark-btn-fix:hover svg { color: #4f46e5 !important; }
+        .dark .dark-btn-fix svg { color: #f3f4f6 !important; }
+        .dark .dark-btn-fix:hover,
+        .dark .light-surface .dark-btn-fix:hover { background-color: #eef2ff !important; color: #4f46e5 !important; border-color: #c7d2fe !important; }
+        .dark .dark-btn-fix:hover svg,
+        .dark .light-surface .dark-btn-fix:hover svg { color: #4f46e5 !important; }
         .dark .dark-force-white { color: #ffffff !important; }
 
         /* Botões de ação dentro de um card "light-surface" (ex: Conversas/Agenda nos cards de
            assistente): o card fica claro, mas esses botões continuam com fundo escuro (herdado
-           da regra geral de bg-white), então o texto deles precisa ficar branco, não escuro. */
-        .dark .light-surface .dark-btn-fix,
-        .dark .light-surface .dark-btn-fix:hover { color: #f3f4f6 !important; }
-        .dark .light-surface .dark-btn-fix:hover { background-color: #374151 !important; }
+           da regra geral de bg-white), então o texto/ícone deles precisa ficar branco em repouso
+           (o hover acima já cuida de inverter pra claro/roxo, igual aos outros botões escuros). */
+        .dark .light-surface .dark-btn-fix { color: #f3f4f6 !important; }
+        .dark .light-surface .dark-btn-fix svg { color: #f3f4f6 !important; }
     </style>
 
     @stack('head')
