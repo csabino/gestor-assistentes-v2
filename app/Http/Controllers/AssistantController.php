@@ -2270,6 +2270,21 @@ class AssistantController extends Controller
                 $isAudioMessage = false;
             }
 
+            // 🛑 MENU DE CONTINUAÇÃO: em vez de a IA decidir por conta própria (e escrever) se anexa
+            // o menu de "mais alguma dúvida / encerrar", ela só sinaliza com uma tag se o ASSUNTO
+            // foi concluído (SDR = oferece agendar reunião; GERAL = as demais). Sem a tag, ela está
+            // fazendo uma pergunta ou aguardando algo do cliente, e nenhum menu é anexado. Isso evita
+            // depender de detectar "terminou em pergunta?" no texto livre, que falha em frases tipo
+            // "me conte sua dúvida" (sem interrogação, mas também aguardando resposta).
+            $closingMenuText = null;
+            if (preg_match('/\[MENU_FINAL_SDR\]/i', $aiReply)) {
+                $closingMenuText = $this->getSdrClosingMenuText();
+                $aiReply = trim(preg_replace('/\[MENU_FINAL_SDR\]/i', '', $aiReply));
+            } elseif (preg_match('/\[MENU_FINAL_GERAL\]/i', $aiReply)) {
+                $closingMenuText = $this->getGenericClosingMenuText();
+                $aiReply = trim(preg_replace('/\[MENU_FINAL_GERAL\]/i', '', $aiReply));
+            }
+
             // ENVIO PARA O OMNI COM A RESPOSTA FINAL TRATADA E FORMATADA
             $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $cleanSender, $assistant->id);
 
@@ -2299,12 +2314,6 @@ class AssistantController extends Controller
 
                 // === INÍCIO DO FILTRO DE ÁUDIO (LIMPEZA PARA O TTS) ===
                 $textForAudio = $separated['audio_text'];
-
-                // 0. Remove o menu de continuação do que vai pro TTS: o sistema já manda esse menu
-                // separado em texto logo após o áudio (mais abaixo), então ouvir a Ingrid "lendo"
-                // o menu em voz alta antes dele aparecer escrito ficaria repetitivo.
-                $textForAudio = preg_replace('/\n*Restou mais alguma dúvida ou posso te ajudar em algo mais\?[\s\S]*$/u', '', $textForAudio);
-                $textForAudio = trim($textForAudio);
 
                 // 1. Remove emojis (Mantém o texto de voz limpo)
                 $textForAudio = preg_replace('/[\x{1F300}-\x{1F64F}\x{1F680}-\x{1F6FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FAFF}\x{1F1E6}-\x{1F1FF}\x{2300}-\x{23FF}\x{2500}-\x{25FF}\x{2B00}-\x{2BFF}]/u', '', $textForAudio);
@@ -2351,23 +2360,22 @@ class AssistantController extends Controller
                         $this->sendWhatsappMessage($assistant, $cleanSender, $separated['extracted_links']);
                     }
 
-                    // Ler um menu numerado em voz alta fica estranho, então nunca vai no áudio -
-                    // mas o cliente ainda precisa das opções pra continuar, daí vai em texto logo
-                    // depois. Só faz isso quando a resposta realmente conclui o assunto: se a
-                    // própria fala termina em pergunta (ex: "qual é a sua dúvida?"), a Ingrid está
-                    // esperando a resposta do cliente, e colar o menu ali confundiria a conversa.
-                    $replyForQuestionCheck = trim(preg_replace('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}\x{200D}]/u', '', $aiReply));
-                    if (!str_ends_with(rtrim($replyForQuestionCheck), '?')) {
-                        $this->sendWhatsappMessage($assistant, $cleanSender, $this->getGenericClosingMenuText());
+                    // Ler um menu numerado em voz alta fica estranho, então nunca vai no áudio - vai
+                    // em texto logo depois, mas só quando a IA sinalizou (via tag) que o assunto foi
+                    // concluído. Sem a tag, ela fez uma pergunta ou está aguardando algo do cliente.
+                    if ($closingMenuText !== null) {
+                        $this->sendWhatsappMessage($assistant, $cleanSender, $closingMenuText);
                     }
                 } else {
-                    $formattedReply = $this->formatTextForWhatsapp($aiReply);
+                    $replyWithMenu = $aiReply . ($closingMenuText !== null ? "\n\n" . $closingMenuText : '');
+                    $formattedReply = $this->formatTextForWhatsapp($replyWithMenu);
                     $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
                 }
             } elseif ($hasMainMenuTag) {
                 $waResult = $this->sendWhatsappInteractiveMenu($assistant, $cleanSender, $aiReply);
             } else {
-                $formattedReply = $this->formatTextForWhatsapp($aiReply);
+                $replyWithMenu = $aiReply . ($closingMenuText !== null ? "\n\n" . $closingMenuText : '');
+                $formattedReply = $this->formatTextForWhatsapp($replyWithMenu);
                 $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
             }
 
@@ -2604,10 +2612,19 @@ class AssistantController extends Controller
     }
 
     /**
-     * Menu de continuação genérico (Cenário B do prompt), usado em código como garantia depois de
-     * uma resposta em áudio - não dá pra confiar que a IA sempre vai lembrar de anexar isso na
-     * própria fala, e ler um menu numerado em voz alta soa estranho de qualquer forma.
+     * Menus de continuação (texto/áudio) montados 100% em código, disparados pelas tags
+     * [MENU_FINAL_SDR] / [MENU_FINAL_GERAL]. A IA só decide (e sinaliza) SE o assunto foi
+     * concluído; o texto e a formatação do menu nunca dependem dela escrever certo.
      */
+    private function getSdrClosingMenuText(): string
+    {
+        return "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\n"
+             . "Por favor, selecione uma das opções:\n"
+             . "1️⃣ Agendar uma reunião com um especialista\n"
+             . "2️⃣ Encerrar o atendimento\n"
+             . "3️⃣ Voltar ao Menu Principal";
+    }
+
     private function getGenericClosingMenuText(): string
     {
         return "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\n"
