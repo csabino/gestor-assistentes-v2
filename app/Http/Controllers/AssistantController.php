@@ -2298,7 +2298,13 @@ class AssistantController extends Controller
                 
                 // 1. Remove emojis (Mantém o texto de voz limpo)
                 $textForAudio = preg_replace('/[\x{1F300}-\x{1F64F}\x{1F680}-\x{1F6FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FAFF}\x{1F1E6}-\x{1F1FF}\x{2300}-\x{23FF}\x{2500}-\x{25FF}\x{2B00}-\x{2BFF}]/u', '', $textForAudio);
-                
+
+                // 1.1. Emojis numerados (1️⃣, 2️⃣...) são um dígito normal + marcadores invisíveis
+                // (seletor de variação U+FE0F + "keycap combinante" U+20E3), fora das faixas acima.
+                // Sem remover esses marcadores, o Google TTS lia "tecla um", "tecla dois" em vez de
+                // só "um", "dois".
+                $textForAudio = preg_replace('/[\x{FE0F}\x{20E3}]/u', '', $textForAudio);
+
                 // 2. Converte as horas para leitura correta (ex: 17h -> 17 horas, 09h30 -> 9 horas e 30 minutos).
                 // O (int) descarta o zero à esquerda: sem isso "09h" virava "09 horas" e o Google TTS
                 // lia dígito por dígito ("zero nove horas") em vez de "nove horas".
