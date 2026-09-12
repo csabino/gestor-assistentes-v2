@@ -30,6 +30,39 @@
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+
+        /* Retrofit de modo escuro para as classes utilitárias usadas nas telas de conteúdo
+           (Assistentes, Equipe & Agendas, Calendário, Configurações). Em vez de reescrever
+           cada tela classe por classe, essas regras escurecem os padrões mais comuns
+           (fundo branco/cinza claro, texto escuro, bordas) de forma centralizada. */
+        .dark .bg-white { background-color: #1f2937; }
+        .dark .bg-gray-50 { background-color: #111827; }
+        .dark .bg-gray-100 { background-color: #374151; }
+        .dark .bg-gray-200 { background-color: #4b5563; }
+        .dark .bg-slate-50 { background-color: #111827; }
+        .dark .bg-indigo-50 { background-color: rgba(99, 102, 241, .15); }
+
+        .dark .text-gray-800 { color: #f3f4f6; }
+        .dark .text-gray-700 { color: #e5e7eb; }
+        .dark .text-gray-600 { color: #d1d5db; }
+        .dark .text-gray-500 { color: #9ca3af; }
+        .dark .text-gray-400 { color: #6b7280; }
+        .dark .text-slate-800 { color: #f3f4f6; }
+        .dark .text-slate-700 { color: #e5e7eb; }
+        .dark .text-slate-600 { color: #d1d5db; }
+        .dark .text-slate-500 { color: #9ca3af; }
+        .dark .text-slate-400 { color: #6b7280; }
+
+        .dark .border-gray-100 { border-color: #374151; }
+        .dark .border-gray-200 { border-color: #374151; }
+        .dark .border-gray-300 { border-color: #4b5563; }
+        .dark .border-slate-100 { border-color: #374151; }
+        .dark .border-slate-200 { border-color: #374151; }
+        .dark .border-slate-300 { border-color: #4b5563; }
+
+        .dark input, .dark select, .dark textarea { background-color: #374151; color: #f3f4f6; border-color: #4b5563; }
+        .dark input::placeholder, .dark textarea::placeholder { color: #9ca3af; }
+        .dark table thead tr { background-color: #111827 !important; }
     </style>
 
     @stack('head')

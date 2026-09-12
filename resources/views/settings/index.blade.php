@@ -3,13 +3,13 @@
 @section('title', 'Configurações Avançadas - ' . $assistant->name)
 
 @section('content')
-        <form id="settingsForm" action="/?view=settings" method="POST" class="container mx-auto px-6 max-w-6xl pt-8 pb-12">
+        <form id="settingsForm" action="/?view=settings" method="POST" class="container mx-auto px-6 max-w-6xl flex flex-col h-[calc(100vh-8rem)] pt-4">
             @csrf
-            
+
             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
 
             <!-- CABEÇALHO FIXO -->
-            <div class="sticky top-0 z-40 bg-gray-50/90 backdrop-blur-md py-4 mb-6 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm -mx-6 px-6">
+            <div class="shrink-0 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <a href="/?configure={{ $assistant->id }}" class="text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 text-sm transition bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg> Voltar
@@ -20,12 +20,14 @@
                         <p class="text-xs text-gray-500 mt-0.5">Gerencie fuso horário, agendamento, integrações e anexos para este assistente.</p>
                     </div>
                 </div>
-                
+
                 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg text-xs transition shadow-sm flex items-center gap-2 shrink-0">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                     Salvar Configurações
                 </button>
             </div>
+
+            <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 pb-8">
 
             @if(session('success'))
                 <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
@@ -304,6 +306,7 @@
                     </div>
                 </div>
 
+            </div>
             </div>
         </form>
 @endsection

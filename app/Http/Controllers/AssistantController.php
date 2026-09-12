@@ -643,6 +643,16 @@ class AssistantController extends Controller
         return $this->servePublicFile($path);
     }
 
+    public function rename(Request $request, $id)
+    {
+        $request->validate(['name' => 'required|string|max:255']);
+
+        $assistant = Assistant::findOrFail($id);
+        $assistant->update(['name' => $request->name]);
+
+        return response()->json(['success' => true, 'name' => $assistant->name]);
+    }
+
     private function servePublicFile($relativePath)
     {
         $cleanPath = ltrim(str_replace(['..', '\\'], ['', '/'], (string)$relativePath), '/');

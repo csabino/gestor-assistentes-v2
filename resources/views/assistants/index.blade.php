@@ -158,16 +158,51 @@
                 </div>
 
             @elseif($configuring)
-                
-                <div class="sticky top-0 z-40 bg-gray-50/90 backdrop-blur-md py-4 mb-6 border-b border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm -mx-6 px-6">
+                <div class="flex flex-col h-[calc(100vh-8rem)]" x-data="{
+                    renameModalOpen: false,
+                    renameValue: @js($configuring->name),
+                    renameSaving: false,
+                    renameError: null,
+                    async saveRename() {
+                        this.renameSaving = true;
+                        this.renameError = null;
+                        try {
+                            const res = await fetch('/assistants/{{ $configuring->id }}/rename', {
+                                method: 'PATCH',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                },
+                                body: JSON.stringify({ name: this.renameValue }),
+                            });
+                            const json = await res.json();
+                            if (!res.ok) {
+                                this.renameError = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message || 'Erro ao salvar.');
+                                return;
+                            }
+                            window.location.reload();
+                        } catch (e) {
+                            this.renameError = 'Erro de conexão. Tente novamente.';
+                        } finally {
+                            this.renameSaving = false;
+                        }
+                    }
+                }">
+                <div class="shrink-0 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
                         <a href="/" class="text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 text-sm transition bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg> Voltar
                         </a>
                         <div class="h-6 w-px bg-gray-300 hidden md:block"></div>
-                        <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">{{ $configuring->name }}</h1>
+                        <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            {{ $configuring->name }}
+                            <button type="button" @click="renameValue = @js($configuring->name); renameError = null; renameModalOpen = true" title="Renomear assistente" class="text-gray-400 hover:text-indigo-600 p-1 rounded-md hover:bg-indigo-50 transition">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
+                            </button>
+                        </h1>
                     </div>
-                    
+
                     <div class="flex items-center gap-3 w-full md:w-auto">
                         <a href="/?view=settings&assistant_id={{ $configuring->id }}" class="text-slate-700 bg-white hover:bg-indigo-50 hover:text-indigo-600 border border-gray-300 text-xs px-3.5 py-2 rounded-lg font-semibold transition shadow-sm flex justify-center items-center gap-2 shrink-0" title="Configurações Avançadas (Fuso Horário & Webhook)">
                             <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
@@ -195,8 +230,9 @@
                     </div>
                 </div>
 
+                <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1">
                 <form id="configForm" action="/" method="POST" enctype="multipart/form-data" onsubmit="saveScrollPosition()"
-                    x-data="{ 
+                    x-data="{
                         provider: '{{ $configuring->provider ?? 'openai' }}',
                         wa_provider: '{{ $configuring->whatsapp_provider ?? '' }}',
                         wa_url: '{{ $configuring->whatsapp_url ?? '' }}',
@@ -939,6 +975,24 @@
                     @endforeach
                     <form id="bulkDeleteForm" action="/" method="POST" class="hidden"></form>
                 @endif
+                </div>
+
+                <!-- MODAL RENOMEAR ASSISTENTE -->
+                <div x-show="renameModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div @click.away="renameModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200">
+                        <h3 class="text-base font-bold text-gray-800 mb-4">Renomear Assistente</h3>
+                        <div x-show="renameError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-3" x-text="renameError"></div>
+                        <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nome</label>
+                        <input type="text" x-model="renameValue" @keydown.enter="saveRename()" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-5 outline-none focus:border-indigo-500">
+                        <div class="flex justify-end gap-2">
+                            <button type="button" @click="renameModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
+                            <button type="button" @click="saveRename()" :disabled="renameSaving" :class="renameSaving ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
+                                <span x-text="renameSaving ? 'Salvando...' : 'Salvar'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                </div>
 
             @else
                 <div x-data="{

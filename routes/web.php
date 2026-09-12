@@ -61,5 +61,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/settings/environment', [EnvironmentController::class, 'index']);
         Route::post('/settings/environment', [EnvironmentController::class, 'update']);
+
+        Route::patch('/assistants/{id}/rename', [AssistantController::class, 'rename']);
     });
 });
