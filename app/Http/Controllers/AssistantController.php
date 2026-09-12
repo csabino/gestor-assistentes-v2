@@ -2344,6 +2344,12 @@ class AssistantController extends Controller
                     if (!empty($separated['extracted_links'])) {
                         $this->sendWhatsappMessage($assistant, $cleanSender, $separated['extracted_links']);
                     }
+
+                    // Ler um menu numerado em voz alta fica estranho, então nunca vai no áudio -
+                    // mas o cliente ainda precisa das opções pra continuar, daí vai em texto logo
+                    // depois. Seguro fazer isso sempre aqui: toda tag de agendamento e o menu
+                    // principal já forçam $isAudioMessage = false antes de chegar nesse bloco.
+                    $this->sendWhatsappMessage($assistant, $cleanSender, $this->getGenericClosingMenuText());
                 } else {
                     $formattedReply = $this->formatTextForWhatsapp($aiReply);
                     $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
@@ -2585,6 +2591,20 @@ class AssistantController extends Controller
              . "4️⃣ Fornecedores (Oferecer produtos/serviços)\n"
              . "5️⃣ Agendar uma Reunião\n"
              . "6️⃣ Outros Assuntos";
+    }
+
+    /**
+     * Menu de continuação genérico (Cenário B do prompt), usado em código como garantia depois de
+     * uma resposta em áudio - não dá pra confiar que a IA sempre vai lembrar de anexar isso na
+     * própria fala, e ler um menu numerado em voz alta soa estranho de qualquer forma.
+     */
+    private function getGenericClosingMenuText(): string
+    {
+        return "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\n"
+             . "Por favor, selecione uma das opções:\n"
+             . "1️⃣ Tenho mais dúvidas\n"
+             . "2️⃣ Encerrar o atendimento\n"
+             . "3️⃣ Voltar ao Menu Principal";
     }
 
     /**
