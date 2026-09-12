@@ -737,12 +737,13 @@ class AssistantController extends Controller
             ];
 
             $connected = false;
+            $statusParams = $isUazapi ? [] : $params;
 
             foreach ($statusPaths as $path) {
                 $url = $baseUrl . $path;
-                $res = Http::withHeaders($headers)->get($url, $params);
+                $res = Http::withHeaders($headers)->get($url, $statusParams);
                 if (!$res->successful()) {
-                    $res = Http::withHeaders($headers)->post($url, $params);
+                    $res = Http::withHeaders($headers)->post($url, $statusParams);
                 }
 
                 if ($res->successful()) {
@@ -792,11 +793,16 @@ class AssistantController extends Controller
                     '/instance/qr'
                 ];
 
+                // A UazAPI identifica a instância só pelo header "token"; mandar corpo/params
+                // extras nessa chamada específica pode fazer a API responder diferente do
+                // esperado (confirmado testando manualmente sem corpo nenhum).
+                $qrParams = $isUazapi ? [] : $params;
+
                 foreach ($qrPaths as $path) {
                     $url = $baseUrl . $path;
-                    $res = Http::withHeaders($headers)->post($url, $params);
+                    $res = Http::withHeaders($headers)->post($url, $qrParams);
                     if (!$res->successful()) {
-                        $res = Http::withHeaders($headers)->get($url, $params);
+                        $res = Http::withHeaders($headers)->get($url, $qrParams);
                     }
 
                     if ($res->successful()) {
