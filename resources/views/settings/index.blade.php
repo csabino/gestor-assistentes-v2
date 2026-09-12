@@ -11,7 +11,7 @@
             <!-- CABEÇALHO FIXO -->
             <div class="shrink-0 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <a href="/?configure={{ $assistant->id }}" class="text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 text-sm transition bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                    <a href="/?configure={{ $assistant->id }}" class="dark-btn-fix text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 text-sm transition bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg> Voltar
                     </a>
                     <div class="h-6 w-px bg-gray-300 hidden md:block"></div>
@@ -78,7 +78,7 @@
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Fuso Padrão</label>
 
                             <button type="button" @click="open = !open" class="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-xs font-medium text-gray-800 flex justify-between items-center focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
-                                <span x-text="selected" class="truncate font-semibold text-indigo-600"></span>
+                                <span x-text="selected" class="dark-force-white truncate font-semibold text-indigo-600"></span>
                                 <svg class="w-4 h-4 text-gray-400 shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </button>
 

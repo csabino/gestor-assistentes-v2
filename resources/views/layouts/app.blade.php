@@ -63,6 +63,23 @@
         .dark input, .dark select, .dark textarea { background-color: #374151; color: #f3f4f6; border-color: #4b5563; }
         .dark input::placeholder, .dark textarea::placeholder { color: #9ca3af; }
         .dark table thead tr { background-color: #111827 !important; }
+
+        /* Superfícies que devem continuar sempre claras mesmo no tema escuro (ex: cards de assistente). */
+        .dark .light-surface { background-color: #ffffff !important; border-color: #e5e7eb !important; }
+        .dark .light-surface .text-gray-800 { color: #1f2937 !important; }
+        .dark .light-surface .text-gray-700 { color: #374151 !important; }
+        .dark .light-surface .text-gray-600 { color: #4b5563 !important; }
+        .dark .light-surface .text-gray-500 { color: #6b7280 !important; }
+        .dark .light-surface .text-gray-400 { color: #9ca3af !important; }
+        .dark .light-surface .border-gray-100 { border-color: #f3f4f6 !important; }
+        .dark .light-surface .border-gray-200 { border-color: #e5e7eb !important; }
+        .dark .light-surface .bg-gray-50 { background-color: #f9fafb !important; }
+        .dark .light-surface thead tr { background-color: #f9fafb !important; }
+
+        /* Botões com fundo/texto roxo claro que ficam com baixo contraste no tema escuro. */
+        .dark .dark-btn-fix { background-color: #1f2937 !important; color: #f3f4f6 !important; border-color: #4b5563 !important; }
+        .dark .dark-btn-fix:hover { background-color: #374151 !important; }
+        .dark .dark-force-white { color: #ffffff !important; }
     </style>
 
     @stack('head')
