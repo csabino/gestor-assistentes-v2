@@ -57,7 +57,7 @@
 
                 @if($lockedAgent)
                     <div class="bg-white border border-slate-200 rounded-lg px-4 py-2 text-xs flex items-center gap-2 shadow-sm">
-                        <span class="font-bold text-indigo-600 uppercase text-[10px]">Sua Agenda:</span>
+                        <span class="dark-force-white font-bold text-indigo-600 uppercase text-[10px]">Sua Agenda:</span>
                         <span class="font-bold text-slate-700">{{ $agents->first()->name ?? auth()->user()->name }}</span>
                         @if($agents->first())
                             <span class="text-slate-400">({{ $agents->first()->department_name }})</span>
@@ -68,7 +68,7 @@
                     <input type="hidden" name="view" value="agenda">
 
                     <div class="flex items-center gap-2 border-r border-slate-200 pr-3">
-                        <span class="font-bold text-indigo-600 uppercase text-[10px] tracking-wide">Status:</span>
+                        <span class="dark-force-white font-bold text-indigo-600 uppercase text-[10px] tracking-wide">Status:</span>
                         <select name="status" onchange="document.querySelector('[name=assistant_id]').value=''; document.querySelector('[name=agent_id]').value='all'; this.form.submit()" class="font-bold text-slate-700 bg-transparent focus:outline-none cursor-pointer text-xs">
                             <option value="ativo" {{ $statusFilter == 'ativo' ? 'selected' : '' }}>Ativos</option>
                             <option value="inativo" {{ $statusFilter == 'inativo' ? 'selected' : '' }}>Inativos</option>
@@ -77,7 +77,7 @@
                     </div>
 
                     <div class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs flex items-center gap-2 shadow-sm">
-                        <span class="font-bold text-indigo-600 uppercase text-[10px]">Assistente IA:</span>
+                        <span class="dark-force-white font-bold text-indigo-600 uppercase text-[10px]">Assistente IA:</span>
                         <select name="assistant_id" onchange="document.querySelector('[name=agent_id]').value='all'; this.form.submit()" class="font-bold text-slate-700 bg-transparent focus:outline-none cursor-pointer">
                             @forelse($assistants as $ast)
                                 <option value="{{ $ast->id }}" {{ $currentAssistantId == $ast->id ? 'selected' : '' }}>{{ $ast->name }}</option>
@@ -88,7 +88,7 @@
                     </div>
 
                     <div class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs flex items-center gap-2 shadow-sm">
-                        <span class="font-bold text-indigo-600 uppercase text-[10px]">AGENTE:</span>
+                        <span class="dark-force-white font-bold text-indigo-600 uppercase text-[10px]">AGENTE:</span>
                         <select name="agent_id" onchange="this.form.submit()" class="font-bold text-slate-700 bg-transparent focus:outline-none cursor-pointer max-w-[200px] truncate">
                             <option value="all" {{ $currentAgentId === 'all' ? 'selected' : '' }}>Todos os Agentes</option>
                             @foreach($agents as $ag)
