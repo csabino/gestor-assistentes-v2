@@ -805,6 +805,12 @@ class AssistantController extends Controller
                         $res = Http::withHeaders($headers)->get($url, $qrParams);
                     }
 
+                    Log::info('WA_CONNECT_DEBUG', [
+                        'url' => $url,
+                        'http_status' => $res->status(),
+                        'body' => $res->body(),
+                    ]);
+
                     if ($res->successful()) {
                         $json = $res->json();
                         if (is_array($json)) {
