@@ -96,8 +96,8 @@
 
         /* Botão neutro (ex: Fechar de modais): fundo escuro/letra clara em repouso,
            inverte pra fundo claro/letra escura no hover. */
-        .dark .dark-btn-fix-neutral { background-color: #374151 !important; color: #f9fafb !important; }
-        .dark .dark-btn-fix-neutral:hover { background-color: #e5e7eb !important; color: #111827 !important; }
+        .dark .dark-btn-fix-neutral { background-color: #e5e7eb !important; color: #111827 !important; }
+        .dark .dark-btn-fix-neutral:hover { background-color: #374151 !important; color: #f9fafb !important; }
 
         /* Painel lateral de conversas (modal de Histórico): força fundo escuro e texto claro,
            já que usa tons com opacidade (bg-slate-50/50) que a regra geral não alcança. */
