@@ -81,6 +81,15 @@
         .dark .light-surface .border-gray-200 { border-color: #e5e7eb !important; }
         .dark .light-surface .bg-gray-50 { background-color: #f9fafb !important; }
         .dark .light-surface thead tr { background-color: #f9fafb !important; }
+        .dark .light-surface .text-slate-800 { color: #1f2937 !important; }
+        .dark .light-surface .text-slate-700 { color: #374151 !important; }
+        .dark .light-surface .text-slate-600 { color: #4b5563 !important; }
+        .dark .light-surface .text-slate-500 { color: #6b7280 !important; }
+        .dark .light-surface .text-slate-400 { color: #9ca3af !important; }
+        .dark .light-surface .border-slate-100 { border-color: #f3f4f6 !important; }
+        .dark .light-surface .border-slate-200 { border-color: #e5e7eb !important; }
+        .dark .light-surface .bg-slate-50 { background-color: #f8fafc !important; }
+        .dark .light-surface .bg-slate-100 { background-color: #f1f5f9 !important; }
 
         /* Botões com fundo/texto roxo claro que ficam com baixo contraste no tema escuro:
            fundo escuro/letra branca em repouso, e inverte pra claro/roxo no hover (igual ao

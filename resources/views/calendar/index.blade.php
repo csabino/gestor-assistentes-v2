@@ -100,7 +100,7 @@
                 @endif
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-0">
+            <div class="light-surface bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-0">
 
                 <div class="flex items-center justify-between border-b border-slate-100 pb-4 shrink-0 mb-4">
                     <div class="flex items-center gap-2">
