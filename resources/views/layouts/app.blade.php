@@ -53,6 +53,11 @@
         .dark .text-slate-500 { color: #9ca3af; }
         .dark .text-slate-400 { color: #6b7280; }
         .dark .text-red-600 { color: #f87171; }
+        .dark .dark-danger-fix,
+        .dark .dark-danger-fix svg,
+        .dark .light-surface .dark-danger-fix,
+        .dark .light-surface .dark-card-fix .dark-danger-fix { color: #fca5a5 !important; }
+        .dark .dark-danger-fix:hover { color: #b91c1c !important; }
 
         .dark .border-gray-100 { border-color: #374151; }
         .dark .border-gray-200 { border-color: #374151; }

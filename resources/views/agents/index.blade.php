@@ -166,7 +166,7 @@
                                                             <input type="hidden" name="department_id" value="{{ $dept->id }}">
                                                             <input type="hidden" name="assistant_id" value="{{ $selectedAssistantId }}">
                                                             <input type="hidden" name="status" value="{{ $statusFilter }}">
-                                                            <button type="submit" class="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition">
+                                                            <button type="submit" class="dark-danger-fix text-red-600 hover:bg-red-50 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition">
                                                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" /></svg> Desvincular
                                                             </button>
                                                         </form>
