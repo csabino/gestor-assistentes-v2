@@ -750,16 +750,6 @@ class AssistantController extends Controller
                 $url = $baseUrl . $path;
                 $res = Http::withHeaders($headers)->get($url, $statusParams);
 
-                // Log::info nunca aparece nesse container (nem arquivo, nem stdout);
-                // gravamos direto no banco pra poder consultar via tinker.
-                \DB::table('wa_debug_log')->insert([
-                    'url' => $url . ' [GET status]',
-                    'http_status' => $res->status(),
-                    'body' => $res->body(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
                 if (!$res->successful()) {
                     $res = $isUazapi
                         ? Http::withHeaders($headers)->send('POST', $url)
@@ -842,14 +832,6 @@ class AssistantController extends Controller
                     if (!$res->successful()) {
                         $res = Http::withHeaders($headers)->get($url, $qrParams);
                     }
-
-                    \DB::table('wa_debug_log')->insert([
-                        'url' => $url . ' [connect]',
-                        'http_status' => $res->status(),
-                        'body' => $res->body(),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
 
                     if ($res->successful()) {
                         $json = $res->json();
@@ -1691,8 +1673,6 @@ class AssistantController extends Controller
 
     public function webhook(Request $request, $id)
     {
-        Log::info('WEBHOOK_DEBUG hit', ['assistant_id' => $id, 'method' => $request->method(), 'payload' => $request->all()]);
-
         $this->configureTimezone($id);
         $this->ensureWebhookLogTableExists();
         $this->ensureChatMessagesTableExists();
@@ -2211,8 +2191,6 @@ class AssistantController extends Controller
                 $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
             }
 
-            Log::info('WEBHOOK_DEBUG antes do insert final', ['assistant_id' => $assistant->id, 'sender' => $sender, 'waResult' => $waResult]);
-
             DB::table('webhook_logs')->insert([
                 'assistant_id' => $assistant->id,
                 'sender' => substr($sender, 0, 255),
@@ -2225,11 +2203,9 @@ class AssistantController extends Controller
                 'updated_at' => $nowFormatted,
             ]);
 
-            Log::info('WEBHOOK_DEBUG insert final ok', ['assistant_id' => $assistant->id]);
-
             return response()->json(['status' => 'success', 'reply' => $aiReply]);
         } catch (\Throwable $e) {
-            Log::error('WEBHOOK_DEBUG exception', [
+            Log::error('Erro no webhook do WhatsApp', [
                 'assistant_id' => $id,
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
@@ -2250,7 +2226,7 @@ class AssistantController extends Controller
                     'updated_at' => $nowFormatted,
                 ]);
             } catch (\Throwable $e2) {
-                Log::error('WEBHOOK_DEBUG falha ao gravar log de erro', ['message' => $e2->getMessage()]);
+                Log::error('Falha ao gravar log de erro do webhook', ['message' => $e2->getMessage()]);
             }
 
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 200);
