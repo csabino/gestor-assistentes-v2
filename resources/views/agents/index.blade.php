@@ -157,8 +157,8 @@
                                                         </div>
                                                     </div>
 
-                                                    <!-- FOOTER DO CARD: Controles aparecem no hover -->
-                                                    <div class="mt-2 pt-1.5 border-t border-gray-50 flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                    <!-- FOOTER DO CARD -->
+                                                    <div class="mt-2 pt-1.5 border-t border-gray-50 flex justify-end gap-1.5">
                                                         <form action="/?view=equipe" method="POST" onsubmit="return confirm('Desvincular este usuário do departamento?');">
                                                             @csrf
                                                             <input type="hidden" name="action" value="unlink_user">
