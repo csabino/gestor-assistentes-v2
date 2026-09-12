@@ -713,7 +713,14 @@ class AssistantController extends Controller
         $isUazapi = str_contains($baseUrl, 'uazapi.com') || $provider === 'uazapi';
 
         try {
-            $headers = [
+            // A UazAPI só reconhece o header "token" (confirmado testando manualmente com
+            // curl). Mandar os headers extras abaixo (chutes genéricos pra outros provedores)
+            // junto pode fazer a API tratar a chamada como não autenticada e responder algo
+            // sem QR Code, mesmo com o token certo.
+            $headers = $isUazapi ? [
+                'token' => $token,
+                'Content-Type' => 'application/json'
+            ] : [
                 'token' => $token,
                 'Client-Token' => $token,
                 'client-token' => $token,
@@ -743,7 +750,9 @@ class AssistantController extends Controller
                 $url = $baseUrl . $path;
                 $res = Http::withHeaders($headers)->get($url, $statusParams);
                 if (!$res->successful()) {
-                    $res = Http::withHeaders($headers)->post($url, $statusParams);
+                    $res = $isUazapi
+                        ? Http::withHeaders($headers)->send('POST', $url)
+                        : Http::withHeaders($headers)->post($url, $statusParams);
                 }
 
                 if ($res->successful()) {
@@ -812,7 +821,13 @@ class AssistantController extends Controller
 
                 foreach ($qrPaths as $path) {
                     $url = $baseUrl . $path;
-                    $res = Http::withHeaders($headers)->post($url, $qrParams);
+                    // Http::post($url, []) manda o corpo literal "[]" (Laravel serializa o
+                    // array vazio como JSON), diferente de não mandar corpo nenhum. O teste
+                    // manual que funcionou com a UazAPI não mandava corpo algum, então para
+                    // ela replicamos isso com send() puro em vez de post() com array vazio.
+                    $res = $isUazapi
+                        ? Http::withHeaders($headers)->send('POST', $url)
+                        : Http::withHeaders($headers)->post($url, $qrParams);
                     if (!$res->successful()) {
                         $res = Http::withHeaders($headers)->get($url, $qrParams);
                     }
