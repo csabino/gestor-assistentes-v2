@@ -2347,9 +2347,13 @@ class AssistantController extends Controller
 
                     // Ler um menu numerado em voz alta fica estranho, então nunca vai no áudio -
                     // mas o cliente ainda precisa das opções pra continuar, daí vai em texto logo
-                    // depois. Seguro fazer isso sempre aqui: toda tag de agendamento e o menu
-                    // principal já forçam $isAudioMessage = false antes de chegar nesse bloco.
-                    $this->sendWhatsappMessage($assistant, $cleanSender, $this->getGenericClosingMenuText());
+                    // depois. Só faz isso quando a resposta realmente conclui o assunto: se a
+                    // própria fala termina em pergunta (ex: "qual é a sua dúvida?"), a Ingrid está
+                    // esperando a resposta do cliente, e colar o menu ali confundiria a conversa.
+                    $replyForQuestionCheck = trim(preg_replace('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}\x{200D}]/u', '', $aiReply));
+                    if (!str_ends_with(rtrim($replyForQuestionCheck), '?')) {
+                        $this->sendWhatsappMessage($assistant, $cleanSender, $this->getGenericClosingMenuText());
+                    }
                 } else {
                     $formattedReply = $this->formatTextForWhatsapp($aiReply);
                     $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
