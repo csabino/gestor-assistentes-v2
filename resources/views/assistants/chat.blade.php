@@ -17,15 +17,22 @@
         .chat-content a { color: #4f46e5; text-decoration: underline; font-weight: 600; word-break: break-all; }
     </style>
 </head>
-<body class="bg-gray-100 text-slate-800 h-full flex flex-col overflow-hidden">
+@php
+    $chatBranding = \App\Models\Setting::branding();
+    $chatBgImage = $chatBranding['login_bg_url']
+        ? "linear-gradient(rgba(15,23,42,.45), rgba(15,23,42,.45)), url('" . $chatBranding['login_bg_url'] . "')"
+        : 'linear-gradient(135deg, #4338ca, #4f46e5 50%, #6366f1)';
+@endphp
+<body class="h-full flex items-center justify-center p-0 sm:p-6 bg-cover bg-center" style="background-image: {{ $chatBgImage }};">
+    <div class="bg-gray-100 text-slate-800 w-full h-full sm:h-[85vh] sm:max-h-[720px] sm:max-w-md flex flex-col overflow-hidden sm:rounded-2xl shadow-2xl">
     <!-- HEADER FIXO -->
     <header class="shrink-0 p-4 bg-white border-b border-gray-200 shadow-sm flex justify-between items-center z-10">
-        <h1 class="text-xl font-bold text-indigo-600">Chat com {{ $assistant->name }}</h1>
-        <a href="/" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium transition text-gray-700">Voltar ao Painel</a>
+        <h1 class="text-base font-bold text-indigo-600 truncate">Chat com {{ $assistant->name }}</h1>
+        <a href="/" id="back-to-panel-link" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs font-medium transition text-gray-700 shrink-0">Voltar ao Painel</a>
     </header>
 
     <!-- MIOLO COM SCROLL -->
-    <main id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full">
+    <main id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 w-full">
         <div class="flex justify-start">
             <div class="bg-white text-slate-700 p-3 rounded-lg max-w-[80%] border border-gray-200 shadow-sm chat-content">
                 <p>Olá! 😊<br>Seja muito bem-vindo(a)!<br>Sou {{ $assistant->name }}, Assistente Virtual.<br>Como posso ajudar você hoje?</p>
@@ -35,15 +42,22 @@
 
     <!-- FOOTER FIXO -->
     <footer class="shrink-0 p-4 bg-white border-t border-gray-200 z-10">
-        <form id="chat-form" class="max-w-4xl mx-auto flex gap-2">
+        <form id="chat-form" class="flex gap-2">
             <input type="text" id="chat-input" placeholder="Digite sua mensagem..." required
                 class="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800">
             <button type="submit" id="send-btn"
                 class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold transition">Enviar</button>
         </form>
     </footer>
+    </div>
 
     <script>
+        // Dentro do modal de prévia do painel (iframe), esconde o link "Voltar ao Painel"
+        // (ele não faz sentido navegando dentro de um quadradinho pequeno).
+        if (window.top !== window.self) {
+            document.getElementById('back-to-panel-link')?.remove();
+        }
+
         const assistantId = "{{ $assistant->id }}";
         const chatMessages = document.getElementById('chat-messages');
         const chatForm = document.getElementById('chat-form');

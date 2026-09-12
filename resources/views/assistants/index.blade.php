@@ -5,15 +5,13 @@
 @push('scripts')
     <script>
         function openChatPopup(id) {
-            const width = 720;
-            const height = 480;
-            const left = (window.top.outerWidth / 2) + window.top.screenX - (width / 2);
-            const top = (window.top.outerHeight / 2) + window.top.screenY - (height / 2);
-            window.open(
-                '/chat/' + id,
-                'chat_' + id,
-                `toolbar=no, location=no, status=no, menubar=no, scrollbars=no, resizable=yes, width=${width}, height=${height}, top=${top}, left=${left}`
-            );
+            document.getElementById('chatPreviewFrame').src = '/chat/' + id;
+            document.getElementById('chatPreviewModal').classList.remove('hidden');
+        }
+
+        function closeChatPopup() {
+            document.getElementById('chatPreviewModal').classList.add('hidden');
+            document.getElementById('chatPreviewFrame').src = 'about:blank';
         }
 
         function copyChatLink(id) {
@@ -1178,6 +1176,16 @@
                 </div>
                 </div>
             @endif
+
+            <!-- MODAL DE PRÉVIA DO CHAT PÚBLICO -->
+            <div id="chatPreviewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+                <div class="relative w-full max-w-sm h-[85vh] max-h-[720px]">
+                    <button type="button" onclick="closeChatPopup()" class="absolute -top-3 -right-3 z-10 bg-white text-slate-600 hover:text-slate-900 rounded-full p-1.5 shadow-lg border border-slate-200">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                    <iframe id="chatPreviewFrame" src="about:blank" class="w-full h-full rounded-2xl shadow-2xl border-0"></iframe>
+                </div>
+            </div>
 
             @if(isset($conversationsAssistant) && $conversationsAssistant)
                 <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
