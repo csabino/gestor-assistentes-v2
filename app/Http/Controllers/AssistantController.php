@@ -784,6 +784,18 @@ class AssistantController extends Controller
                 return response()->json(['connected' => true, 'success' => true, 'message' => 'WhatsApp conectado!']);
             }
 
+            // O front-end já tem um QR Code na tela e está só perguntando se já conectou.
+            // Não chamamos /instance/connect de novo aqui: isso geraria/invalidaria um QR
+            // novo a cada 3s (era essa a causa do QR nunca ficar tempo suficiente na tela
+            // para ser escaneado, mesmo a API respondendo certo em cada chamada isolada).
+            if ($isTest && $request->boolean('has_qr')) {
+                return response()->json([
+                    'connected' => false,
+                    'success' => true,
+                    'message' => 'Aguardando leitura do QR Code...'
+                ]);
+            }
+
             if ($isTest) {
                 // Idem: a UazAPI só tem um endpoint real de conectar/gerar QR Code.
                 $qrPaths = $isUazapi ? ['/instance/connect'] : [

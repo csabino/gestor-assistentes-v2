@@ -394,15 +394,24 @@
                             if (!this.showWaModal) return;
                             if (!this.waResult || (!this.waResult.qr && !this.waResult.connected)) this.waLoading = true;
                             
+                            const hasQr = !!(this.waResult && this.waResult.qr);
+
                             try {
                                 const response = await fetch('/', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                                    body: JSON.stringify({ action: 'test_whatsapp', ...this.getWaParams() })
+                                    body: JSON.stringify({ action: 'test_whatsapp', has_qr: hasQr, ...this.getWaParams() })
                                 });
                                 const data = await response.json();
+
+                                // Depois que já temos um QR na tela, as tentativas seguintes só
+                                // checam se conectou (sem pedir um QR novo, que invalidaria o atual).
+                                // Se ainda não conectou, mantém o QR já exibido em vez de sobrescrever.
+                                if (hasQr && !data.connected) {
+                                    data.qr = this.waResult.qr;
+                                }
                                 this.waResult = data;
-                                
+
                                 if (data.connected) {
                                     this.waStatus = 'connected';
                                 } else if (data.success && this.pollAttempts < 20 && this.showWaModal) {
