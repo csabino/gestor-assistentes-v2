@@ -2270,20 +2270,24 @@ class AssistantController extends Controller
                 $isAudioMessage = false;
             }
 
-            // 🛑 MENU DE CONTINUAÇÃO: em vez de a IA decidir por conta própria (e escrever) se anexa
-            // o menu de "mais alguma dúvida / encerrar", ela só sinaliza com uma tag se o ASSUNTO
-            // foi concluído (SDR = oferece agendar reunião; GERAL = as demais). Sem a tag, ela está
-            // fazendo uma pergunta ou aguardando algo do cliente, e nenhum menu é anexado. Isso evita
-            // depender de detectar "terminou em pergunta?" no texto livre, que falha em frases tipo
-            // "me conte sua dúvida" (sem interrogação, mas também aguardando resposta).
-            $closingMenuText = null;
-            if (preg_match('/\[MENU_FINAL_SDR\]/i', $aiReply)) {
-                $closingMenuText = $this->getSdrClosingMenuText();
-                $aiReply = trim(preg_replace('/\[MENU_FINAL_SDR\]/i', '', $aiReply));
-            } elseif (preg_match('/\[MENU_FINAL_GERAL\]/i', $aiReply)) {
-                $closingMenuText = $this->getGenericClosingMenuText();
-                $aiReply = trim(preg_replace('/\[MENU_FINAL_GERAL\]/i', '', $aiReply));
+            // 🛑 MENU DE CONTINUAÇÃO: pedir pra IA lembrar de sinalizar "terminei o assunto" falhava
+            // (ela esquecia a tag na maioria das respostas, deixando o cliente sem opção nenhuma).
+            // Invertido: por padrão o sistema SEMPRE mostra o menu de continuação; a IA só precisa
+            // sinalizar [AGUARDANDO_CLIENTE] nos casos em que está ativamente esperando algo dela -
+            // ação mais fácil de lembrar, porque é o que ela está fazendo naquele exato momento.
+            $hasWaitingTag = (bool) preg_match('/\[AGUARDANDO_CLIENTE\]/i', $aiReply);
+            if ($hasWaitingTag) {
+                $aiReply = trim(preg_replace('/\[AGUARDANDO_CLIENTE\]/i', '', $aiReply));
             }
+
+            // Não mostra o menu quando: a IA sinalizou que está aguardando algo do cliente; a
+            // mensagem é uma confirmação/erro de agendamento (processAppointmentTag já montou seu
+            // próprio menu embutido); é o menu principal (não faz sentido logo depois); ou é a
+            // mensagem final de despedida/pesquisa de satisfação (a conversa já terminou de vez).
+            $isFarewellMessage = (bool) preg_match('/Agradecemos por entrar em contato com a InHouse/i', $aiReply);
+            $closingMenuText = ($hasWaitingTag || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage)
+                ? null
+                : $this->getGenericClosingMenuText();
 
             // ENVIO PARA O OMNI COM A RESPOSTA FINAL TRATADA E FORMATADA
             $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $cleanSender, $assistant->id);
@@ -2612,19 +2616,10 @@ class AssistantController extends Controller
     }
 
     /**
-     * Menus de continuação (texto/áudio) montados 100% em código, disparados pelas tags
-     * [MENU_FINAL_SDR] / [MENU_FINAL_GERAL]. A IA só decide (e sinaliza) SE o assunto foi
-     * concluído; o texto e a formatação do menu nunca dependem dela escrever certo.
+     * Menu de continuação (texto/áudio) montado 100% em código. Aparece por padrão sempre que a
+     * IA não sinalizar [AGUARDANDO_CLIENTE] - ver comentário no webhook() sobre por que o padrão
+     * é "mostra, a menos que avisada" em vez de "só mostra se avisada".
      */
-    private function getSdrClosingMenuText(): string
-    {
-        return "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\n"
-             . "Por favor, selecione uma das opções:\n"
-             . "1️⃣ Agendar uma reunião com um especialista\n"
-             . "2️⃣ Encerrar o atendimento\n"
-             . "3️⃣ Voltar ao Menu Principal";
-    }
-
     private function getGenericClosingMenuText(): string
     {
         return "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\n"
