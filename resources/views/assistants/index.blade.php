@@ -1284,7 +1284,7 @@
                         </div>
 
                         <div class="p-3 border-t border-slate-100 bg-white flex justify-end shrink-0 z-10 relative">
-                            <a href="/" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-5 py-2 rounded-lg text-xs transition">
+                            <a href="/" class="dark-btn-fix-neutral bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-5 py-2 rounded-lg text-xs transition">
                                 Fechar
                             </a>
                         </div>
