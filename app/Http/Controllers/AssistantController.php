@@ -2258,6 +2258,14 @@ class AssistantController extends Controller
                 $isAudioMessage = false;
             }
 
+            // 🛑 MENU PRINCIPAL: a IA emite [MENU_PRINCIPAL] em vez de escrever a lista numerada -
+            // o sistema envia o menu de verdade como lista interativa do WhatsApp (não faz sentido em áudio).
+            $hasMainMenuTag = (bool) preg_match('/\[MENU_PRINCIPAL\]/i', $aiReply);
+            if ($hasMainMenuTag) {
+                $aiReply = trim(preg_replace('/\[MENU_PRINCIPAL\]/i', '', $aiReply));
+                $isAudioMessage = false;
+            }
+
             // ENVIO PARA O OMNI COM A RESPOSTA FINAL TRATADA E FORMATADA
             $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $cleanSender, $assistant->id);
 
@@ -2291,9 +2299,20 @@ class AssistantController extends Controller
                 // 1. Remove emojis (Mantém o texto de voz limpo)
                 $textForAudio = preg_replace('/[\x{1F300}-\x{1F64F}\x{1F680}-\x{1F6FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FAFF}\x{1F1E6}-\x{1F1FF}\x{2300}-\x{23FF}\x{2500}-\x{25FF}\x{2B00}-\x{2BFF}]/u', '', $textForAudio);
                 
-                // 2. Converte as horas para leitura correta (ex: 17h -> 17 horas, 09h30 -> 9 horas e 30 minutos)
-                $textForAudio = preg_replace('/\b(\d{1,2})h(\d{2})\b/i', '$1 horas e $2 minutos', $textForAudio);
-                $textForAudio = preg_replace('/\b(\d{1,2})h\b/i', '$1 horas', $textForAudio);
+                // 2. Converte as horas para leitura correta (ex: 17h -> 17 horas, 09h30 -> 9 horas e 30 minutos).
+                // O (int) descarta o zero à esquerda: sem isso "09h" virava "09 horas" e o Google TTS
+                // lia dígito por dígito ("zero nove horas") em vez de "nove horas".
+                $textForAudio = preg_replace_callback('/\b(\d{1,2})h(\d{2})\b/i', function ($m) {
+                    return ((int) $m[1]) . ' horas e ' . ((int) $m[2]) . ' minutos';
+                }, $textForAudio);
+                $textForAudio = preg_replace_callback('/\b(\d{1,2})h\b/i', function ($m) {
+                    return ((int) $m[1]) . ' horas';
+                }, $textForAudio);
+                // Cobre horários escritos como "09:00" (formato usado nas confirmações de agendamento),
+                // mesmo motivo do item acima.
+                $textForAudio = preg_replace_callback('/\b0(\d)(:\d{2})\b/', function ($m) {
+                    return $m[1] . $m[2];
+                }, $textForAudio);
                 
                 // 3. Substitui traços isolados por vírgula para forçar pausa ao invés de falar "menos"
                 $textForAudio = preg_replace('/\s+[-–—]\s+/', ', ', $textForAudio);
@@ -2319,6 +2338,8 @@ class AssistantController extends Controller
                     $formattedReply = $this->formatTextForWhatsapp($aiReply);
                     $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
                 }
+            } elseif ($hasMainMenuTag) {
+                $waResult = $this->sendWhatsappInteractiveMenu($assistant, $cleanSender, $aiReply);
             } else {
                 $formattedReply = $this->formatTextForWhatsapp($aiReply);
                 $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
@@ -2526,6 +2547,80 @@ class AssistantController extends Controller
             return ['success' => $response->successful(), 'error' => $response->failed() ? $response->body() : null];
         } catch (\Throwable $e) {
             return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Itens do menu inicial no formato "texto|id|descrição" exigido pelo endpoint /send/menu (tipo
+     * "list") da UazAPI. Mantidos em código (não no prompt) porque a tag [MENU_PRINCIPAL] sempre
+     * dispara exatamente essas opções - a IA não escreve mais a lista numerada por conta própria.
+     */
+    private function getMainMenuChoices(): array
+    {
+        return [
+            'Conhecer ou contratar as soluções da InHouse|vendas|Vendas',
+            'Sou Cliente|suporte|Suporte / Pós-venda',
+            'Trabalhe Conosco|vagas|Vagas e Recrutamento',
+            'Fornecedores|fornecedores|Oferecer produtos/serviços',
+            'Agendar uma Reunião|agendar',
+            'Outros Assuntos|outros',
+        ];
+    }
+
+    private function getMainMenuFallbackText(): string
+    {
+        return "1️⃣ Conhecer ou contratar as soluções da InHouse (Vendas)\n"
+             . "2️⃣ Sou Cliente (Suporte/Pós-venda)\n"
+             . "3️⃣ Trabalhe Conosco (Vagas e Recrutamento)\n"
+             . "4️⃣ Fornecedores (Oferecer produtos/serviços)\n"
+             . "5️⃣ Agendar uma Reunião\n"
+             . "6️⃣ Outros Assuntos";
+    }
+
+    /**
+     * Envia o menu inicial como lista interativa do WhatsApp (endpoint /send/menu da UazAPI).
+     * A própria documentação da UazAPI avisa que botões/listas "podem ser descontinuados a
+     * qualquer momento sem aviso prévio" - por isso, qualquer falha aqui cai para texto simples
+     * em vez de deixar o cliente sem menu nenhum.
+     */
+    private function sendWhatsappInteractiveMenu(Assistant $assistant, string $to, string $introText): array
+    {
+        $baseUrl = rtrim($assistant->whatsapp_url ?? '', '/');
+        $isUazapi = str_contains($baseUrl, 'uazapi.com') || $assistant->whatsapp_provider === 'uazapi';
+        $fallbackText = trim($introText) . "\n\n" . $this->getMainMenuFallbackText();
+
+        if (empty($baseUrl) || empty($assistant->whatsapp_token) || !$isUazapi) {
+            return $this->sendWhatsappMessage($assistant, $to, $fallbackText);
+        }
+
+        try {
+            $cleanTo = preg_replace('/[^0-9]/', '', $to);
+            $token = trim($assistant->whatsapp_token);
+            $endpoint = $baseUrl . '/send/menu';
+
+            $payload = [
+                'token' => $token,
+                'number' => $cleanTo,
+                'type' => 'list',
+                'text' => $introText,
+                'choices' => $this->getMainMenuChoices(),
+                'listButton' => 'Ver opções',
+            ];
+
+            $response = Http::withHeaders([
+                'token' => $token,
+                'Content-Type' => 'application/json'
+            ])->post($endpoint . '?token=' . urlencode($token), $payload);
+
+            if ($response->failed()) {
+                Log::warning("Falha ao enviar menu interativo, caindo para texto simples: " . $response->body());
+                return $this->sendWhatsappMessage($assistant, $to, $fallbackText);
+            }
+
+            return ['success' => true, 'error' => null];
+        } catch (\Throwable $e) {
+            Log::warning("Exceção ao enviar menu interativo, caindo para texto simples: " . $e->getMessage());
+            return $this->sendWhatsappMessage($assistant, $to, $fallbackText);
         }
     }
 
