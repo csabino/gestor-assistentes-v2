@@ -342,7 +342,7 @@ class AssistantController extends Controller
                 'updated_at' => now()
             ]);
 
-            $msg = "\n\n❌ *REUNIÃO CANCELADA COM SUCESSO!*\n\nO agendamento do dia " . Carbon::parse($appointment->start_time)->format('d/m/Y \à\s H:i') . " foi cancelado na agenda e os participantes foram notificados.\n\nRestou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento";
+            $msg = "\n\n❌ *REUNIÃO CANCELADA COM SUCESSO!*\n\nO agendamento do dia " . Carbon::parse($appointment->start_time)->format('d/m/Y \à\s H:i') . " foi cancelado na agenda e os participantes foram notificados.\n\nRestou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento\n3️⃣ Voltar ao Menu Principal";
 
             return trim(preg_replace('/\[(?:CANCELAR_REUNIAO|Cancelar reunião|CANCELAR_AGENDAMENTO|CANCELAR):.*?\](.*)$/is', $msg, $aiReply));
         }
@@ -493,7 +493,7 @@ class AssistantController extends Controller
                 $msg .= "📅 *Nova Data/Hora:* " . $newStartTime->format('d/m/Y \à\s H:i') . "\n";
                 if ($meetingResult['meet_link'] ?? false) $msg .= "🎥 *Link do Google Meet:* " . $meetingResult['meet_link'] . "\n\n";
 
-                $msg .= "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento";
+                $msg .= "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento\n3️⃣ Voltar ao Menu Principal";
 
                 return trim(preg_replace('/\[REAGENDAR_REUNIAO:.*?\](.*)$/s', $msg, $aiReply));
 
@@ -629,7 +629,7 @@ class AssistantController extends Controller
                     $msg .= "🎥 *Link do Google Meet:* " . $meetingResult['meet_link'] . "\n";
                 }
 
-                $msg .= "\nRestou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento";
+                $msg .= "\nRestou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento\n3️⃣ Voltar ao Menu Principal";
 
                 return trim(preg_replace('/\[AGENDAR_REUNIAO:.*?\](.*)$/s', $msg, $aiReply));
 
@@ -1424,7 +1424,19 @@ class AssistantController extends Controller
         $schedulingEnabled = Setting::where('assistant_id', $assistant->id)->where('key', 'scheduling_enabled')->value('value') ?? '1';
 
         if ($schedulingEnabled === '1') {
-            $depts = DB::table('departments')->where('assistant_id', $assistant->id)->get();
+            // Só oferece pra IA os departamentos que têm pelo menos um atendente ativo vinculado;
+            // um departamento vazio nunca conseguiria ser realmente agendado (allocateAgentRoundRobin
+            // sempre retornaria nulo), então não faz sentido a IA oferecê-lo como opção ao cliente.
+            $depts = DB::table('departments')
+                ->where('departments.assistant_id', $assistant->id)
+                ->whereExists(function ($q) {
+                    $q->select(DB::raw(1))
+                      ->from('department_user')
+                      ->join('users', 'department_user.user_id', '=', 'users.id')
+                      ->whereColumn('department_user.department_id', 'departments.id')
+                      ->where('users.is_active', 1);
+                })
+                ->get();
             if ($depts->isNotEmpty()) {
                 $deptNames = $depts->pluck('name')->toArray();
                 $defaultDeptId = Setting::where('assistant_id', $assistant->id)->where('key', 'default_department_id')->value('value');
