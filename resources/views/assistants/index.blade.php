@@ -27,9 +27,9 @@
     @if($configuring)
         <script>
             function saveScrollPosition() {
-                const mainContent = document.getElementById('mainContent');
-                if (mainContent) {
-                    sessionStorage.setItem('scrollpos_config_{{ $configuring->id }}', mainContent.scrollTop);
+                const scrollArea = document.getElementById('configScrollArea');
+                if (scrollArea) {
+                    sessionStorage.setItem('scrollpos_config_{{ $configuring->id }}', scrollArea.scrollTop);
                 }
             }
 
@@ -38,9 +38,9 @@
                 const scrollpos = sessionStorage.getItem(key);
                 if (scrollpos !== null) {
                     setTimeout(() => {
-                        const mainContent = document.getElementById('mainContent');
-                        if (mainContent) {
-                            mainContent.scrollTop = parseInt(scrollpos);
+                        const scrollArea = document.getElementById('configScrollArea');
+                        if (scrollArea) {
+                            scrollArea.scrollTop = parseInt(scrollpos);
                         }
                     }, 50);
                     sessionStorage.removeItem(key);
@@ -228,7 +228,7 @@
                     </div>
                 </div>
 
-                <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1">
+                <div id="configScrollArea" class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1">
                 <form id="configForm" action="/" method="POST" enctype="multipart/form-data" onsubmit="saveScrollPosition()"
                     x-data="{
                         provider: '{{ $configuring->provider ?? 'openai' }}',

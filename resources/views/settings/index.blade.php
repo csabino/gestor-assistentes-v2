@@ -3,7 +3,7 @@
 @section('title', 'Configurações Avançadas - ' . $assistant->name)
 
 @section('content')
-        <form id="settingsForm" action="/?view=settings" method="POST" class="container mx-auto px-6 max-w-6xl flex flex-col h-[calc(100vh-8rem)] pt-4">
+        <form id="settingsForm" action="/?view=settings" method="POST" class="container mx-auto px-6 max-w-6xl flex flex-col h-[calc(100vh-8rem)] pt-4" onsubmit="saveSettingsScrollPosition()">
             @csrf
 
             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
@@ -27,7 +27,7 @@
                 </button>
             </div>
 
-            <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 pb-8">
+            <div id="settingsScrollArea" class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 pb-8">
 
             @if(session('success'))
                 <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
@@ -309,4 +309,27 @@
             </div>
             </div>
         </form>
+
+        <script>
+            function saveSettingsScrollPosition() {
+                const scrollArea = document.getElementById('settingsScrollArea');
+                if (scrollArea) {
+                    sessionStorage.setItem('scrollpos_settings_{{ $assistant->id }}', scrollArea.scrollTop);
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", function() {
+                const key = 'scrollpos_settings_{{ $assistant->id }}';
+                const scrollpos = sessionStorage.getItem(key);
+                if (scrollpos !== null) {
+                    setTimeout(() => {
+                        const scrollArea = document.getElementById('settingsScrollArea');
+                        if (scrollArea) {
+                            scrollArea.scrollTop = parseInt(scrollpos);
+                        }
+                    }, 50);
+                    sessionStorage.removeItem(key);
+                }
+            });
+        </script>
 @endsection
