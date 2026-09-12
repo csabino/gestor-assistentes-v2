@@ -749,6 +749,17 @@ class AssistantController extends Controller
             foreach ($statusPaths as $path) {
                 $url = $baseUrl . $path;
                 $res = Http::withHeaders($headers)->get($url, $statusParams);
+
+                // Log::info nunca aparece nesse container (nem arquivo, nem stdout);
+                // gravamos direto no banco pra poder consultar via tinker.
+                \DB::table('wa_debug_log')->insert([
+                    'url' => $url . ' [GET status]',
+                    'http_status' => $res->status(),
+                    'body' => $res->body(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
                 if (!$res->successful()) {
                     $res = $isUazapi
                         ? Http::withHeaders($headers)->send('POST', $url)
@@ -832,10 +843,12 @@ class AssistantController extends Controller
                         $res = Http::withHeaders($headers)->get($url, $qrParams);
                     }
 
-                    Log::info('WA_CONNECT_DEBUG', [
-                        'url' => $url,
+                    \DB::table('wa_debug_log')->insert([
+                        'url' => $url . ' [connect]',
                         'http_status' => $res->status(),
                         'body' => $res->body(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ]);
 
                     if ($res->successful()) {
