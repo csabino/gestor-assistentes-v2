@@ -134,7 +134,7 @@
                                                         @endif
                                                     @endforeach
                                                 </select>
-                                                <button type="submit" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-1 rounded border border-indigo-200 text-[9px] transition uppercase tracking-wide">+ Vincular</button>
+                                                <button type="submit" class="dark-btn-fix w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-1 rounded border border-indigo-200 text-[9px] transition uppercase tracking-wide">+ Vincular</button>
                                             </form>
                                         </div>
 
