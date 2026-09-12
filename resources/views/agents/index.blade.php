@@ -118,7 +118,7 @@
                                     <div class="md:w-3/4 p-4 flex flex-wrap content-start gap-3 items-start bg-slate-50/30 max-h-64 overflow-y-auto custom-scroll">
 
                                         <!-- CARD 1: VINCULAR USUÁRIO EXISTENTE (Sempre na esquerda) -->
-                                        <div class="bg-white border border-slate-200 border-dashed hover:border-indigo-400 rounded-lg p-2 w-36 shrink-0 shadow-sm relative transition group">
+                                        <div class="dark-card-fix bg-white border border-slate-200 border-dashed hover:border-indigo-400 rounded-lg p-2 w-36 shrink-0 shadow-sm relative transition group">
                                             <form action="/?view=equipe" method="POST" class="flex flex-col gap-1.5">
                                                 @csrf
                                                 <input type="hidden" name="action" value="link_user">
@@ -141,12 +141,16 @@
                                         <!-- CARDS 2...N: AGENTES VINCULADOS -->
                                         @foreach($agents as $agent)
                                             @if($agent->department_id == $dept->id)
-                                                <div class="bg-white border border-gray-200 rounded-lg p-2 w-52 shrink-0 shadow-sm relative group hover:border-indigo-300 transition flex flex-col justify-between">
+                                                <div class="dark-card-fix bg-white border border-gray-200 rounded-lg p-2 w-52 shrink-0 shadow-sm relative group hover:border-indigo-300 transition flex flex-col justify-between">
 
                                                     <div class="flex items-center gap-2">
-                                                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 border border-indigo-200 uppercase">
-                                                            {{ substr($agent->name, 0, 1) }}
-                                                        </div>
+                                                        @if($agent->avatar_path)
+                                                            <img src="/?view_file={{ $agent->avatar_path }}" alt="Avatar" class="w-8 h-8 rounded-full object-cover shrink-0 border border-gray-200">
+                                                        @else
+                                                            <span class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 border border-gray-300 text-gray-400">
+                                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.9-2.19 4.9-4.9S14.7 2.2 12 2.2 7.1 4.39 7.1 7.1 9.3 12 12 12zm0 2.45c-3.27 0-9.8 1.64-9.8 4.9V22h19.6v-2.65c0-3.26-6.53-4.9-9.8-4.9z"/></svg>
+                                                            </span>
+                                                        @endif
                                                         <div class="pr-1 min-w-0">
                                                             <h4 class="font-bold text-gray-800 text-xs truncate">{{ $agent->name }}</h4>
                                                             <p class="text-[10px] text-gray-500 font-mono truncate mt-0.5">{{ $agent->email }}</p>

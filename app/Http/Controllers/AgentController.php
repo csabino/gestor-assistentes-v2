@@ -56,7 +56,7 @@ class AgentController extends Controller
         $agents = DB::table('department_user')
             ->join('users', 'department_user.user_id', '=', 'users.id')
             ->whereIn('department_user.department_id', $deptIds)
-            ->select('users.id', 'users.name', 'users.email', 'users.role', 'department_user.department_id')
+            ->select('users.id', 'users.name', 'users.email', 'users.role', 'users.avatar_path', 'department_user.department_id')
             ->orderBy('users.name', 'asc')
             ->get();
 

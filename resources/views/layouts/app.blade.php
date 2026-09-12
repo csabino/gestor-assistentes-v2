@@ -111,6 +111,21 @@
         .dark .conv-sidebar .text-slate-400 { color: #d1d5db !important; }
         .dark .conv-sidebar .border-slate-100,
         .dark .conv-sidebar .border-slate-200 { border-color: #374151 !important; }
+
+        /* Cards que ficam escuros de propósito mesmo dentro de um "light-surface" (ex: cards de
+           agente/vincular usuário dentro do quadrinho branco de um departamento): sem isso, o
+           texto herdava a cor escura do light-surface e ficava ilegível sobre o fundo escuro. */
+        .dark .light-surface .dark-card-fix,
+        .dark .light-surface .dark-card-fix .text-gray-800,
+        .dark .light-surface .dark-card-fix .text-gray-700,
+        .dark .light-surface .dark-card-fix .text-gray-600,
+        .dark .light-surface .dark-card-fix .text-gray-500,
+        .dark .light-surface .dark-card-fix .text-gray-400 { color: #f3f4f6 !important; }
+        .dark .light-surface .dark-card-fix select,
+        .dark .light-surface .dark-card-fix input { background-color: #374151 !important; color: #f3f4f6 !important; border-color: #4b5563 !important; }
+        .dark .light-surface .dark-card-fix .border-gray-200,
+        .dark .light-surface .dark-card-fix .border-slate-200,
+        .dark .light-surface .dark-card-fix .border-gray-50 { border-color: #4b5563 !important; }
     </style>
 
     @stack('head')
