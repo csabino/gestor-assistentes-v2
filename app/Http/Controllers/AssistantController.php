@@ -710,6 +710,8 @@ class AssistantController extends Controller
             return response()->json(['connected' => false, 'success' => false, 'message' => 'Credenciais incompletas.']);
         }
 
+        $isUazapi = str_contains($baseUrl, 'uazapi.com') || $provider === 'uazapi';
+
         try {
             $headers = [
                 'token' => $token,
@@ -724,7 +726,10 @@ class AssistantController extends Controller
                 'instance' => $instance
             ]);
 
-            $statusPaths = [
+            // A UazAPI só tem um endpoint real de status (identifica a instância pelo header
+            // "token", sem precisar de sufixo na URL). Os outros caminhos abaixo são chutes
+            // genéricos (estilo Evolution API) mantidos só para os demais provedores.
+            $statusPaths = $isUazapi ? ['/instance/status'] : [
                 '/instance/connectionState/' . $instance,
                 '/instance/connectionState',
                 '/instance/status/' . $instance,
@@ -745,17 +750,18 @@ class AssistantController extends Controller
                     if (is_array($json)) {
                         if (
                             (!empty($json['connected']) && $json['connected'] === true) ||
-                            (!empty($json['instance']['connected']) && $json['instance']['connected'] === true)
+                            (!empty($json['instance']['connected']) && $json['instance']['connected'] === true) ||
+                            (!empty($json['status']['connected']) && $json['status']['connected'] === true)
                         ) {
                             $connected = true;
                             break;
                         }
 
-                        $state = $json['instance']['state'] 
-                              ?? $json['instance']['status'] 
-                              ?? $json['state'] 
-                              ?? $json['status'] 
-                              ?? $json['connectionStatus'] 
+                        $state = $json['instance']['state']
+                              ?? $json['instance']['status']
+                              ?? $json['state']
+                              ?? $json['status']
+                              ?? $json['connectionStatus']
                               ?? null;
 
                         if (is_array($state)) {
@@ -778,7 +784,8 @@ class AssistantController extends Controller
             }
 
             if ($isTest) {
-                $qrPaths = [
+                // Idem: a UazAPI só tem um endpoint real de conectar/gerar QR Code.
+                $qrPaths = $isUazapi ? ['/instance/connect'] : [
                     '/instance/connect/' . $instance,
                     '/instance/connect',
                     '/instance/qr/' . $instance,
@@ -795,10 +802,10 @@ class AssistantController extends Controller
                     if ($res->successful()) {
                         $json = $res->json();
                         if (is_array($json)) {
-                            $qr = $json['qrcode'] 
-                               ?? $json['base64'] 
-                               ?? $json['qr'] 
-                               ?? $json['code'] 
+                            $qr = $json['qrcode']
+                               ?? $json['base64']
+                               ?? $json['qr']
+                               ?? $json['code']
                                ?? ($json['data']['qrcode'] ?? null)
                                ?? ($json['data']['base64'] ?? null)
                                ?? ($json['instance']['qrcode'] ?? null);
@@ -812,9 +819,9 @@ class AssistantController extends Controller
                                     $qr = 'data:image/png;base64,' . $qr;
                                 }
                                 return response()->json([
-                                    'connected' => false, 
-                                    'success' => true, 
-                                    'qr' => $qr, 
+                                    'connected' => false,
+                                    'success' => true,
+                                    'qr' => $qr,
                                     'message' => 'Escaneie o QR Code no seu celular.'
                                 ]);
                             }
@@ -822,10 +829,13 @@ class AssistantController extends Controller
                     }
                 }
 
+                // Não achamos QR Code em nenhum formato conhecido: antes isso assumia
+                // "conectado" por padrão (bug real). Agora é honesto: reporta que ainda
+                // está tentando, sem inventar um estado que não foi confirmado pela API.
                 return response()->json([
-                    'connected' => true, 
-                    'success' => true, 
-                    'message' => 'WhatsApp conectado com sucesso!'
+                    'connected' => false,
+                    'success' => true,
+                    'message' => 'Aguardando o QR Code da instância. Tente novamente em alguns segundos.'
                 ]);
             }
 
