@@ -39,7 +39,7 @@
                             
                             <!-- COMBO: STATUS -->
                             <div class="flex items-center gap-2 border-r border-indigo-200 pr-3">
-                                <span class="font-bold text-indigo-700 uppercase text-[10px] tracking-wide">Status:</span>
+                                <span class="dark-force-white font-bold text-indigo-700 uppercase text-[10px] tracking-wide">Status:</span>
                                 <select name="status" onchange="document.getElementById('assistantFilter').submit()" class="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer text-sm">
                                     <option value="ativo" {{ $statusFilter == 'ativo' ? 'selected' : '' }}>Ativos</option>
                                     <option value="inativo" {{ $statusFilter == 'inativo' ? 'selected' : '' }}>Inativos</option>
@@ -49,7 +49,7 @@
 
                             <!-- COMBO: ASSISTENTE -->
                             <div class="flex items-center gap-2">
-                                <span class="font-bold text-indigo-700 uppercase text-[10px] tracking-wide">Assistente IA:</span>
+                                <span class="dark-force-white font-bold text-indigo-700 uppercase text-[10px] tracking-wide">Assistente IA:</span>
                                 <select name="assistant_id" onchange="document.getElementById('assistantFilter').submit()" class="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer text-sm">
                                     @foreach($assistants as $ast)
                                         <option value="{{ $ast->id }}" {{ $selectedAssistantId == $ast->id ? 'selected' : '' }}>{{ $ast->name }}</option>
@@ -80,10 +80,10 @@
                         </form>
 
                         <!-- LISTA DE CARDS DE DEPARTAMENTOS (rolagem interna do quadro, não da página) -->
-                        <div class="border border-gray-200 rounded-xl bg-gray-50/40 p-4 flex-1 min-h-0 overflow-y-auto custom-scroll">
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/40 dark:bg-gray-900 p-4 flex-1 min-h-0 overflow-y-auto custom-scroll">
                         <div class="space-y-6">
                             @forelse($departments as $dept)
-                                <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row transition hover:border-indigo-200">
+                                <div class="light-surface bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row transition hover:border-indigo-200">
                                     
                                     <!-- ESQUERDA: DEPARTAMENTO E CONTROLES (AGORA COM ÍCONES) -->
                                     <div class="md:w-1/4 bg-gray-50/80 p-5 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between shrink-0">
