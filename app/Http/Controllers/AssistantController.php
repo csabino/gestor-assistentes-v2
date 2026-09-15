@@ -2301,7 +2301,14 @@ class AssistantController extends Controller
             // o cliente sobre quem vai responder a seguir).
             $isFarewellMessage = (bool) preg_match('/Agradecemos por entrar em contato com a InHouse/i', $aiReply);
             $isHandoffMessage = (bool) preg_match('/Vou encaminhar sua solicitação para um de nossos atendentes/i', $aiReply);
-            $closingMenuText = ($hasWaitingTag || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage)
+
+            // Garantia extra em código (não dá pra confiar só na IA lembrar de emitir a tag aqui):
+            // se o cliente ACABOU de escolher "1 - Tenho mais dúvidas", a resposta seguinte é
+            // sempre um convite pra ele contar a dúvida - nunca faz sentido perguntar de novo
+            // "quer continuar ou encerrar?" logo depois dele já ter dito que quer continuar.
+            $justPickedContinue = (bool) preg_match('/^\s*1\s*$/', $userMessage) || (bool) preg_match('/tenho mais d[uú]vidas/i', $userMessage);
+
+            $closingMenuText = ($hasWaitingTag || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage || $justPickedContinue)
                 ? null
                 : $this->getGenericClosingMenuText();
 
