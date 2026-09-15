@@ -2294,10 +2294,14 @@ class AssistantController extends Controller
 
             // Não mostra o menu quando: a IA sinalizou que está aguardando algo do cliente; a
             // mensagem é uma confirmação/erro de agendamento (processAppointmentTag já montou seu
-            // próprio menu embutido); é o menu principal (não faz sentido logo depois); ou é a
-            // mensagem final de despedida/pesquisa de satisfação (a conversa já terminou de vez).
+            // próprio menu embutido); é o menu principal (não faz sentido logo depois); é a
+            // mensagem final de despedida/pesquisa de satisfação (a conversa já terminou de vez);
+            // ou é o encaminhamento pra atendente humano (garantido em código, não só no prompt -
+            // colar "selecione uma opção" logo depois de "vou te encaminhar pra um humano" confunde
+            // o cliente sobre quem vai responder a seguir).
             $isFarewellMessage = (bool) preg_match('/Agradecemos por entrar em contato com a InHouse/i', $aiReply);
-            $closingMenuText = ($hasWaitingTag || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage)
+            $isHandoffMessage = (bool) preg_match('/Vou encaminhar sua solicitação para um de nossos atendentes/i', $aiReply);
+            $closingMenuText = ($hasWaitingTag || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage)
                 ? null
                 : $this->getGenericClosingMenuText();
 
