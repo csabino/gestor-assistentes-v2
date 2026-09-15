@@ -1604,9 +1604,9 @@ class AssistantController extends Controller
             $history = array_slice($history, -12);
 
             $systemPrompt = $this->buildSystemPromptWithKnowledge($assistant);
-            $response = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
+            $aiResult = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
 
-            return response()->json(['reply' => $response]);
+            return response()->json(['reply' => $aiResult['reply']]);
         } catch (\Throwable $e) {
             return response()->json(['reply' => '⚠️ Erro no Chat: ' . $e->getMessage()], 200);
         }
@@ -2245,7 +2245,9 @@ class AssistantController extends Controller
             // ATIVA O 'DIGITANDO...' ENQUANTO A IA PROCESSA A RESPOSTA
             $this->sendWhatsappPresence($assistant, $cleanSender, 'composing');
 
-            $aiReply = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
+            $aiResult = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
+            $aiReply = $aiResult['reply'];
+            $aiConcluded = $aiResult['concluded']; // true/false (OpenAI) ou null (outros provedores/sem sinal)
 
             if (!empty($displayName) && $displayName !== 'Cliente') {
                 $aiReply = str_replace(['#NOME#', '[NOME]', '[Nome do Cliente]'], $displayName, $aiReply);
@@ -2336,16 +2338,18 @@ class AssistantController extends Controller
             // "quer continuar ou encerrar?" logo depois dele já ter dito que quer continuar.
             $justPickedContinue = (bool) preg_match('/^\s*1\s*$/', $userMessage) || (bool) preg_match('/tenho mais d[uú]vidas/i', $userMessage);
 
-            // Rede de segurança: a IA repetidamente "esquece" de emitir [AGUARDANDO_CLIENTE] mesmo
-            // fazendo uma pergunta direta de verdade (ex: "qual é a sua preferência?", "quais
-            // dúvidas você tem?"). Em vez de continuar só ajustando o texto do prompt, o código
-            // agora também confere se a resposta termina em "?" (ignorando emojis no final) e trata
-            // isso como aguardando resposta, com ou sem a tag - vale igual pra texto e pra áudio,
-            // já que os dois usam esse mesmo $aiReply.
+            // Sinal estruturado da OpenAI (ver callAiApi): $aiConcluded === false é a fonte mais
+            // confiável de "está aguardando o cliente" que existe aqui, porque é garantido pela API
+            // (json_schema strict), não uma instrução de prompt que a IA pode esquecer de seguir.
+            $aiSignaledWaiting = ($aiConcluded === false);
+
+            // Rede de segurança pros casos em que $aiConcluded vem null (outro provedor, ou falha
+            // ao decodificar o JSON): confere se a resposta termina em "?" (ignorando emojis no
+            // final) e trata isso como aguardando resposta também.
             $replyStrippedForQuestionCheck = trim(preg_replace('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}\x{200D}]/u', '', $aiReply));
             $endsWithQuestion = str_ends_with(rtrim($replyStrippedForQuestionCheck), '?');
 
-            $closingMenuText = ($hasWaitingTag || $endsWithQuestion || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage || $justPickedContinue)
+            $closingMenuText = ($hasWaitingTag || $aiSignaledWaiting || $endsWithQuestion || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage || $justPickedContinue)
                 ? null
                 : $this->getGenericClosingMenuText();
 
@@ -2485,13 +2489,25 @@ class AssistantController extends Controller
         }
     }
 
-    private function callAiApi(Assistant $assistant, string $systemPrompt, string $userMessage, array $history = []): string
+    /**
+     * @return array{reply: string, concluded: ?bool} 'concluded' é true (assunto encerrado, pode
+     *   mostrar o menu de continuação), false (a IA está esperando uma resposta específica do
+     *   cliente - não mostrar menu), ou null quando o provedor não suporta saída estruturada (nesse
+     *   caso o chamador cai de volta pras heurísticas de texto/tag como sinal secundário).
+     *
+     * Só a OpenAI usa "structured outputs" (json_schema com strict:true) pra isso: é uma garantia
+     * de formato imposta pela própria API (constrained decoding), não uma instrução de prompt que a
+     * IA pode esquecer de seguir - foi exatamente essa fragilidade (a IA "esquecendo" de sinalizar
+     * se ainda estava aguardando o cliente) que gerou repetidos bugs do menu de continuação
+     * aparecendo no meio de uma pergunta seguida da IA.
+     */
+    private function callAiApi(Assistant $assistant, string $systemPrompt, string $userMessage, array $history = []): array
     {
         $provider = $assistant->provider ?? 'openai';
 
         if ($provider === 'openai') {
             $key = trim($assistant->openai_api_key ?? '');
-            if (!$key) return 'Erro: Chave API da OpenAI não configurada.';
+            if (!$key) return ['reply' => 'Erro: Chave API da OpenAI não configurada.', 'concluded' => null];
 
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
             foreach ($history as $msg) {
@@ -2501,31 +2517,79 @@ class AssistantController extends Controller
             }
             $messages[] = ['role' => 'user', 'content' => $userMessage];
 
+            $model = $assistant->model ?? 'gpt-4o-mini';
+
             $res = Http::withToken($key)->post('https://api.openai.com/v1/chat/completions', [
-                'model' => $assistant->model ?? 'gpt-4o-mini',
+                'model' => $model,
                 'messages' => $messages,
+                'response_format' => [
+                    'type' => 'json_schema',
+                    'json_schema' => [
+                        'name' => 'assistant_reply',
+                        'strict' => true,
+                        'schema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'reply' => [
+                                    'type' => 'string',
+                                    'description' => 'A mensagem completa a ser enviada ao cliente, seguindo todas as instruções do prompt do sistema (incluindo qualquer tag técnica entre colchetes, quando aplicável).',
+                                ],
+                                'waiting_for_client_reply' => [
+                                    'type' => 'boolean',
+                                    'description' => 'true SOMENTE se essa mensagem termina fazendo uma pergunta direta ao cliente ou pedindo uma informação pontual que ele deve responder agora, na própria conversa. false se o assunto atual foi concluído nessa mensagem (mesmo que o cliente ainda precise fazer algo fora da conversa, como preencher um formulário externo ou aguardar um retorno da equipe).',
+                                ],
+                            ],
+                            'required' => ['reply', 'waiting_for_client_reply'],
+                            'additionalProperties' => false,
+                        ],
+                    ],
+                ],
             ]);
 
-            if ($res->failed()) return 'Erro na API OpenAI: ' . json_encode($res->json());
-            return $res->json('choices.0.message.content') ?? 'Resposta vazia da OpenAI.';
+            // Nem todo modelo da OpenAI suporta "structured outputs" (json_schema). Se a chamada
+            // falhar por causa disso, cai pra uma chamada comum em texto simples, sem quebrar o
+            // assistente - só perde o sinal extra de "concluded" e volta a depender das heurísticas.
+            if ($res->failed()) {
+                $res = Http::withToken($key)->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => $model,
+                    'messages' => $messages,
+                ]);
+
+                if ($res->failed()) return ['reply' => 'Erro na API OpenAI: ' . json_encode($res->json()), 'concluded' => null];
+                return ['reply' => $res->json('choices.0.message.content') ?? 'Resposta vazia da OpenAI.', 'concluded' => null];
+            }
+
+            $rawContent = $res->json('choices.0.message.content');
+            $decoded = json_decode((string) $rawContent, true);
+
+            if (is_array($decoded) && array_key_exists('reply', $decoded)) {
+                return [
+                    'reply' => (string) $decoded['reply'],
+                    'concluded' => array_key_exists('waiting_for_client_reply', $decoded) ? !$decoded['waiting_for_client_reply'] : null,
+                ];
+            }
+
+            // Não deveria acontecer com json_schema em modo strict, mas por segurança: se vier algo
+            // fora do formato esperado, usa o texto cru e deixa o chamador decidir pelas heurísticas.
+            return ['reply' => (string) ($rawContent ?: 'Resposta vazia da OpenAI.'), 'concluded' => null];
         }
 
         if ($provider === 'gemini') {
             $key = trim($assistant->gemini_api_key ?? '');
-            if (!$key) return 'Erro: Chave API do Gemini não configurada.';
+            if (!$key) return ['reply' => 'Erro: Chave API do Gemini não configurada.', 'concluded' => null];
 
             $res = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$assistant->model}:generateContent?key={$key}", [
                 'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
                 'contents' => [['parts' => [['text' => $userMessage]]]]
             ]);
 
-            if ($res->failed()) return 'Erro na API Gemini: ' . json_encode($res->json());
-            return $res->json('candidates.0.content.parts.0.text') ?? 'Resposta vazia do Gemini.';
+            if ($res->failed()) return ['reply' => 'Erro na API Gemini: ' . json_encode($res->json()), 'concluded' => null];
+            return ['reply' => $res->json('candidates.0.content.parts.0.text') ?? 'Resposta vazia do Gemini.', 'concluded' => null];
         }
 
         if ($provider === 'anthropic') {
             $key = trim($assistant->anthropic_api_key ?? '');
-            if (!$key) return 'Erro: Chave API do Claude não configurada.';
+            if (!$key) return ['reply' => 'Erro: Chave API do Claude não configurada.', 'concluded' => null];
 
             $res = Http::withHeaders([
                 'x-api-key' => $key,
@@ -2538,13 +2602,13 @@ class AssistantController extends Controller
                 'messages' => [['role' => 'user', 'content' => $userMessage]]
             ]);
 
-            if ($res->failed()) return 'Erro na API Anthropic: ' . json_encode($res->json());
-            return $res->json('content.0.text') ?? 'Resposta vazia da Anthropic.';
+            if ($res->failed()) return ['reply' => 'Erro na API Anthropic: ' . json_encode($res->json()), 'concluded' => null];
+            return ['reply' => $res->json('content.0.text') ?? 'Resposta vazia da Anthropic.', 'concluded' => null];
         }
 
         if ($provider === 'grok') {
             $key = trim($assistant->grok_api_key ?? '');
-            if (!$key) return 'Erro: Chave API do Grok não configurada.';
+            if (!$key) return ['reply' => 'Erro: Chave API do Grok não configurada.', 'concluded' => null];
 
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
             foreach ($history as $msg) {
@@ -2559,11 +2623,11 @@ class AssistantController extends Controller
                 'messages' => $messages
             ]);
 
-            if ($res->failed()) return 'Erro na API Grok: ' . json_encode($res->json());
-            return $res->json('choices.0.message.content') ?? 'Resposta vazia do Grok.';
+            if ($res->failed()) return ['reply' => 'Erro na API Grok: ' . json_encode($res->json()), 'concluded' => null];
+            return ['reply' => $res->json('choices.0.message.content') ?? 'Resposta vazia do Grok.', 'concluded' => null];
         }
 
-        return 'Provedor de IA não configurado.';
+        return ['reply' => 'Provedor de IA não configurado.', 'concluded' => null];
     }
 
     private function testAi(Request $request)
