@@ -2101,7 +2101,7 @@ class AssistantController extends Controller
             // interpretando errado o "3" (ou o texto da opção) vindo do menu de continuação -
             // tratava como se fosse "1 - continuar ajudando" em vez de voltar ao menu. Isso é
             // uma navegação, não uma pergunta de conteúdo, então resolve 100% em código.
-            if (preg_match('/^\s*3\s*$/', $userMessage) || preg_match('/voltar\s+(ao|no|pro|para\s+o)\s+menu\s+principal/i', $userMessage)) {
+            if (preg_match('/^\s*3\s*$/', $userMessage) || preg_match('/menu\s+(principal|inicial)/i', $userMessage)) {
                 $menuIntroText = "Vamos voltar ao menu principal! Por favor, escolha de novo sobre qual destes assuntos você gostaria de falar:";
                 $waResult = $this->sendWhatsappInteractiveMenu($assistant, $cleanSender, $menuIntroText);
 
