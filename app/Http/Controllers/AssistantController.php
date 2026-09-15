@@ -2125,6 +2125,17 @@ class AssistantController extends Controller
                 return response()->json(['status' => 'success', 'reply' => $menuIntroText]);
             }
 
+            // 🛑 DESAMBIGUAÇÃO DE "1"/"2": a IA vem confundindo o número "1" (quer continuar) com
+            // "2" (quer encerrar) quando o cliente só digita o número puro ou a frase curta do
+            // menu de continuação - já causou o atendimento sendo encerrado por engano mais de uma
+            // vez. Reescreve pra uma frase clara ANTES de mandar pra IA, removendo a ambiguidade na
+            // origem em vez de tentar corrigir a interpretação dela depois.
+            if (preg_match('/^\s*1\s*$/', $userMessage) || preg_match('/^\s*tenho mais d[uú]vidas\s*$/i', trim($userMessage))) {
+                $userMessage = 'Quero continuar a conversa, ainda tenho mais dúvidas ou preciso de mais alguma coisa.';
+            } elseif (preg_match('/^\s*2\s*$/', $userMessage) || preg_match('/^\s*encerrar( o atendimento)?\s*$/i', trim($userMessage))) {
+                $userMessage = 'Quero encerrar o atendimento, por favor finalize.';
+            }
+
             $rawPushName = $request->input('message.senderName')
                 ?? $request->input('senderName')
                 ?? $request->input('pushName')
