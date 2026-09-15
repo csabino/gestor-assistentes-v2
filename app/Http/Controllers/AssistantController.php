@@ -2097,6 +2097,34 @@ class AssistantController extends Controller
                 return response()->json(['status' => 'no_message']);
             }
 
+            // 🛑 VOLTAR AO MENU PRINCIPAL: atalho determinístico, sem passar pela IA. A IA vinha
+            // interpretando errado o "3" (ou o texto da opção) vindo do menu de continuação -
+            // tratava como se fosse "1 - continuar ajudando" em vez de voltar ao menu. Isso é
+            // uma navegação, não uma pergunta de conteúdo, então resolve 100% em código.
+            if (preg_match('/^\s*3\s*$/', $userMessage) || preg_match('/voltar\s+(ao|pro|para\s+o)\s+menu\s+principal/i', $userMessage)) {
+                $menuIntroText = "Vamos voltar ao menu principal! Por favor, escolha de novo sobre qual destes assuntos você gostaria de falar:";
+                $waResult = $this->sendWhatsappInteractiveMenu($assistant, $cleanSender, $menuIntroText);
+
+                DB::table('chat_messages')->insert([
+                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender, 'protocol' => null, 'role' => 'user', 'content' => $userMessage, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted],
+                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender, 'protocol' => null, 'role' => 'assistant', 'content' => $menuIntroText, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted],
+                ]);
+
+                DB::table('webhook_logs')->insert([
+                    'assistant_id' => $assistant->id,
+                    'sender' => substr($sender, 0, 255),
+                    'user_message' => $userMessage,
+                    'ai_reply' => $menuIntroText,
+                    'wa_send_result' => json_encode($waResult, JSON_INVALID_UTF8_IGNORE),
+                    'raw_snippet' => json_encode($request->all(), JSON_INVALID_UTF8_IGNORE),
+                    'timestamp' => $nowFormatted,
+                    'created_at' => $nowFormatted,
+                    'updated_at' => $nowFormatted,
+                ]);
+
+                return response()->json(['status' => 'success', 'reply' => $menuIntroText]);
+            }
+
             $rawPushName = $request->input('message.senderName')
                 ?? $request->input('senderName')
                 ?? $request->input('pushName')
