@@ -2533,7 +2533,7 @@ class AssistantController extends Controller
 
             $model = $assistant->model ?? 'gpt-4o-mini';
 
-            $res = Http::withToken($key)->post('https://api.openai.com/v1/chat/completions', [
+            $res = Http::withToken($key)->timeout(45)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $model,
                 'messages' => $messages,
                 'response_format' => [
@@ -2564,7 +2564,7 @@ class AssistantController extends Controller
             // falhar por causa disso, cai pra uma chamada comum em texto simples, sem quebrar o
             // assistente - só perde o sinal extra de "concluded" e volta a depender das heurísticas.
             if ($res->failed()) {
-                $res = Http::withToken($key)->post('https://api.openai.com/v1/chat/completions', [
+                $res = Http::withToken($key)->timeout(45)->post('https://api.openai.com/v1/chat/completions', [
                     'model' => $model,
                     'messages' => $messages,
                 ]);
@@ -2592,7 +2592,7 @@ class AssistantController extends Controller
             $key = trim($assistant->gemini_api_key ?? '');
             if (!$key) return ['reply' => 'Erro: Chave API do Gemini não configurada.', 'concluded' => null];
 
-            $res = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$assistant->model}:generateContent?key={$key}", [
+            $res = Http::timeout(45)->post("https://generativelanguage.googleapis.com/v1beta/models/{$assistant->model}:generateContent?key={$key}", [
                 'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
                 'contents' => [['parts' => [['text' => $userMessage]]]]
             ]);
@@ -2609,7 +2609,7 @@ class AssistantController extends Controller
                 'x-api-key' => $key,
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json'
-            ])->post('https://api.anthropic.com/v1/messages', [
+            ])->timeout(45)->post('https://api.anthropic.com/v1/messages', [
                 'model' => $assistant->model ?? 'claude-3-haiku-20240307',
                 'system' => $systemPrompt,
                 'max_tokens' => 1024,
@@ -2632,7 +2632,7 @@ class AssistantController extends Controller
             }
             $messages[] = ['role' => 'user', 'content' => $userMessage];
 
-            $res = Http::withToken($key)->post('https://api.x.ai/v1/chat/completions', [
+            $res = Http::withToken($key)->timeout(45)->post('https://api.x.ai/v1/chat/completions', [
                 'model' => $assistant->model ?? 'grok-2-mini',
                 'messages' => $messages
             ]);
