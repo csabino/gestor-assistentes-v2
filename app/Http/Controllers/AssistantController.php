@@ -2276,6 +2276,18 @@ class AssistantController extends Controller
             // sinalizar [AGUARDANDO_CLIENTE] nos casos em que está ativamente esperando algo dela -
             // ação mais fácil de lembrar, porque é o que ela está fazendo naquele exato momento.
             $hasWaitingTag = (bool) preg_match('/\[AGUARDANDO_CLIENTE\]/i', $aiReply);
+
+            // DEBUG TEMPORÁRIO: captura o texto bruto da IA (com a tag, se houver) pra confirmar se
+            // ela está emitindo [AGUARDANDO_CLIENTE] em respostas que deveriam concluir o assunto.
+            // Remover assim que o comportamento do menu de continuação estiver confirmado correto.
+            DB::table('ai_tag_debug')->insert([
+                'user_message' => mb_substr($userMessage, 0, 255),
+                'raw_reply' => $aiReply,
+                'has_waiting_tag' => $hasWaitingTag,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             if ($hasWaitingTag) {
                 $aiReply = trim(preg_replace('/\[AGUARDANDO_CLIENTE\]/i', '', $aiReply));
             }
