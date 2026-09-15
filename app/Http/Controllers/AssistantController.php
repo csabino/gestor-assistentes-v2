@@ -2101,7 +2101,7 @@ class AssistantController extends Controller
             // interpretando errado o "3" (ou o texto da opção) vindo do menu de continuação -
             // tratava como se fosse "1 - continuar ajudando" em vez de voltar ao menu. Isso é
             // uma navegação, não uma pergunta de conteúdo, então resolve 100% em código.
-            if (preg_match('/^\s*3\s*$/', $userMessage) || preg_match('/voltar\s+(ao|pro|para\s+o)\s+menu\s+principal/i', $userMessage)) {
+            if (preg_match('/^\s*3\s*$/', $userMessage) || preg_match('/voltar\s+(ao|no|pro|para\s+o)\s+menu\s+principal/i', $userMessage)) {
                 $menuIntroText = "Vamos voltar ao menu principal! Por favor, escolha de novo sobre qual destes assuntos você gostaria de falar:";
                 $waResult = $this->sendWhatsappInteractiveMenu($assistant, $cleanSender, $menuIntroText);
 
@@ -2354,13 +2354,16 @@ class AssistantController extends Controller
             // (json_schema strict), não uma instrução de prompt que a IA pode esquecer de seguir.
             $aiSignaledWaiting = ($aiConcluded === false);
 
-            // Rede de segurança pros casos em que $aiConcluded vem null (outro provedor, ou falha
-            // ao decodificar o JSON): confere se a resposta termina em "?" (ignorando emojis no
-            // final) e trata isso como aguardando resposta também.
+            // Rede de segurança independente do que a IA disse: mesmo em modo estruturado ela pode
+            // errar o próprio julgamento (marcar "concluded" mesmo tendo feito uma pergunta, às
+            // vezes emendando uma frase de gentileza depois do "?", tipo "...falar? Estou aqui pra
+            // ajudar!"). Por isso checa se existe um "?" em QUALQUER lugar da resposta (não só no
+            // final) - é raríssimo um bot de atendimento usar "?" sem esperar resposta de verdade,
+            // então vale a pena ser permissivo aqui pra nunca cortar uma pergunta ao meio.
             $replyStrippedForQuestionCheck = trim(preg_replace('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}\x{200D}]/u', '', $aiReply));
-            $endsWithQuestion = str_ends_with(rtrim($replyStrippedForQuestionCheck), '?');
+            $hasQuestionMark = str_contains($replyStrippedForQuestionCheck, '?');
 
-            $closingMenuText = ($hasWaitingTag || $aiSignaledWaiting || $endsWithQuestion || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage || $justPickedContinue)
+            $closingMenuText = ($hasWaitingTag || $aiSignaledWaiting || $hasQuestionMark || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage || $justPickedContinue)
                 ? null
                 : $this->getGenericClosingMenuText();
 
