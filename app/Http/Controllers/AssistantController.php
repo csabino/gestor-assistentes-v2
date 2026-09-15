@@ -2308,7 +2308,16 @@ class AssistantController extends Controller
             // "quer continuar ou encerrar?" logo depois dele já ter dito que quer continuar.
             $justPickedContinue = (bool) preg_match('/^\s*1\s*$/', $userMessage) || (bool) preg_match('/tenho mais d[uú]vidas/i', $userMessage);
 
-            $closingMenuText = ($hasWaitingTag || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage || $justPickedContinue)
+            // Rede de segurança: a IA repetidamente "esquece" de emitir [AGUARDANDO_CLIENTE] mesmo
+            // fazendo uma pergunta direta de verdade (ex: "qual é a sua preferência?", "quais
+            // dúvidas você tem?"). Em vez de continuar só ajustando o texto do prompt, o código
+            // agora também confere se a resposta termina em "?" (ignorando emojis no final) e trata
+            // isso como aguardando resposta, com ou sem a tag - vale igual pra texto e pra áudio,
+            // já que os dois usam esse mesmo $aiReply.
+            $replyStrippedForQuestionCheck = trim(preg_replace('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}\x{200D}]/u', '', $aiReply));
+            $endsWithQuestion = str_ends_with(rtrim($replyStrippedForQuestionCheck), '?');
+
+            $closingMenuText = ($hasWaitingTag || $endsWithQuestion || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage || $justPickedContinue)
                 ? null
                 : $this->getGenericClosingMenuText();
 
