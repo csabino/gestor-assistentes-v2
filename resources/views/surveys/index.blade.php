@@ -47,6 +47,7 @@
                         <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3">Dados da Pesquisa</h3>
                         <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end" onsubmit="saveSurveyScrollPosition()">
                             @csrf
+                            <input type="hidden" name="view" value="surveys">
                             <input type="hidden" name="action" value="update_survey">
                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                             <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
@@ -80,6 +81,7 @@
                                     <div class="flex items-start justify-between gap-3 mb-2">
                                         <form action="/" method="POST" class="flex-1 flex flex-col sm:flex-row gap-2" onsubmit="saveSurveyScrollPosition()">
                                             @csrf
+                            <input type="hidden" name="view" value="surveys">
                                             <input type="hidden" name="action" value="update_question">
                                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                             <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
@@ -93,6 +95,7 @@
                                         </form>
                                         <form action="/" method="POST" onsubmit="if(!confirm('Remover esta pergunta?'))return false; saveSurveyScrollPosition();">
                                             @csrf
+                            <input type="hidden" name="view" value="surveys">
                                             <input type="hidden" name="action" value="delete_question">
                                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                             <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
@@ -110,6 +113,7 @@
                                                     <span class="text-gray-300">•</span>
                                                     <form action="/" method="POST" class="flex-1 flex gap-2" onsubmit="saveSurveyScrollPosition()">
                                                         @csrf
+                            <input type="hidden" name="view" value="surveys">
                                                         <input type="hidden" name="action" value="update_option">
                                                         <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                                         <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
@@ -119,6 +123,7 @@
                                                     </form>
                                                     <form action="/" method="POST" onsubmit="saveSurveyScrollPosition()">
                                                         @csrf
+                            <input type="hidden" name="view" value="surveys">
                                                         <input type="hidden" name="action" value="delete_option">
                                                         <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                                         <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
@@ -132,6 +137,7 @@
 
                                             <form action="/" method="POST" class="flex gap-2 pt-1" onsubmit="saveSurveyScrollPosition()">
                                                 @csrf
+                            <input type="hidden" name="view" value="surveys">
                                                 <input type="hidden" name="action" value="add_option">
                                                 <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                                 <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
@@ -151,6 +157,7 @@
 
                         <form action="/" method="POST" class="flex flex-col sm:flex-row gap-2 border-t border-gray-100 pt-4" onsubmit="saveSurveyScrollPosition()">
                             @csrf
+                            <input type="hidden" name="view" value="surveys">
                             <input type="hidden" name="action" value="add_question">
                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                             <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
@@ -201,6 +208,7 @@
                         <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3">Nova Pesquisa</h3>
                         <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
                             @csrf
+                            <input type="hidden" name="view" value="surveys">
                             <input type="hidden" name="action" value="store_survey">
                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                             <input type="text" name="name" placeholder="Nome (ex: Pesquisa de Satisfação)" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-500">
@@ -232,6 +240,7 @@
                                     </a>
                                     <form action="/" method="POST" onsubmit="return confirm('Excluir esta pesquisa e todas as perguntas dela?');">
                                         @csrf
+                            <input type="hidden" name="view" value="surveys">
                                         <input type="hidden" name="action" value="delete_survey">
                                         <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                         <input type="hidden" name="survey_id" value="{{ $survey->id }}">
