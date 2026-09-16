@@ -2343,13 +2343,17 @@ class AssistantController extends Controller
 
                 $candidateSurvey = Survey::where('assistant_id', $assistant->id)->where('is_active', true)->first();
                 if ($candidateSurvey) {
-                    $alreadyOffered = SurveyResponse::where('assistant_id', $assistant->id)
+                    // Só bloqueia se já houver uma pesquisa PENDENTE (aguardando resposta ou em
+                    // andamento) pra esse número - uma vez concluída ou recusada, o próximo
+                    // encerramento (de um novo atendimento/chamado) oferece de novo normalmente,
+                    // mesmo que seja no mesmo dia.
+                    $hasPendingSurvey = SurveyResponse::where('assistant_id', $assistant->id)
                         ->where('phone_number', $cleanSender)
                         ->where('survey_id', $candidateSurvey->id)
-                        ->where('created_at', '>=', now()->subHours(12))
+                        ->whereIn('status', ['awaiting_confirmation', 'in_progress'])
                         ->exists();
 
-                    if (!$alreadyOffered) {
+                    if (!$hasPendingSurvey) {
                         $offeredSurvey = $candidateSurvey;
                         $aiReply = 'Antes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?';
                         $hasMainMenuTag = false;
