@@ -2803,12 +2803,22 @@ class AssistantController extends Controller
             $closingReply = $this->callAiApi(
                 $assistant,
                 $systemPrompt,
-                '[SISTEMA: o cliente acabou de concluir a pesquisa de opinião. Finalize o atendimento agora mesmo, seguindo estritamente as suas instruções de encerramento. Não pergunte mais nada e não ofereça nenhuma outra pesquisa.]'
+                '[SISTEMA: o cliente acabou de concluir a pesquisa de opinião - ela já foi respondida agora mesmo aqui no chat. Finalize o atendimento agora, seguindo estritamente as suas instruções de encerramento. Não pergunte mais nada, não ofereça nenhuma pesquisa e NÃO inclua nenhuma tag de pesquisa entre colchetes na sua resposta - isso já foi feito.]'
             );
-            $closingReply = trim(preg_replace('/\[MENU_PRINCIPAL\]/i', '', $closingReply));
-            $formattedClosing = $this->formatTextForWhatsapp($closingReply);
-            $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $formattedClosing);
+
+            // O Omni recebe o texto cru (é ele que reconhece a mensagem de encerramento pra fechar o
+            // chamado). O cliente no WhatsApp não precisa ver a tag nem o link antigo de pesquisa,
+            // já que ele acabou de responder a pesquisa aqui mesmo no chat.
             $this->sendToOmni($closingReply, $pushName, 'output', $surveyResponse->phone_number, $assistant->id);
+
+            $cleanedClosing = trim(preg_replace('/\[MENU_PRINCIPAL\]/i', '', $closingReply));
+            foreach (Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get() as $s) {
+                $cleanedClosing = trim(preg_replace('/\[' . preg_quote($s->tag, '/') . '\]/i', '', $cleanedClosing));
+            }
+            $cleanedClosing = trim(preg_replace('/\n?[^\n]*\[[^\]]*pesquisa[^\]]*\]\([^\)]+\)[^\n]*/iu', '', $cleanedClosing));
+
+            $formattedClosing = $this->formatTextForWhatsapp($cleanedClosing);
+            $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $formattedClosing);
         } catch (\Throwable $e) {
             Log::error('Erro ao encerrar atendimento apos conclusao da pesquisa: ' . $e->getMessage());
         }
