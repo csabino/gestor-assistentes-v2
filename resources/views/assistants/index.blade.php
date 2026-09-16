@@ -156,7 +156,7 @@
                 </div>
 
             @elseif($configuring)
-                <div class="flex flex-col h-[calc(100vh-8rem)]" x-data="{
+                <div class="flex flex-col h-[calc(100vh-12rem)]" x-data="{
                     renameModalOpen: false,
                     renameValue: @js($configuring->name),
                     renameSaving: false,
@@ -1016,7 +1016,7 @@
                 }" x-init="
                     $watch('filter', value => localStorage.setItem('assistant_filter', value));
                     $watch('view', value => localStorage.setItem('assistant_view', value));
-                " class="flex flex-col h-[calc(100vh-8rem)]">
+                " class="flex flex-col h-[calc(100vh-12rem)]">
                 <div class="mb-3 shrink-0">
                     <h1 class="text-xl font-bold text-gray-800">Gestão de Assistentes IA</h1>
                     <p class="text-xs text-gray-500 mt-1">Crie, configure e monitore seus assistentes virtuais multimodais integrados ao WhatsApp e canais de atendimento.</p>
