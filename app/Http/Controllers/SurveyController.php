@@ -22,7 +22,6 @@ class SurveyController extends Controller
             if ($action === 'update_question') return $this->updateQuestion($request);
             if ($action === 'delete_question') return $this->deleteQuestion($request);
             if ($action === 'add_option') return $this->addOption($request);
-            if ($action === 'update_option') return $this->updateOption($request);
             if ($action === 'delete_option') return $this->deleteOption($request);
         }
 
@@ -194,6 +193,16 @@ class SurveyController extends Controller
             'type' => $request->input('type'),
         ]);
 
+        // Textos das opções vêm juntos nesse mesmo formulário (options[option_id] => texto),
+        // pra não precisar de um botão "Salvar" separado por opção.
+        foreach ((array) $request->input('options', []) as $optionId => $optionText) {
+            $optionText = trim((string) $optionText);
+            if ($optionText === '') continue;
+            SurveyQuestionOption::where('id', (int) $optionId)
+                ->where('survey_question_id', $questionId)
+                ->update(['option_text' => $optionText]);
+        }
+
         return $this->redirectBack($assistantId, $surveyId)->with('success', 'Pergunta atualizada!');
     }
 
@@ -224,20 +233,6 @@ class SurveyController extends Controller
         ]);
 
         return $this->redirectBack($assistantId, $surveyId)->with('success', 'Opção adicionada!');
-    }
-
-    private function updateOption(Request $request)
-    {
-        $assistantId = (int) $request->input('assistant_id');
-        $surveyId = (int) $request->input('survey_id');
-        $optionId = (int) $request->input('option_id');
-        $request->validate(['option_text' => 'required|string|max:255']);
-
-        SurveyQuestionOption::where('id', $optionId)->update([
-            'option_text' => trim($request->input('option_text')),
-        ]);
-
-        return $this->redirectBack($assistantId, $surveyId)->with('success', 'Opção atualizada!');
     }
 
     private function deleteOption(Request $request)

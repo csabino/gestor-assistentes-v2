@@ -141,6 +141,24 @@
         .dark .light-surface .dark-card-fix .border-gray-200,
         .dark .light-surface .dark-card-fix .border-slate-200,
         .dark .light-surface .dark-card-fix .border-gray-50 { border-color: #4b5563 !important; }
+
+        /* Usado só na página de Pesquisas: cartão de verdade escuro no tema escuro (ao contrário do
+           "light-surface", que força tudo a ficar claro), mas com os campos de formulário (input/
+           select) claros por cima, pra manter contraste e legibilidade fácil de digitar. */
+        .dark .dark-card-invert { background-color: #1f2937 !important; border-color: #374151 !important; }
+        .dark .dark-card-invert .text-gray-800,
+        .dark .dark-card-invert .text-gray-700 { color: #f3f4f6 !important; }
+        .dark .dark-card-invert .text-gray-600,
+        .dark .dark-card-invert .text-gray-500,
+        .dark .dark-card-invert .text-gray-400 { color: #9ca3af !important; }
+        .dark .dark-card-invert .text-gray-300 { color: #d1d5db !important; }
+        .dark .dark-card-invert .border-gray-100,
+        .dark .dark-card-invert .border-gray-200 { border-color: #374151 !important; }
+        .dark .dark-card-invert .bg-gray-50 { background-color: #111827 !important; }
+        .dark .dark-card-invert .bg-gray-100 { background-color: #374151 !important; color: #f3f4f6 !important; }
+        .dark .dark-card-invert input,
+        .dark .dark-card-invert select { background-color: #ffffff !important; color: #111827 !important; border-color: #d1d5db !important; }
+        .dark .dark-card-invert input::placeholder { color: #9ca3af !important; }
     </style>
 
     @stack('head')

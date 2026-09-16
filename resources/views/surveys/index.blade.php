@@ -5,7 +5,7 @@
 @section('content')
         <div class="container mx-auto px-6 max-w-6xl flex flex-col h-[calc(100vh-10rem)] pt-4">
 
-            <div class="shrink-0 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="dark-card-invert shrink-0 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <a href="/?configure={{ $assistant->id }}" class="dark-btn-fix text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 text-sm transition bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg> Voltar
@@ -35,15 +35,20 @@
 
                 @if($editingSurvey)
                     {{-- ====================== DETALHE DA PESQUISA ====================== --}}
+                    <div x-data="{ showResponsesModal: false }">
                     <div class="flex items-center gap-3 mb-5">
                         <a href="/?view=surveys&assistant_id={{ $assistant->id }}" class="text-gray-400 hover:text-indigo-600 transition" title="Voltar para a lista de pesquisas">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
                         </a>
                         <h2 class="text-lg font-bold text-gray-800">{{ $editingSurvey->name }}</h2>
                         <span class="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">[{{ $editingSurvey->tag }}]</span>
+                        <button type="button" @click="showResponsesModal = true" class="ml-auto bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
+                            Ver Respostas ({{ $responses->count() }})
+                        </button>
                     </div>
 
-                    <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
+                    <div class="dark-card-invert bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
                         <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3">Dados da Pesquisa</h3>
                         <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end" onsubmit="saveSurveyScrollPosition()">
                             @csrf
@@ -72,30 +77,47 @@
                         <p class="text-[11px] text-gray-400 mt-2">Use <code class="bg-gray-100 px-1 rounded">[{{ $editingSurvey->tag }}]</code> no prompt do assistente para oferecer essa pesquisa ao cliente. Se houver mais de uma pesquisa ativa, preencha "Quando usar" para a IA saber escolher a certa.</p>
                     </div>
 
-                    <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                    <div class="dark-card-invert bg-white p-5 rounded-xl shadow-sm border border-gray-200">
                         <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-4">Perguntas</h3>
 
                         <div class="space-y-4 mb-5">
                             @forelse($editingSurvey->questions as $question)
                                 <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                                     <div class="flex items-start justify-between gap-3 mb-2">
-                                        <form action="/" method="POST" class="flex-1 flex flex-col sm:flex-row gap-2" onsubmit="saveSurveyScrollPosition()">
+                                        <form action="/" method="POST" class="flex-1 flex flex-col gap-2" onsubmit="saveSurveyScrollPosition()">
                                             @csrf
-                            <input type="hidden" name="view" value="surveys">
+                                            <input type="hidden" name="view" value="surveys">
                                             <input type="hidden" name="action" value="update_question">
                                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                             <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
                                             <input type="hidden" name="question_id" value="{{ $question->id }}">
-                                            <input type="text" name="question_text" value="{{ $question->question_text }}" required class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                                            <select name="type" class="border border-gray-300 rounded-lg px-2 py-2 text-xs font-semibold outline-none focus:border-indigo-500">
-                                                <option value="multiple_choice" {{ $question->type === 'multiple_choice' ? 'selected' : '' }}>Múltipla Escolha</option>
-                                                <option value="free_text" {{ $question->type === 'free_text' ? 'selected' : '' }}>Texto Livre</option>
-                                            </select>
-                                            <button type="submit" class="bg-white border border-gray-300 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 text-xs font-bold px-3 py-2 rounded-lg transition">Salvar</button>
+
+                                            <div class="flex flex-col sm:flex-row gap-2">
+                                                <input type="text" name="question_text" value="{{ $question->question_text }}" required class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                                                <select name="type" class="border border-gray-300 rounded-lg px-2 py-2 text-xs font-semibold outline-none focus:border-indigo-500">
+                                                    <option value="multiple_choice" {{ $question->type === 'multiple_choice' ? 'selected' : '' }}>Múltipla Escolha</option>
+                                                    <option value="free_text" {{ $question->type === 'free_text' ? 'selected' : '' }}>Texto Livre</option>
+                                                </select>
+                                            </div>
+
+                                            @if($question->type === 'multiple_choice')
+                                                <div class="pl-1 space-y-1.5">
+                                                    @foreach($question->options as $option)
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-gray-300">•</span>
+                                                            <input type="text" name="options[{{ $option->id }}]" value="{{ $option->option_text }}" class="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-indigo-500">
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+
+                                            <div>
+                                                <button type="submit" class="bg-white border border-gray-300 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 text-xs font-bold px-3 py-2 rounded-lg transition">Salvar</button>
+                                            </div>
                                         </form>
                                         <form action="/" method="POST" onsubmit="if(!confirm('Remover esta pergunta?'))return false; saveSurveyScrollPosition();">
                                             @csrf
-                            <input type="hidden" name="view" value="surveys">
+                                            <input type="hidden" name="view" value="surveys">
                                             <input type="hidden" name="action" value="delete_question">
                                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                             <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
@@ -107,43 +129,31 @@
                                     </div>
 
                                     @if($question->type === 'multiple_choice')
-                                        <div class="pl-1 mt-3 space-y-1.5">
+                                        <div class="pl-1 flex flex-wrap items-center gap-1.5">
                                             @foreach($question->options as $option)
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-gray-300">•</span>
-                                                    <form action="/" method="POST" class="flex-1 flex gap-2" onsubmit="saveSurveyScrollPosition()">
-                                                        @csrf
-                            <input type="hidden" name="view" value="surveys">
-                                                        <input type="hidden" name="action" value="update_option">
-                                                        <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                                                        <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
-                                                        <input type="hidden" name="option_id" value="{{ $option->id }}">
-                                                        <input type="text" name="option_text" value="{{ $option->option_text }}" required class="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-indigo-500">
-                                                        <button type="submit" class="text-gray-400 hover:text-indigo-600 text-xs px-1">Salvar</button>
-                                                    </form>
-                                                    <form action="/" method="POST" onsubmit="saveSurveyScrollPosition()">
-                                                        @csrf
-                            <input type="hidden" name="view" value="surveys">
-                                                        <input type="hidden" name="action" value="delete_option">
-                                                        <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                                                        <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
-                                                        <input type="hidden" name="option_id" value="{{ $option->id }}">
-                                                        <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="Remover opção">
-                                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                        </button>
-                                                    </form>
-                                                </div>
+                                                <form action="/" method="POST" onsubmit="saveSurveyScrollPosition()" class="inline-flex">
+                                                    @csrf
+                                                    <input type="hidden" name="view" value="surveys">
+                                                    <input type="hidden" name="action" value="delete_option">
+                                                    <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
+                                                    <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
+                                                    <input type="hidden" name="option_id" value="{{ $option->id }}">
+                                                    <button type="submit" class="text-[11px] text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-300 rounded px-1.5 py-0.5 transition flex items-center gap-1" title="Remover esta opção">
+                                                        <span>{{ \Illuminate\Support\Str::limit($option->option_text, 18) }}</span>
+                                                        <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+                                                </form>
                                             @endforeach
 
-                                            <form action="/" method="POST" class="flex gap-2 pt-1" onsubmit="saveSurveyScrollPosition()">
+                                            <form action="/" method="POST" class="flex gap-1.5" onsubmit="saveSurveyScrollPosition()">
                                                 @csrf
-                            <input type="hidden" name="view" value="surveys">
+                                                <input type="hidden" name="view" value="surveys">
                                                 <input type="hidden" name="action" value="add_option">
                                                 <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                                 <input type="hidden" name="survey_id" value="{{ $editingSurvey->id }}">
                                                 <input type="hidden" name="question_id" value="{{ $question->id }}">
-                                                <input type="text" name="option_text" placeholder="Nova opção de resposta" required class="flex-1 border border-dashed border-gray-300 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-indigo-500">
-                                                <button type="submit" class="text-indigo-600 hover:text-indigo-800 text-xs font-bold px-2">+ Adicionar</button>
+                                                <input type="text" name="option_text" placeholder="Nova opção" required class="w-32 border border-dashed border-gray-300 rounded-md px-2 py-1 text-[11px] outline-none focus:border-indigo-500">
+                                                <button type="submit" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold px-1">+ Adicionar</button>
                                             </form>
                                         </div>
                                     @else
@@ -170,41 +180,51 @@
                         </form>
                     </div>
 
-                    <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Respostas Recebidas ({{ $responses->count() }})</h3>
-                            @if($responses->isNotEmpty())
-                                <a href="/?view=surveys&assistant_id={{ $assistant->id }}&survey_id={{ $editingSurvey->id }}&export=csv" class="bg-white border border-gray-200 hover:border-emerald-300 hover:text-emerald-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center gap-1.5">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                                    Exportar CSV
-                                </a>
-                            @endif
-                        </div>
-
-                        @forelse($responses as $response)
-                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3">
-                                <div class="flex items-center justify-between mb-2 text-xs">
-                                    <span class="font-bold text-gray-700">{{ $response->client_name ?: $response->phone_number }}</span>
-                                    <span class="text-gray-400">{{ $response->phone_number }} • {{ optional($response->completed_at)->format('d/m/Y H:i') }}</span>
-                                </div>
-                                <div class="space-y-1.5">
-                                    @foreach($editingSurvey->questions as $q)
-                                        @php($answer = $response->answers->firstWhere('survey_question_id', $q->id))
-                                        <div class="text-xs">
-                                            <span class="text-gray-500">{{ $q->question_text }}:</span>
-                                            <span class="text-gray-800 font-medium">{{ $answer?->answer_text ?? '—' }}</span>
-                                        </div>
-                                    @endforeach
+                    <div x-show="showResponsesModal" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                        <div @click.away="showResponsesModal = false" class="dark-card-invert bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col border border-slate-200">
+                            <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                                <h3 class="text-base font-bold text-gray-800">Respostas Recebidas ({{ $responses->count() }})</h3>
+                                <div class="flex items-center gap-2">
+                                    @if($responses->isNotEmpty())
+                                        <a href="/?view=surveys&assistant_id={{ $assistant->id }}&survey_id={{ $editingSurvey->id }}&export=csv" class="bg-white border border-gray-200 hover:border-emerald-300 hover:text-emerald-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                                            Exportar CSV
+                                        </a>
+                                    @endif
+                                    <button type="button" @click="showResponsesModal = false" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg transition">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
                                 </div>
                             </div>
-                        @empty
-                            <p class="text-sm text-gray-400 text-center py-6">Nenhuma resposta recebida ainda.</p>
-                        @endforelse
+
+                            <div class="flex-1 min-h-0 overflow-y-auto custom-scroll p-5">
+                                @forelse($responses as $response)
+                                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3">
+                                        <div class="flex items-center justify-between mb-2 text-xs">
+                                            <span class="font-bold text-gray-700">{{ $response->client_name ?: $response->phone_number }}</span>
+                                            <span class="text-gray-400">{{ $response->phone_number }} • {{ optional($response->completed_at)->format('d/m/Y H:i') }}</span>
+                                        </div>
+                                        <div class="space-y-1.5">
+                                            @foreach($editingSurvey->questions as $q)
+                                                @php($answer = $response->answers->firstWhere('survey_question_id', $q->id))
+                                                <div class="text-xs">
+                                                    <span class="text-gray-500">{{ $q->question_text }}:</span>
+                                                    <span class="text-gray-800 font-medium">{{ $answer?->answer_text ?? '—' }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @empty
+                                    <p class="text-sm text-gray-400 text-center py-6">Nenhuma resposta recebida ainda.</p>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
                     </div>
 
                 @else
                     {{-- ====================== LISTA DE PESQUISAS ====================== --}}
-                    <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
+                    <div class="dark-card-invert bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
                         <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3">Nova Pesquisa</h3>
                         <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
                             @csrf
@@ -220,7 +240,7 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         @forelse($surveys as $survey)
-                            <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-3">
+                            <div class="dark-card-invert bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-3">
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="min-w-0">
                                         <h3 class="font-bold text-gray-800 truncate">{{ $survey->name }}</h3>
