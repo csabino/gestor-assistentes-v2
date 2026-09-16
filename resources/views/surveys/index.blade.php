@@ -63,8 +63,12 @@
                                 Ativa
                             </label>
                             <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg transition">Salvar</button>
+                            <div class="md:col-span-4">
+                                <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Quando usar (contexto para a IA, opcional)</label>
+                                <input type="text" name="trigger_context" value="{{ $editingSurvey->trigger_context }}" placeholder="Ex: usar apenas ao encerrar atendimentos de pós-venda/suporte" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                            </div>
                         </form>
-                        <p class="text-[11px] text-gray-400 mt-2">Use <code class="bg-gray-100 px-1 rounded">[{{ $editingSurvey->tag }}]</code> no prompt do assistente para oferecer essa pesquisa ao cliente.</p>
+                        <p class="text-[11px] text-gray-400 mt-2">Use <code class="bg-gray-100 px-1 rounded">[{{ $editingSurvey->tag }}]</code> no prompt do assistente para oferecer essa pesquisa ao cliente. Se houver mais de uma pesquisa ativa, preencha "Quando usar" para a IA saber escolher a certa.</p>
                     </div>
 
                     <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200">
@@ -170,6 +174,7 @@
                             <input type="text" name="name" placeholder="Nome (ex: Pesquisa de Satisfação)" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-500">
                             <input type="text" name="tag" placeholder="Tag (ex: PESQUISA_SATISFACAO)" required pattern="[A-Za-z0-9_]+" title="Só letras, números e underline" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-indigo-500">
                             <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2.5 px-5 rounded-lg transition whitespace-nowrap">+ Criar Pesquisa</button>
+                            <input type="text" name="trigger_context" placeholder="Quando usar (opcional - só precisa se tiver mais de uma pesquisa ativa)" class="w-full md:col-span-3 border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-500">
                         </form>
                     </div>
 
@@ -186,6 +191,9 @@
                                     </span>
                                 </div>
                                 <p class="text-xs text-gray-400">{{ $survey->questions()->count() }} pergunta(s)</p>
+                                @if($survey->trigger_context)
+                                    <p class="text-[11px] text-gray-400 italic truncate" title="{{ $survey->trigger_context }}">Uso: {{ $survey->trigger_context }}</p>
+                                @endif
                                 <div class="flex items-center justify-between border-t border-gray-100 pt-3 mt-1">
                                     <a href="/?view=surveys&assistant_id={{ $assistant->id }}&survey_id={{ $survey->id }}" class="bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition">
                                         Configurar Perguntas

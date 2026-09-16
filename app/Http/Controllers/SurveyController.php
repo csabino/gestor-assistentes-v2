@@ -65,6 +65,7 @@ class SurveyController extends Controller
             'assistant_id' => $assistantId,
             'name' => trim($request->input('name')),
             'tag' => $tag,
+            'trigger_context' => trim($request->input('trigger_context') ?? '') ?: null,
             'is_active' => true,
         ]);
 
@@ -89,6 +90,7 @@ class SurveyController extends Controller
         Survey::where('id', $surveyId)->where('assistant_id', $assistantId)->update([
             'name' => trim($request->input('name')),
             'tag' => $tag,
+            'trigger_context' => trim($request->input('trigger_context') ?? '') ?: null,
             'is_active' => $request->boolean('is_active'),
         ]);
 

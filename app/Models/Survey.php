@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Survey extends Model
 {
-    protected $fillable = ['assistant_id', 'name', 'tag', 'is_active'];
+    protected $fillable = ['assistant_id', 'name', 'tag', 'trigger_context', 'is_active'];
 
     protected $casts = [
         'is_active' => 'boolean',

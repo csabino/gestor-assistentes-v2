@@ -1503,11 +1503,20 @@ class AssistantController extends Controller
             $prompt .= "MÓDULO DE PESQUISAS DE OPINIÃO:\n";
             $prompt .= "Pesquisas disponíveis para oferecer ao cliente:\n";
             foreach ($activeSurveys as $s) {
-                $prompt .= "• \"{$s->name}\" (tag: {$s->tag})\n";
+                $prompt .= "• \"{$s->name}\" (tag: {$s->tag})";
+                if (!empty(trim($s->trigger_context ?? ''))) {
+                    $prompt .= " — usar quando: " . trim($s->trigger_context);
+                } elseif ($activeSurveys->count() > 1) {
+                    $prompt .= " — sem contexto específico definido; use seu julgamento para escolher a pesquisa mais adequada à situação";
+                }
+                $prompt .= "\n";
             }
             $prompt .= "\nDIRETRIZ DE OFERTA DE PESQUISA:\n";
+            if ($activeSurveys->count() > 1) {
+                $prompt .= "Há mais de uma pesquisa ativa. Escolha SEMPRE a pesquisa cujo \"usar quando\" combine com o contexto real da conversa (tipo de atendimento, motivo do contato, etc.). NUNCA ofereça mais de uma pesquisa na mesma conversa.\n";
+            }
             $prompt .= "Quando fizer sentido (por exemplo, ao encerrar ou concluir um atendimento), pergunte educadamente ao cliente se ele topa responder a pesquisa correspondente, explicando que são poucas perguntas rápidas. NUNCA escreva você mesmo as perguntas da pesquisa - isso é feito pelo sistema.\n";
-            $prompt .= "Se, e SOMENTE SE, o cliente concordar em responder, emita no final da SUA MESMA mensagem de confirmação (ex: \"Perfeito, vamos lá!\") a tag exata da pesquisa entre colchetes, exatamente como mostrado acima (ex: [{$activeSurveys->first()->tag}]).\n";
+            $prompt .= "Se, e SOMENTE SE, o cliente concordar em responder, emita no final da SUA MESMA mensagem de confirmação (ex: \"Perfeito, vamos lá!\") a tag exata da pesquisa escolhida entre colchetes, exatamente como mostrado acima (ex: [{$activeSurveys->first()->tag}]).\n";
             $prompt .= "Se o cliente recusar, apenas agradeça e siga normalmente, sem emitir nenhuma tag.\n";
             $prompt .= "===============================================\n";
         }
