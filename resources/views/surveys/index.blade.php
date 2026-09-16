@@ -45,7 +45,7 @@
 
                     <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
                         <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3">Dados da Pesquisa</h3>
-                        <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end">
+                        <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end" onsubmit="saveSurveyScrollPosition()">
                             @csrf
                             <input type="hidden" name="action" value="update_survey">
                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
@@ -78,7 +78,7 @@
                             @forelse($editingSurvey->questions as $question)
                                 <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                                     <div class="flex items-start justify-between gap-3 mb-2">
-                                        <form action="/" method="POST" class="flex-1 flex flex-col sm:flex-row gap-2">
+                                        <form action="/" method="POST" class="flex-1 flex flex-col sm:flex-row gap-2" onsubmit="saveSurveyScrollPosition()">
                                             @csrf
                                             <input type="hidden" name="action" value="update_question">
                                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
@@ -91,7 +91,7 @@
                                             </select>
                                             <button type="submit" class="bg-white border border-gray-300 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 text-xs font-bold px-3 py-2 rounded-lg transition">Salvar</button>
                                         </form>
-                                        <form action="/" method="POST" onsubmit="return confirm('Remover esta pergunta?');">
+                                        <form action="/" method="POST" onsubmit="if(!confirm('Remover esta pergunta?'))return false; saveSurveyScrollPosition();">
                                             @csrf
                                             <input type="hidden" name="action" value="delete_question">
                                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
@@ -108,7 +108,7 @@
                                             @foreach($question->options as $option)
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-gray-300">•</span>
-                                                    <form action="/" method="POST" class="flex-1 flex gap-2">
+                                                    <form action="/" method="POST" class="flex-1 flex gap-2" onsubmit="saveSurveyScrollPosition()">
                                                         @csrf
                                                         <input type="hidden" name="action" value="update_option">
                                                         <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
@@ -117,7 +117,7 @@
                                                         <input type="text" name="option_text" value="{{ $option->option_text }}" required class="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-indigo-500">
                                                         <button type="submit" class="text-gray-400 hover:text-indigo-600 text-xs px-1">Salvar</button>
                                                     </form>
-                                                    <form action="/" method="POST">
+                                                    <form action="/" method="POST" onsubmit="saveSurveyScrollPosition()">
                                                         @csrf
                                                         <input type="hidden" name="action" value="delete_option">
                                                         <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
@@ -130,7 +130,7 @@
                                                 </div>
                                             @endforeach
 
-                                            <form action="/" method="POST" class="flex gap-2 pt-1">
+                                            <form action="/" method="POST" class="flex gap-2 pt-1" onsubmit="saveSurveyScrollPosition()">
                                                 @csrf
                                                 <input type="hidden" name="action" value="add_option">
                                                 <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
@@ -149,7 +149,7 @@
                             @endforelse
                         </div>
 
-                        <form action="/" method="POST" class="flex flex-col sm:flex-row gap-2 border-t border-gray-100 pt-4">
+                        <form action="/" method="POST" class="flex flex-col sm:flex-row gap-2 border-t border-gray-100 pt-4" onsubmit="saveSurveyScrollPosition()">
                             @csrf
                             <input type="hidden" name="action" value="add_question">
                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
@@ -248,4 +248,27 @@
                 @endif
             </div>
         </div>
+
+        <script>
+            function saveSurveyScrollPosition() {
+                const scrollArea = document.getElementById('surveysScrollArea');
+                if (scrollArea) {
+                    sessionStorage.setItem('scrollpos_surveys_{{ $editingSurvey->id ?? $assistant->id }}', scrollArea.scrollTop);
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", function() {
+                const key = 'scrollpos_surveys_{{ $editingSurvey->id ?? $assistant->id }}';
+                const scrollpos = sessionStorage.getItem(key);
+                if (scrollpos !== null) {
+                    setTimeout(() => {
+                        const scrollArea = document.getElementById('surveysScrollArea');
+                        if (scrollArea) {
+                            scrollArea.scrollTop = parseInt(scrollpos);
+                        }
+                    }, 50);
+                    sessionStorage.removeItem(key);
+                }
+            });
+        </script>
 @endsection
