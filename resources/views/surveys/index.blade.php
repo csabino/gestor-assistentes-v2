@@ -224,37 +224,39 @@
 
                 @else
                     {{-- ====================== LISTA DE PESQUISAS ====================== --}}
-                    <div class="dark-card-invert bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
-                        <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3">Nova Pesquisa</h3>
-                        <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+                    <div class="dark-card-invert bg-white p-3 rounded-xl shadow-sm border border-gray-200 mb-4">
+                        <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">Nova Pesquisa</h3>
+                        <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2">
                             @csrf
                             <input type="hidden" name="view" value="surveys">
                             <input type="hidden" name="action" value="store_survey">
                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                            <input type="text" name="name" placeholder="Nome (ex: Pesquisa de Satisfação)" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-500">
-                            <input type="text" name="tag" placeholder="Tag (ex: PESQUISA_SATISFACAO)" required pattern="[A-Za-z0-9_]+" title="Só letras, números e underline" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-indigo-500">
-                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2.5 px-5 rounded-lg transition whitespace-nowrap">+ Criar Pesquisa</button>
-                            <input type="text" name="trigger_context" placeholder="Quando usar (opcional - só precisa se tiver mais de uma pesquisa ativa)" class="w-full md:col-span-3 border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-500">
+                            <input type="text" name="name" placeholder="Nome (ex: Pesquisa de Satisfação)" required class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-indigo-500">
+                            <input type="text" name="tag" placeholder="Tag (ex: PESQUISA_SATISFACAO)" required pattern="[A-Za-z0-9_]+" title="Só letras, números e underline" class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:border-indigo-500">
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-4 rounded-lg transition whitespace-nowrap">+ Criar Pesquisa</button>
+                            <input type="text" name="trigger_context" placeholder="Quando usar (opcional - só precisa se tiver mais de uma pesquisa ativa)" class="w-full md:col-span-3 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-indigo-500">
                         </form>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         @forelse($surveys as $survey)
-                            <div class="dark-card-invert bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-3">
+                            <div class="dark-card-invert bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-1.5">
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="min-w-0">
-                                        <h3 class="font-bold text-gray-800 truncate">{{ $survey->name }}</h3>
+                                        <div class="flex items-center gap-1.5">
+                                            <h3 class="font-bold text-gray-800 truncate">{{ $survey->name }}</h3>
+                                            <span class="text-[11px] text-gray-400 shrink-0">· {{ $survey->questions()->count() }} pergunta(s)</span>
+                                        </div>
                                         <span class="text-[11px] font-mono text-indigo-600">[{{ $survey->tag }}]</span>
                                     </div>
                                     <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold shrink-0 {{ $survey->is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-300' }}">
                                         {{ $survey->is_active ? 'Ativa' : 'Inativa' }}
                                     </span>
                                 </div>
-                                <p class="text-xs text-gray-400">{{ $survey->questions()->count() }} pergunta(s)</p>
                                 @if($survey->trigger_context)
                                     <p class="text-[11px] text-gray-400 italic truncate" title="{{ $survey->trigger_context }}">Uso: {{ $survey->trigger_context }}</p>
                                 @endif
-                                <div class="flex items-center justify-between border-t border-gray-100 pt-3 mt-1">
+                                <div class="flex items-center justify-between border-t border-gray-100 pt-2">
                                     <a href="/?view=surveys&assistant_id={{ $assistant->id }}&survey_id={{ $survey->id }}" class="bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition">
                                         Configurar Perguntas
                                     </a>
