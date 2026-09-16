@@ -1409,32 +1409,17 @@ class AssistantController extends Controller
         $prompt .= "• Ano Corrente: " . $now->year . "\n";
         $prompt .= "===============================================\n\n";
 
-        // 0. MÓDULO DE PESQUISAS DE OPINIÃO (SE HOUVER PESQUISA ATIVA) - fica ANTES do prompt
-        // principal e com prioridade máxima porque precisa VENCER a regra de encerramento do
-        // prompt principal (que manda encerrar "IMEDIATAMENTE"): colocado depois, a IA ignorava
-        // essa exceção e mandava a mensagem de encerramento direto, pulando a oferta da pesquisa.
+        // 0. MÓDULO DE PESQUISAS DE OPINIÃO (SE HOUVER PESQUISA ATIVA). A IA NÃO decide mais nada
+        // sobre a pesquisa - só marca a própria mensagem de encerramento (que ela já manda de forma
+        // 100% confiável) com uma tag simples. Todo o resto (perguntar, esperar resposta, conduzir
+        // a pesquisa, decidir a hora certa de mandar a mensagem de encerramento de verdade) é feito
+        // em código, interceptando essa tag - pedir pra IA "não mandar a mensagem agora" ou "perguntar
+        // antes" falhou repetidamente, então a IA não recebe mais esse tipo de decisão condicional.
         $activeSurveys = Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get();
         if ($activeSurveys->isNotEmpty()) {
-            $prompt .= "🔴 REGRA DE PRIORIDADE MÁXIMA - LEIA ANTES DE QUALQUER OUTRA INSTRUÇÃO 🔴\n";
             $prompt .= "===============================================\n";
             $prompt .= "MÓDULO DE PESQUISAS DE OPINIÃO:\n";
-            $prompt .= "Pesquisas disponíveis para oferecer ao cliente:\n";
-            foreach ($activeSurveys as $s) {
-                $prompt .= "• \"{$s->name}\" (tag: {$s->tag})";
-                if (!empty(trim($s->trigger_context ?? ''))) {
-                    $prompt .= " — usar quando: " . trim($s->trigger_context);
-                } elseif ($activeSurveys->count() > 1) {
-                    $prompt .= " — sem contexto específico definido; use seu julgamento para escolher a pesquisa mais adequada à situação";
-                }
-                $prompt .= "\n";
-            }
-            $prompt .= "\nDIRETRIZ DE OFERTA DE PESQUISA (ISSO SUBSTITUI, SÓ NA PRIMEIRA VEZ, A SEÇÃO \"MENSAGENS DE ENCERRAMENTO\" QUE VOCÊ VAI LER MAIS ABAIXO):\n";
-            if ($activeSurveys->count() > 1) {
-                $prompt .= "Há mais de uma pesquisa ativa. Escolha SEMPRE a pesquisa cujo \"usar quando\" combine com o contexto real da conversa (tipo de atendimento, motivo do contato, etc.).\n";
-            }
-            $prompt .= "Quando o cliente sinalizar que quer encerrar o atendimento (o gatilho está descrito na seção \"MENSAGENS DE ENCERRAMENTO\" mais abaixo), e você AINDA NÃO tiver oferecido nenhuma pesquisa nesta mesma conversa: NÃO execute a seção \"MENSAGENS DE ENCERRAMENTO\" ainda, mesmo que ela diga \"IMEDIATAMENTE\". Em vez disso, responda SOMENTE com a pergunta abaixo (pode adaptar o texto, mantendo o sentido), incluindo a tag de oferta no final, no formato EXATO [OFERTA_PESQUISA:TAG_DA_PESQUISA] (troque TAG_DA_PESQUISA pela tag real, ex: [OFERTA_PESQUISA:{$activeSurveys->first()->tag}]):\n\n";
-            $prompt .= "\"Antes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?\"\n\n";
-            $prompt .= "O sistema cuida de interpretar a resposta do cliente e conduzir o restante automaticamente - depois de enviar essa pergunta com a tag, não faça mais nada, apenas aguarde. Só depois que você já tiver oferecido a pesquisa nesta mesma conversa (o cliente já respondeu sim ou não a ela) é que você deve seguir normalmente a seção \"MENSAGENS DE ENCERRAMENTO\" quando o cliente pedir pra encerrar de novo.\n";
+            $prompt .= "SEMPRE que você enviar a mensagem de encerramento (qualquer uma das duas mensagens fixas da seção \"MENSAGENS DE ENCERRAMENTO\"), inclua TAMBÉM, ao final dela, na mesma mensagem, a tag [ENCERRAMENTO]. Faça isso em TODA mensagem de encerramento, sem exceção e sem pensar em mais nada sobre pesquisa - o sistema cuida de todo o resto automaticamente ao ver essa tag.\n";
             $prompt .= "===============================================\n\n";
         }
 
@@ -2345,17 +2330,31 @@ class AssistantController extends Controller
                 $isAudioMessage = false;
             }
 
-            // 🛑 OFERTA DE PESQUISA: a IA emite [OFERTA_PESQUISA:TAG] junto da pergunta de permissão,
-            // ao decidir encerrar o atendimento. O sistema só cria um registro "aguardando confirmação" -
-            // a resposta do cliente (sim/não) é interpretada 100% em código (ver checagem no início do
-            // webhook()), sem depender da IA pra essa decisão de fluxo.
+            // 🛑 ENCERRAMENTO: a IA sempre marca sua mensagem de encerramento com [ENCERRAMENTO] (ação
+            // única e já confiável, igual o [MENU_PRINCIPAL]). O sistema intercepta: se houver pesquisa
+            // ativa ainda não oferecida a esse número, DESCARTA o texto de encerramento da IA (ele só
+            // serviu de sinal) e manda no lugar a pergunta de oferta - só quando o cliente responder é
+            // que a mensagem de encerramento de verdade é gerada (ver handleSurveyConfirmation /
+            // sendAiGeneratedClosing). Pedir pra IA decidir "não mandar a mensagem agora" ou "perguntar
+            // antes" falhou repetidamente, então ela não recebe mais esse tipo de decisão condicional.
             $offeredSurvey = null;
-            if (preg_match('/\[OFERTA_PESQUISA:([A-Za-z0-9_]+)\]/i', $aiReply, $mOferta)) {
-                $offeredSurvey = Survey::where('assistant_id', $assistant->id)
-                    ->where('is_active', true)
-                    ->where('tag', strtoupper($mOferta[1]))
-                    ->first();
-                $aiReply = trim(preg_replace('/\[OFERTA_PESQUISA:[A-Za-z0-9_]+\]/i', '', $aiReply));
+            if (preg_match('/\[ENCERRAMENTO\]/i', $aiReply)) {
+                $aiReply = trim(preg_replace('/\[ENCERRAMENTO\]/i', '', $aiReply));
+
+                $candidateSurvey = Survey::where('assistant_id', $assistant->id)->where('is_active', true)->first();
+                if ($candidateSurvey) {
+                    $alreadyOffered = SurveyResponse::where('assistant_id', $assistant->id)
+                        ->where('phone_number', $cleanSender)
+                        ->where('survey_id', $candidateSurvey->id)
+                        ->where('created_at', '>=', now()->subHours(12))
+                        ->exists();
+
+                    if (!$alreadyOffered) {
+                        $offeredSurvey = $candidateSurvey;
+                        $aiReply = 'Antes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?';
+                        $hasMainMenuTag = false;
+                    }
+                }
             }
             if ($offeredSurvey) {
                 $isAudioMessage = false;
