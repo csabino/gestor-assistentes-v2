@@ -1511,11 +1511,13 @@ class AssistantController extends Controller
                 }
                 $prompt .= "\n";
             }
-            $prompt .= "\nDIRETRIZ DE ACIONAMENTO DE PESQUISA:\n";
+            $prompt .= "\nDIRETRIZ DE OFERTA DE PESQUISA:\n";
             if ($activeSurveys->count() > 1) {
                 $prompt .= "Há mais de uma pesquisa ativa. Escolha SEMPRE a pesquisa cujo \"usar quando\" combine com o contexto real da conversa (tipo de atendimento, motivo do contato, etc.).\n";
             }
-            $prompt .= "SEMPRE que você enviar a mensagem de encerramento (a mensagem fixa da seção \"MENSAGENS DE ENCERRAMENTO\"), inclua TAMBÉM, ao final dela, na mesma mensagem, a tag exata da pesquisa entre colchetes, exatamente como mostrado acima (ex: [{$activeSurveys->first()->tag}]). Não pergunte permissão ao cliente e não escreva as perguntas da pesquisa você mesma - o sistema cuida de tudo automaticamente assim que vir a tag.\n";
+            $prompt .= "Quando o cliente sinalizar que quer encerrar o atendimento (ver seção \"MENSAGENS DE ENCERRAMENTO\"), e você AINDA NÃO tiver oferecido nenhuma pesquisa nesta mesma conversa, NÃO mande a mensagem de encerramento ainda. Em vez disso, responda SOMENTE com a pergunta abaixo (pode adaptar o texto, mantendo o sentido), incluindo a tag de oferta no final, no formato EXATO [OFERTA_PESQUISA:TAG_DA_PESQUISA] (troque TAG_DA_PESQUISA pela tag real, ex: [OFERTA_PESQUISA:{$activeSurveys->first()->tag}]):\n\n";
+            $prompt .= "\"Antes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?\"\n\n";
+            $prompt .= "O sistema cuida de interpretar a resposta do cliente e conduzir o restante automaticamente - depois de enviar essa pergunta com a tag, não faça mais nada, apenas aguarde. Se você já tiver oferecido a pesquisa antes nesta mesma conversa (o cliente já respondeu sim ou não), NÃO ofereça de novo - siga direto para a mensagem de encerramento normal.\n";
             $prompt .= "===============================================\n";
         }
 
@@ -2142,18 +2144,22 @@ class AssistantController extends Controller
                 $displayName = $clientName;
             }
 
-            // 🛑 PESQUISA EM ANDAMENTO: se esse número já está respondendo uma pesquisa, essa
-            // mensagem é a resposta da pergunta atual - conduz a sequência 100% em código, sem
-            // passar pela IA (a mesma razão de "3 - voltar ao menu": é navegação/estado
-            // determinístico, não conversa livre).
-            $activeSurveyResponse = SurveyResponse::where('assistant_id', $assistant->id)
+            // 🛑 PESQUISA (AGUARDANDO CONFIRMAÇÃO OU EM ANDAMENTO): se esse número acabou de ser
+            // convidado a responder uma pesquisa, ou já está respondendo uma, essa mensagem é a
+            // resposta atual - conduz a sequência 100% em código, sem passar pela IA (a mesma razão
+            // de "3 - voltar ao menu": é navegação/estado determinístico, não conversa livre).
+            $pendingSurveyResponse = SurveyResponse::where('assistant_id', $assistant->id)
                 ->where('phone_number', $cleanSender)
-                ->where('status', 'in_progress')
+                ->whereIn('status', ['awaiting_confirmation', 'in_progress'])
                 ->latest('id')
                 ->first();
 
-            if ($activeSurveyResponse) {
-                $this->handleSurveyAnswer($assistant, $activeSurveyResponse, $userMessage);
+            if ($pendingSurveyResponse) {
+                if ($pendingSurveyResponse->status === 'awaiting_confirmation') {
+                    $this->handleSurveyConfirmation($assistant, $pendingSurveyResponse, $userMessage);
+                } else {
+                    $this->handleSurveyAnswer($assistant, $pendingSurveyResponse, $userMessage);
+                }
 
                 DB::table('chat_messages')->insert([
                     ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender, 'protocol' => null, 'role' => 'user', 'content' => $userMessage, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted],
@@ -2335,30 +2341,24 @@ class AssistantController extends Controller
                 $isAudioMessage = false;
             }
 
-            // 🛑 PESQUISA: a IA emite a tag de uma pesquisa ativa (ex: [PESQUISA_SATISFACAO_POS_ATENDIMENTO])
-            // depois que o cliente topar respondê-la. O sistema manda a mensagem normal da IA e, em
-            // seguida, assume a condução pergunta a pergunta (ver checagem no início do webhook()).
-            $triggeredSurvey = null;
-            foreach (Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get() as $survey) {
-                if (preg_match('/\[' . preg_quote($survey->tag, '/') . '\]/i', $aiReply)) {
-                    $triggeredSurvey = $survey;
-                    $aiReply = trim(preg_replace('/\[' . preg_quote($survey->tag, '/') . '\]/i', '', $aiReply));
-                    break;
-                }
+            // 🛑 OFERTA DE PESQUISA: a IA emite [OFERTA_PESQUISA:TAG] junto da pergunta de permissão,
+            // ao decidir encerrar o atendimento. O sistema só cria um registro "aguardando confirmação" -
+            // a resposta do cliente (sim/não) é interpretada 100% em código (ver checagem no início do
+            // webhook()), sem depender da IA pra essa decisão de fluxo.
+            $offeredSurvey = null;
+            if (preg_match('/\[OFERTA_PESQUISA:([A-Za-z0-9_]+)\]/i', $aiReply, $mOferta)) {
+                $offeredSurvey = Survey::where('assistant_id', $assistant->id)
+                    ->where('is_active', true)
+                    ->where('tag', strtoupper($mOferta[1]))
+                    ->first();
+                $aiReply = trim(preg_replace('/\[OFERTA_PESQUISA:[A-Za-z0-9_]+\]/i', '', $aiReply));
             }
-            if ($triggeredSurvey) {
+            if ($offeredSurvey) {
                 $isAudioMessage = false;
             }
 
             // ENVIO PARA O OMNI COM A RESPOSTA FINAL TRATADA E FORMATADA
-            // (o Omni recebe o texto completo, com a linha do link de pesquisa antigo - é esse texto
-            // exato que o Omni reconhece pra fechar o chamado automaticamente. O cliente no WhatsApp,
-            // porém, não precisa ver esse link quando já vamos conduzir a pesquisa aqui mesmo no chat.)
             $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $cleanSender, $assistant->id);
-
-            if ($triggeredSurvey) {
-                $aiReply = trim(preg_replace('/\n?[^\n]*\[[^\]]*pesquisa[^\]]*\]\([^\)]+\)[^\n]*/iu', '', $aiReply));
-            }
 
             DB::table('chat_messages')->insert([
                 [
@@ -2456,10 +2456,17 @@ class AssistantController extends Controller
                 $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
             }
 
-            // A resposta da IA já foi enviada acima; agora, se ela topou a pesquisa, disparamos
-            // a primeira pergunta como mensagem seguinte e passamos a conduzir 100% em código.
-            if ($triggeredSurvey) {
-                $this->startSurvey($assistant, $cleanSender, $displayName, $triggeredSurvey);
+            // A pergunta de oferta já foi enviada acima; cria o registro "aguardando confirmação"
+            // pra que a PRÓXIMA mensagem desse número seja interpretada (em código) como sim/não.
+            if ($offeredSurvey) {
+                SurveyResponse::create([
+                    'survey_id' => $offeredSurvey->id,
+                    'assistant_id' => $assistant->id,
+                    'phone_number' => $cleanSender,
+                    'client_name' => $displayName,
+                    'status' => 'awaiting_confirmation',
+                    'current_question_id' => null,
+                ]);
             }
 
             DB::table('webhook_logs')->insert([
@@ -2715,33 +2722,6 @@ class AssistantController extends Controller
     }
 
     /**
-     * Inicia a condução de uma pesquisa: cria o registro de resposta e manda a primeira pergunta.
-     * A partir daqui, TODA mensagem seguinte desse número é tratada como resposta da pesquisa
-     * (ver checagem logo no início do webhook()), sem passar pela IA - a mesma lição de hoje sobre
-     * não confiar na IA pra conduzir uma sequência determinística de perguntas.
-     */
-    private function startSurvey(Assistant $assistant, string $phone, ?string $displayName, Survey $survey): void
-    {
-        $firstQuestion = $survey->questions()->first();
-        if (!$firstQuestion) {
-            return;
-        }
-
-        SurveyResponse::create([
-            'survey_id' => $survey->id,
-            'assistant_id' => $assistant->id,
-            'phone_number' => $phone,
-            'client_name' => $displayName,
-            'status' => 'in_progress',
-            'current_question_id' => $firstQuestion->id,
-        ]);
-
-        $questionMsg = $this->buildSurveyQuestionMessage($firstQuestion);
-        $this->sendWhatsappMessage($assistant, $phone, $questionMsg);
-        $this->sendToOmni($questionMsg, $displayName ?: $phone, 'output', $phone, $assistant->id);
-    }
-
-    /**
      * Registra a resposta da pergunta atual e avança pra próxima (ou encerra a pesquisa).
      * Pra perguntas de múltipla escolha, aceita tanto o número da opção quanto o texto exato -
      * mas nunca trava o fluxo se não bater com nada, só grava o que o cliente escreveu mesmo.
@@ -2795,32 +2775,73 @@ class AssistantController extends Controller
         $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $thanksMsg);
         $this->sendToOmni($thanksMsg, $pushName, 'output', $surveyResponse->phone_number, $assistant->id);
 
-        // A pesquisa acabou de terminar, mas quem encerra o atendimento de verdade (com o texto exato
-        // que o Omni reconhece pra fechar o chamado) é a própria IA - cada assistente pode ter um texto
-        // de encerramento diferente, então não faz sentido fixar isso aqui no código.
+        $this->sendAiGeneratedClosing(
+            $assistant,
+            $surveyResponse->phone_number,
+            $pushName,
+            '[SISTEMA: o cliente acabou de concluir a pesquisa de opinião - ela já foi respondida agora mesmo aqui no chat. Finalize o atendimento agora, seguindo estritamente as suas instruções de encerramento. Não pergunte mais nada, não ofereça nenhuma pesquisa e NÃO inclua nenhuma tag de pesquisa entre colchetes na sua resposta - isso já foi feito.]'
+        );
+    }
+
+    /**
+     * Interpreta (100% em código, sem IA) a resposta do cliente à pergunta "quer responder a
+     * pesquisa?" - se topar, inicia a pesquisa; senão (ou se não entender a resposta), encerra
+     * o atendimento normalmente através da própria IA (mensagem exata que fecha o chamado no Omni).
+     */
+    private function handleSurveyConfirmation(Assistant $assistant, SurveyResponse $pending, string $userMessage): void
+    {
+        $pushName = $pending->client_name ?: $pending->phone_number;
+        $this->sendToOmni($userMessage, $pushName, 'input', $pending->phone_number, $assistant->id);
+
+        $accepted = (bool) preg_match('/\b(sim|s|quero|claro|pode|ok|okay|beleza|bora|vamos|topo|aceito|com certeza)\b/iu', trim($userMessage));
+        $survey = $pending->survey;
+        $firstQuestion = $survey ? $survey->questions()->first() : null;
+
+        if ($accepted && $firstQuestion) {
+            $pending->update(['status' => 'in_progress', 'current_question_id' => $firstQuestion->id]);
+            $questionMsg = $this->buildSurveyQuestionMessage($firstQuestion);
+            $this->sendWhatsappMessage($assistant, $pending->phone_number, $questionMsg);
+            $this->sendToOmni($questionMsg, $pushName, 'output', $pending->phone_number, $assistant->id);
+            return;
+        }
+
+        $pending->update(['status' => 'declined', 'completed_at' => now()]);
+        $this->sendAiGeneratedClosing(
+            $assistant,
+            $pending->phone_number,
+            $pushName,
+            '[SISTEMA: o cliente respondeu que não quer (ou não respondeu claramente) à oferta da pesquisa de opinião. Finalize o atendimento agora, seguindo estritamente as suas instruções de encerramento. Não pergunte mais nada e não ofereça nenhuma pesquisa de novo.]'
+        );
+    }
+
+    /**
+     * Pede pra própria IA gerar a mensagem de encerramento (com o texto exato configurado no
+     * prompt dela, que é o que o Omni reconhece pra fechar o chamado) e manda pro cliente já
+     * limpa de qualquer tag/link de pesquisa - usado depois que a pesquisa foi concluída ou
+     * recusada, pra não depender de um texto fixo de encerramento aqui no código (cada
+     * assistente pode ter um texto diferente).
+     */
+    private function sendAiGeneratedClosing(Assistant $assistant, string $phone, ?string $pushName, string $instructionNote): void
+    {
         try {
             $systemPrompt = $this->buildSystemPromptWithKnowledge($assistant);
-            $closingReply = $this->callAiApi(
-                $assistant,
-                $systemPrompt,
-                '[SISTEMA: o cliente acabou de concluir a pesquisa de opinião - ela já foi respondida agora mesmo aqui no chat. Finalize o atendimento agora, seguindo estritamente as suas instruções de encerramento. Não pergunte mais nada, não ofereça nenhuma pesquisa e NÃO inclua nenhuma tag de pesquisa entre colchetes na sua resposta - isso já foi feito.]'
-            );
+            $closingReply = $this->callAiApi($assistant, $systemPrompt, $instructionNote);
 
             // O Omni recebe o texto cru (é ele que reconhece a mensagem de encerramento pra fechar o
-            // chamado). O cliente no WhatsApp não precisa ver a tag nem o link antigo de pesquisa,
-            // já que ele acabou de responder a pesquisa aqui mesmo no chat.
-            $this->sendToOmni($closingReply, $pushName, 'output', $surveyResponse->phone_number, $assistant->id);
+            // chamado). O cliente no WhatsApp não precisa ver nenhuma tag nem o link antigo de pesquisa.
+            $this->sendToOmni($closingReply, $pushName ?: $phone, 'output', $phone, $assistant->id);
 
-            $cleanedClosing = trim(preg_replace('/\[MENU_PRINCIPAL\]/i', '', $closingReply));
+            $cleaned = trim(preg_replace('/\[MENU_PRINCIPAL\]/i', '', $closingReply));
+            $cleaned = trim(preg_replace('/\[OFERTA_PESQUISA:[A-Za-z0-9_]+\]/i', '', $cleaned));
             foreach (Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get() as $s) {
-                $cleanedClosing = trim(preg_replace('/\[' . preg_quote($s->tag, '/') . '\]/i', '', $cleanedClosing));
+                $cleaned = trim(preg_replace('/\[' . preg_quote($s->tag, '/') . '\]/i', '', $cleaned));
             }
-            $cleanedClosing = trim(preg_replace('/\n?[^\n]*\[[^\]]*pesquisa[^\]]*\]\([^\)]+\)[^\n]*/iu', '', $cleanedClosing));
+            $cleaned = trim(preg_replace('/\n?[^\n]*\[[^\]]*pesquisa[^\]]*\]\([^\)]+\)[^\n]*/iu', '', $cleaned));
 
-            $formattedClosing = $this->formatTextForWhatsapp($cleanedClosing);
-            $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $formattedClosing);
+            $formatted = $this->formatTextForWhatsapp($cleaned);
+            $this->sendWhatsappMessage($assistant, $phone, $formatted);
         } catch (\Throwable $e) {
-            Log::error('Erro ao encerrar atendimento apos conclusao da pesquisa: ' . $e->getMessage());
+            Log::error('Erro ao gerar mensagem de encerramento via IA: ' . $e->getMessage());
         }
     }
 
