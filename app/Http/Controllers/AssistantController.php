@@ -2731,7 +2731,9 @@ class AssistantController extends Controller
             'current_question_id' => $firstQuestion->id,
         ]);
 
-        $this->sendWhatsappMessage($assistant, $phone, $this->buildSurveyQuestionMessage($firstQuestion));
+        $questionMsg = $this->buildSurveyQuestionMessage($firstQuestion);
+        $this->sendWhatsappMessage($assistant, $phone, $questionMsg);
+        $this->sendToOmni($questionMsg, $displayName ?: $phone, 'output', $phone, $assistant->id);
     }
 
     /**
@@ -2741,6 +2743,9 @@ class AssistantController extends Controller
      */
     private function handleSurveyAnswer(Assistant $assistant, SurveyResponse $surveyResponse, string $userMessage): void
     {
+        $pushName = $surveyResponse->client_name ?: $surveyResponse->phone_number;
+        $this->sendToOmni($userMessage, $pushName, 'input', $surveyResponse->phone_number, $assistant->id);
+
         $question = $surveyResponse->currentQuestion;
         if (!$question) {
             $surveyResponse->update(['status' => 'completed', 'completed_at' => now()]);
@@ -2774,12 +2779,34 @@ class AssistantController extends Controller
 
         if ($nextQuestion) {
             $surveyResponse->update(['current_question_id' => $nextQuestion->id]);
-            $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $this->buildSurveyQuestionMessage($nextQuestion));
+            $nextMsg = $this->buildSurveyQuestionMessage($nextQuestion);
+            $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $nextMsg);
+            $this->sendToOmni($nextMsg, $pushName, 'output', $surveyResponse->phone_number, $assistant->id);
             return;
         }
 
         $surveyResponse->update(['status' => 'completed', 'completed_at' => now(), 'current_question_id' => null]);
-        $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, 'Muito obrigado por responder nossa pesquisa! 🙏 Sua opinião é muito importante pra gente.');
+        $thanksMsg = 'Muito obrigado por responder nossa pesquisa! 🙏 Sua opinião é muito importante pra gente.';
+        $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $thanksMsg);
+        $this->sendToOmni($thanksMsg, $pushName, 'output', $surveyResponse->phone_number, $assistant->id);
+
+        // A pesquisa acabou de terminar, mas quem encerra o atendimento de verdade (com o texto exato
+        // que o Omni reconhece pra fechar o chamado) é a própria IA - cada assistente pode ter um texto
+        // de encerramento diferente, então não faz sentido fixar isso aqui no código.
+        try {
+            $systemPrompt = $this->buildSystemPromptWithKnowledge($assistant);
+            $closingReply = $this->callAiApi(
+                $assistant,
+                $systemPrompt,
+                '[SISTEMA: o cliente acabou de concluir a pesquisa de opinião. Finalize o atendimento agora mesmo, seguindo estritamente as suas instruções de encerramento. Não pergunte mais nada e não ofereça nenhuma outra pesquisa.]'
+            );
+            $closingReply = trim(preg_replace('/\[MENU_PRINCIPAL\]/i', '', $closingReply));
+            $formattedClosing = $this->formatTextForWhatsapp($closingReply);
+            $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $formattedClosing);
+            $this->sendToOmni($closingReply, $pushName, 'output', $surveyResponse->phone_number, $assistant->id);
+        } catch (\Throwable $e) {
+            Log::error('Erro ao encerrar atendimento apos conclusao da pesquisa: ' . $e->getMessage());
+        }
     }
 
     /**
