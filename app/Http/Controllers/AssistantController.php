@@ -2835,7 +2835,7 @@ class AssistantController extends Controller
             $this->sendToOmni($closingReply, $pushName ?: $phone, 'output', $phone, $assistant->id);
 
             $cleaned = trim(preg_replace('/\[MENU_PRINCIPAL\]/i', '', $closingReply));
-            $cleaned = trim(preg_replace('/\[OFERTA_PESQUISA:[A-Za-z0-9_]+\]/i', '', $cleaned));
+            $cleaned = trim(preg_replace('/\[ENCERRAMENTO\]/i', '', $cleaned));
             foreach (Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get() as $s) {
                 $cleaned = trim(preg_replace('/\[' . preg_quote($s->tag, '/') . '\]/i', '', $cleaned));
             }
