@@ -47,7 +47,7 @@
 
 @section('content')
         <div id="calendarRoot" x-data="{ showModal: false, modalData: {} }">
-        <div class="container mx-auto px-6 max-w-6xl py-6 flex flex-col h-[calc(100vh-4rem)]">
+        <div class="container mx-auto px-6 max-w-6xl py-6 flex flex-col h-[calc(100vh-8rem)]">
 
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shrink-0">
                 <div>
