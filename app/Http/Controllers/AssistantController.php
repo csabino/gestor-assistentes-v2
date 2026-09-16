@@ -1511,13 +1511,11 @@ class AssistantController extends Controller
                 }
                 $prompt .= "\n";
             }
-            $prompt .= "\nDIRETRIZ DE OFERTA DE PESQUISA:\n";
+            $prompt .= "\nDIRETRIZ DE ACIONAMENTO DE PESQUISA:\n";
             if ($activeSurveys->count() > 1) {
-                $prompt .= "Há mais de uma pesquisa ativa. Escolha SEMPRE a pesquisa cujo \"usar quando\" combine com o contexto real da conversa (tipo de atendimento, motivo do contato, etc.). NUNCA ofereça mais de uma pesquisa na mesma conversa.\n";
+                $prompt .= "Há mais de uma pesquisa ativa. Escolha SEMPRE a pesquisa cujo \"usar quando\" combine com o contexto real da conversa (tipo de atendimento, motivo do contato, etc.).\n";
             }
-            $prompt .= "Quando fizer sentido (por exemplo, ao encerrar ou concluir um atendimento), pergunte educadamente ao cliente se ele topa responder a pesquisa correspondente, explicando que são poucas perguntas rápidas. NUNCA escreva você mesmo as perguntas da pesquisa - isso é feito pelo sistema.\n";
-            $prompt .= "Se, e SOMENTE SE, o cliente concordar em responder, emita no final da SUA MESMA mensagem de confirmação (ex: \"Perfeito, vamos lá!\") a tag exata da pesquisa escolhida entre colchetes, exatamente como mostrado acima (ex: [{$activeSurveys->first()->tag}]).\n";
-            $prompt .= "Se o cliente recusar, apenas agradeça e siga normalmente, sem emitir nenhuma tag.\n";
+            $prompt .= "SEMPRE que você enviar a mensagem de encerramento (a mensagem fixa da seção \"MENSAGENS DE ENCERRAMENTO\"), inclua TAMBÉM, ao final dela, na mesma mensagem, a tag exata da pesquisa entre colchetes, exatamente como mostrado acima (ex: [{$activeSurveys->first()->tag}]). Não pergunte permissão ao cliente e não escreva as perguntas da pesquisa você mesma - o sistema cuida de tudo automaticamente assim que vir a tag.\n";
             $prompt .= "===============================================\n";
         }
 
@@ -2353,7 +2351,14 @@ class AssistantController extends Controller
             }
 
             // ENVIO PARA O OMNI COM A RESPOSTA FINAL TRATADA E FORMATADA
+            // (o Omni recebe o texto completo, com a linha do link de pesquisa antigo - é esse texto
+            // exato que o Omni reconhece pra fechar o chamado automaticamente. O cliente no WhatsApp,
+            // porém, não precisa ver esse link quando já vamos conduzir a pesquisa aqui mesmo no chat.)
             $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $cleanSender, $assistant->id);
+
+            if ($triggeredSurvey) {
+                $aiReply = trim(preg_replace('/\n?[^\n]*\[[^\]]*pesquisa[^\]]*\]\([^\)]+\)[^\n]*/iu', '', $aiReply));
+            }
 
             DB::table('chat_messages')->insert([
                 [
