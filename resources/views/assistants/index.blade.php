@@ -159,6 +159,7 @@
                 <div class="flex flex-col h-[calc(100vh-10rem)]" x-data="{
                     renameModalOpen: false,
                     renameValue: @js($configuring->name),
+                    companyValue: @js($configuring->company_name),
                     renameSaving: false,
                     renameError: null,
                     async saveRename() {
@@ -172,7 +173,7 @@
                                     'Accept': 'application/json',
                                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
                                 },
-                                body: JSON.stringify({ name: this.renameValue }),
+                                body: JSON.stringify({ name: this.renameValue, company_name: this.companyValue }),
                             });
                             const json = await res.json();
                             if (!res.ok) {
@@ -193,12 +194,17 @@
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg> Voltar
                         </a>
                         <div class="h-6 w-px bg-gray-300 hidden md:block"></div>
-                        <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            {{ $configuring->name }}
-                            <button type="button" @click="renameValue = @js($configuring->name); renameError = null; renameModalOpen = true" title="Renomear assistente" class="text-gray-400 hover:text-indigo-600 p-1 rounded-md hover:bg-indigo-50 transition">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
-                            </button>
-                        </h1>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                {{ $configuring->name }}
+                                <button type="button" @click="renameValue = @js($configuring->name); companyValue = @js($configuring->company_name); renameError = null; renameModalOpen = true" title="Editar assistente" class="text-gray-400 hover:text-indigo-600 p-1 rounded-md hover:bg-indigo-50 transition">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
+                                </button>
+                            </h1>
+                            @if($configuring->company_name)
+                                <p class="text-xs text-gray-500 font-medium">{{ $configuring->company_name }}</p>
+                            @endif
+                        </div>
                     </div>
 
                     <div class="flex items-center gap-3 w-full md:w-auto">
@@ -984,13 +990,15 @@
                 @endif
                 </div>
 
-                <!-- MODAL RENOMEAR ASSISTENTE -->
+                <!-- MODAL EDITAR ASSISTENTE (NOME E EMPRESA) -->
                 <div x-show="renameModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
                     <div @click.away="renameModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200">
-                        <h3 class="text-base font-bold text-gray-800 mb-4">Renomear Assistente</h3>
+                        <h3 class="text-base font-bold text-gray-800 mb-4">Editar Assistente</h3>
                         <div x-show="renameError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-3" x-text="renameError"></div>
                         <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nome</label>
-                        <input type="text" x-model="renameValue" @keydown.enter="saveRename()" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-5 outline-none focus:border-indigo-500">
+                        <input type="text" x-model="renameValue" @keydown.enter="saveRename()" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-4 outline-none focus:border-indigo-500">
+                        <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nome da Empresa (opcional)</label>
+                        <input type="text" x-model="companyValue" @keydown.enter="saveRename()" placeholder="Ex: InHouse" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-5 outline-none focus:border-indigo-500">
                         <div class="flex justify-end gap-2">
                             <button type="button" @click="renameModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
                             <button type="button" @click="saveRename()" :disabled="renameSaving" :class="renameSaving ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
@@ -1065,7 +1073,12 @@
                             class="light-surface bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition duration-200 flex flex-col justify-between gap-4">
 
                             <div class="flex justify-between items-start gap-2">
-                                <h3 class="font-bold text-gray-800 truncate text-lg" title="{{ $assistant->name }}">{{ $assistant->name }}</h3>
+                                <div class="min-w-0">
+                                    <h3 class="font-bold text-gray-800 truncate text-lg" title="{{ $assistant->name }}">{{ $assistant->name }}</h3>
+                                    @if($assistant->company_name)
+                                        <p class="text-[11px] text-gray-400 font-semibold truncate">{{ $assistant->company_name }}</p>
+                                    @endif
+                                </div>
 
                                 <form action="/" method="POST" class="shrink-0">
                                     @csrf @method('PATCH')

@@ -750,12 +750,18 @@ class AssistantController extends Controller
 
     public function rename(Request $request, $id)
     {
-        $request->validate(['name' => 'required|string|max:255']);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'company_name' => 'nullable|string|max:255',
+        ]);
 
         $assistant = Assistant::findOrFail($id);
-        $assistant->update(['name' => $request->name]);
+        $assistant->update([
+            'name' => $request->name,
+            'company_name' => trim($request->input('company_name') ?? '') ?: null,
+        ]);
 
-        return response()->json(['success' => true, 'name' => $assistant->name]);
+        return response()->json(['success' => true, 'name' => $assistant->name, 'company_name' => $assistant->company_name]);
     }
 
     private function servePublicFile($relativePath)
