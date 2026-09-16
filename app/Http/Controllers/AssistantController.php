@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Assistant;
 use App\Models\Setting;
+use App\Models\Survey;
+use App\Models\SurveyResponse;
+use App\Models\SurveyResponseAnswer;
 use App\Services\GoogleCalendarService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -1493,6 +1496,22 @@ class AssistantController extends Controller
             }
         }
 
+        // 3.5. MÓDULO DE PESQUISAS DE OPINIÃO (SE HOUVER PESQUISA ATIVA)
+        $activeSurveys = Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get();
+        if ($activeSurveys->isNotEmpty()) {
+            $prompt .= "\n\n===============================================\n";
+            $prompt .= "MÓDULO DE PESQUISAS DE OPINIÃO:\n";
+            $prompt .= "Pesquisas disponíveis para oferecer ao cliente:\n";
+            foreach ($activeSurveys as $s) {
+                $prompt .= "• \"{$s->name}\" (tag: {$s->tag})\n";
+            }
+            $prompt .= "\nDIRETRIZ DE OFERTA DE PESQUISA:\n";
+            $prompt .= "Quando fizer sentido (por exemplo, ao encerrar ou concluir um atendimento), pergunte educadamente ao cliente se ele topa responder a pesquisa correspondente, explicando que são poucas perguntas rápidas. NUNCA escreva você mesmo as perguntas da pesquisa - isso é feito pelo sistema.\n";
+            $prompt .= "Se, e SOMENTE SE, o cliente concordar em responder, emita no final da SUA MESMA mensagem de confirmação (ex: \"Perfeito, vamos lá!\") a tag exata da pesquisa entre colchetes, exatamente como mostrado acima (ex: [{$activeSurveys->first()->tag}]).\n";
+            $prompt .= "Se o cliente recusar, apenas agradeça e siga normalmente, sem emitir nenhuma tag.\n";
+            $prompt .= "===============================================\n";
+        }
+
         // 4. BASE DE CONHECIMENTO (COM TRAVA BLINDADA DE TOKENS)
         $files = $assistant->knowledge_files;
         if (is_array($files) && !empty($files)) {
@@ -2116,6 +2135,39 @@ class AssistantController extends Controller
                 $displayName = $clientName;
             }
 
+            // 🛑 PESQUISA EM ANDAMENTO: se esse número já está respondendo uma pesquisa, essa
+            // mensagem é a resposta da pergunta atual - conduz a sequência 100% em código, sem
+            // passar pela IA (a mesma razão de "3 - voltar ao menu": é navegação/estado
+            // determinístico, não conversa livre).
+            $activeSurveyResponse = SurveyResponse::where('assistant_id', $assistant->id)
+                ->where('phone_number', $cleanSender)
+                ->where('status', 'in_progress')
+                ->latest('id')
+                ->first();
+
+            if ($activeSurveyResponse) {
+                $this->handleSurveyAnswer($assistant, $activeSurveyResponse, $userMessage);
+
+                DB::table('chat_messages')->insert([
+                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender, 'protocol' => null, 'role' => 'user', 'content' => $userMessage, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted],
+                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender, 'protocol' => null, 'role' => 'assistant', 'content' => '[Resposta de pesquisa registrada]', 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted],
+                ]);
+
+                DB::table('webhook_logs')->insert([
+                    'assistant_id' => $assistant->id,
+                    'sender' => substr($sender, 0, 255),
+                    'user_message' => $userMessage,
+                    'ai_reply' => '[PESQUISA] resposta registrada',
+                    'wa_send_result' => json_encode(['success' => true], JSON_INVALID_UTF8_IGNORE),
+                    'raw_snippet' => json_encode($request->all(), JSON_INVALID_UTF8_IGNORE),
+                    'timestamp' => $nowFormatted,
+                    'created_at' => $nowFormatted,
+                    'updated_at' => $nowFormatted,
+                ]);
+
+                return response()->json(['status' => 'success']);
+            }
+
             $omniInputRes = $this->sendToOmni($userMessage, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'input', $cleanSender, $assistant->id);
 
             $protocolo = null;
@@ -2276,6 +2328,21 @@ class AssistantController extends Controller
                 $isAudioMessage = false;
             }
 
+            // 🛑 PESQUISA: a IA emite a tag de uma pesquisa ativa (ex: [PESQUISA_SATISFACAO_POS_ATENDIMENTO])
+            // depois que o cliente topar respondê-la. O sistema manda a mensagem normal da IA e, em
+            // seguida, assume a condução pergunta a pergunta (ver checagem no início do webhook()).
+            $triggeredSurvey = null;
+            foreach (Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get() as $survey) {
+                if (preg_match('/\[' . preg_quote($survey->tag, '/') . '\]/i', $aiReply)) {
+                    $triggeredSurvey = $survey;
+                    $aiReply = trim(preg_replace('/\[' . preg_quote($survey->tag, '/') . '\]/i', '', $aiReply));
+                    break;
+                }
+            }
+            if ($triggeredSurvey) {
+                $isAudioMessage = false;
+            }
+
             // ENVIO PARA O OMNI COM A RESPOSTA FINAL TRATADA E FORMATADA
             $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $cleanSender, $assistant->id);
 
@@ -2373,6 +2440,12 @@ class AssistantController extends Controller
             } else {
                 $formattedReply = $this->formatTextForWhatsapp($aiReply);
                 $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
+            }
+
+            // A resposta da IA já foi enviada acima; agora, se ela topou a pesquisa, disparamos
+            // a primeira pergunta como mensagem seguinte e passamos a conduzir 100% em código.
+            if ($triggeredSurvey) {
+                $this->startSurvey($assistant, $cleanSender, $displayName, $triggeredSurvey);
             }
 
             DB::table('webhook_logs')->insert([
@@ -2605,6 +2678,99 @@ class AssistantController extends Controller
              . "4️⃣ Fornecedores (Oferecer produtos/serviços)\n"
              . "5️⃣ Agendar uma Reunião\n"
              . "6️⃣ Outros Assuntos";
+    }
+
+    /**
+     * Monta o texto de uma pergunta de pesquisa (com as opções numeradas, se for múltipla escolha).
+     */
+    private function buildSurveyQuestionMessage($question): string
+    {
+        $msg = $question->question_text;
+
+        if ($question->type === 'multiple_choice') {
+            $msg .= "\n\n";
+            $i = 1;
+            foreach ($question->options as $option) {
+                $msg .= "{$i}️⃣ {$option->option_text}\n";
+                $i++;
+            }
+            $msg = rtrim($msg);
+        }
+
+        return $msg;
+    }
+
+    /**
+     * Inicia a condução de uma pesquisa: cria o registro de resposta e manda a primeira pergunta.
+     * A partir daqui, TODA mensagem seguinte desse número é tratada como resposta da pesquisa
+     * (ver checagem logo no início do webhook()), sem passar pela IA - a mesma lição de hoje sobre
+     * não confiar na IA pra conduzir uma sequência determinística de perguntas.
+     */
+    private function startSurvey(Assistant $assistant, string $phone, ?string $displayName, Survey $survey): void
+    {
+        $firstQuestion = $survey->questions()->first();
+        if (!$firstQuestion) {
+            return;
+        }
+
+        SurveyResponse::create([
+            'survey_id' => $survey->id,
+            'assistant_id' => $assistant->id,
+            'phone_number' => $phone,
+            'client_name' => $displayName,
+            'status' => 'in_progress',
+            'current_question_id' => $firstQuestion->id,
+        ]);
+
+        $this->sendWhatsappMessage($assistant, $phone, $this->buildSurveyQuestionMessage($firstQuestion));
+    }
+
+    /**
+     * Registra a resposta da pergunta atual e avança pra próxima (ou encerra a pesquisa).
+     * Pra perguntas de múltipla escolha, aceita tanto o número da opção quanto o texto exato -
+     * mas nunca trava o fluxo se não bater com nada, só grava o que o cliente escreveu mesmo.
+     */
+    private function handleSurveyAnswer(Assistant $assistant, SurveyResponse $surveyResponse, string $userMessage): void
+    {
+        $question = $surveyResponse->currentQuestion;
+        if (!$question) {
+            $surveyResponse->update(['status' => 'completed', 'completed_at' => now()]);
+            return;
+        }
+
+        $answerText = trim($userMessage);
+
+        if ($question->type === 'multiple_choice') {
+            $options = $question->options;
+            if (preg_match('/^\s*(\d+)\s*$/', $answerText, $m)) {
+                $option = $options->get(((int) $m[1]) - 1);
+                if ($option) $answerText = $option->option_text;
+            } else {
+                foreach ($options as $option) {
+                    if (mb_strtolower(trim($option->option_text)) === mb_strtolower($answerText)) {
+                        $answerText = $option->option_text;
+                        break;
+                    }
+                }
+            }
+        }
+
+        SurveyResponseAnswer::create([
+            'survey_response_id' => $surveyResponse->id,
+            'survey_question_id' => $question->id,
+            'answer_text' => $answerText,
+        ]);
+
+        $nextQuestion = $question->survey->questions()->where('sort_order', '>', $question->sort_order)->first();
+
+        if ($nextQuestion) {
+            $surveyResponse->update(['current_question_id' => $nextQuestion->id]);
+            $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, $this->buildSurveyQuestionMessage($nextQuestion));
+            return;
+        }
+
+        $surveyResponse->update(['status' => 'completed', 'completed_at' => now(), 'current_question_id' => null]);
+        $this->sendWhatsappMessage($assistant, $surveyResponse->phone_number, 'Muito obrigado por responder nossa pesquisa! 🙏 Sua opinião é muito importante pra gente.');
     }
 
     /**
