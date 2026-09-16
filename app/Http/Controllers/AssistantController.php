@@ -1409,6 +1409,35 @@ class AssistantController extends Controller
         $prompt .= "• Ano Corrente: " . $now->year . "\n";
         $prompt .= "===============================================\n\n";
 
+        // 0. MÓDULO DE PESQUISAS DE OPINIÃO (SE HOUVER PESQUISA ATIVA) - fica ANTES do prompt
+        // principal e com prioridade máxima porque precisa VENCER a regra de encerramento do
+        // prompt principal (que manda encerrar "IMEDIATAMENTE"): colocado depois, a IA ignorava
+        // essa exceção e mandava a mensagem de encerramento direto, pulando a oferta da pesquisa.
+        $activeSurveys = Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get();
+        if ($activeSurveys->isNotEmpty()) {
+            $prompt .= "🔴 REGRA DE PRIORIDADE MÁXIMA - LEIA ANTES DE QUALQUER OUTRA INSTRUÇÃO 🔴\n";
+            $prompt .= "===============================================\n";
+            $prompt .= "MÓDULO DE PESQUISAS DE OPINIÃO:\n";
+            $prompt .= "Pesquisas disponíveis para oferecer ao cliente:\n";
+            foreach ($activeSurveys as $s) {
+                $prompt .= "• \"{$s->name}\" (tag: {$s->tag})";
+                if (!empty(trim($s->trigger_context ?? ''))) {
+                    $prompt .= " — usar quando: " . trim($s->trigger_context);
+                } elseif ($activeSurveys->count() > 1) {
+                    $prompt .= " — sem contexto específico definido; use seu julgamento para escolher a pesquisa mais adequada à situação";
+                }
+                $prompt .= "\n";
+            }
+            $prompt .= "\nDIRETRIZ DE OFERTA DE PESQUISA (ISSO SUBSTITUI, SÓ NA PRIMEIRA VEZ, A SEÇÃO \"MENSAGENS DE ENCERRAMENTO\" QUE VOCÊ VAI LER MAIS ABAIXO):\n";
+            if ($activeSurveys->count() > 1) {
+                $prompt .= "Há mais de uma pesquisa ativa. Escolha SEMPRE a pesquisa cujo \"usar quando\" combine com o contexto real da conversa (tipo de atendimento, motivo do contato, etc.).\n";
+            }
+            $prompt .= "Quando o cliente sinalizar que quer encerrar o atendimento (o gatilho está descrito na seção \"MENSAGENS DE ENCERRAMENTO\" mais abaixo), e você AINDA NÃO tiver oferecido nenhuma pesquisa nesta mesma conversa: NÃO execute a seção \"MENSAGENS DE ENCERRAMENTO\" ainda, mesmo que ela diga \"IMEDIATAMENTE\". Em vez disso, responda SOMENTE com a pergunta abaixo (pode adaptar o texto, mantendo o sentido), incluindo a tag de oferta no final, no formato EXATO [OFERTA_PESQUISA:TAG_DA_PESQUISA] (troque TAG_DA_PESQUISA pela tag real, ex: [OFERTA_PESQUISA:{$activeSurveys->first()->tag}]):\n\n";
+            $prompt .= "\"Antes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?\"\n\n";
+            $prompt .= "O sistema cuida de interpretar a resposta do cliente e conduzir o restante automaticamente - depois de enviar essa pergunta com a tag, não faça mais nada, apenas aguarde. Só depois que você já tiver oferecido a pesquisa nesta mesma conversa (o cliente já respondeu sim ou não a ela) é que você deve seguir normalmente a seção \"MENSAGENS DE ENCERRAMENTO\" quando o cliente pedir pra encerrar de novo.\n";
+            $prompt .= "===============================================\n\n";
+        }
+
         // 1. PROMPT PRINCIPAL
         $prompt .= $assistant->system_prompt ?? '';
 
@@ -1494,31 +1523,6 @@ class AssistantController extends Controller
                 $prompt .= "Emita: [REAGENDAR_REUNIAO: departamento=\"NOME_DO_SETOR\", data_hora_original=\"YYYY-MM-DD HH:MM:SS\", nova_data_hora=\"YYYY-MM-DD HH:MM:SS\", email_cliente=\"email@cliente.com\"]\n";
                 $prompt .= "===============================================\n";
             }
-        }
-
-        // 3.5. MÓDULO DE PESQUISAS DE OPINIÃO (SE HOUVER PESQUISA ATIVA)
-        $activeSurveys = Survey::where('assistant_id', $assistant->id)->where('is_active', true)->get();
-        if ($activeSurveys->isNotEmpty()) {
-            $prompt .= "\n\n===============================================\n";
-            $prompt .= "MÓDULO DE PESQUISAS DE OPINIÃO:\n";
-            $prompt .= "Pesquisas disponíveis para oferecer ao cliente:\n";
-            foreach ($activeSurveys as $s) {
-                $prompt .= "• \"{$s->name}\" (tag: {$s->tag})";
-                if (!empty(trim($s->trigger_context ?? ''))) {
-                    $prompt .= " — usar quando: " . trim($s->trigger_context);
-                } elseif ($activeSurveys->count() > 1) {
-                    $prompt .= " — sem contexto específico definido; use seu julgamento para escolher a pesquisa mais adequada à situação";
-                }
-                $prompt .= "\n";
-            }
-            $prompt .= "\nDIRETRIZ DE OFERTA DE PESQUISA:\n";
-            if ($activeSurveys->count() > 1) {
-                $prompt .= "Há mais de uma pesquisa ativa. Escolha SEMPRE a pesquisa cujo \"usar quando\" combine com o contexto real da conversa (tipo de atendimento, motivo do contato, etc.).\n";
-            }
-            $prompt .= "Quando o cliente sinalizar que quer encerrar o atendimento (ver seção \"MENSAGENS DE ENCERRAMENTO\"), e você AINDA NÃO tiver oferecido nenhuma pesquisa nesta mesma conversa, NÃO mande a mensagem de encerramento ainda. Em vez disso, responda SOMENTE com a pergunta abaixo (pode adaptar o texto, mantendo o sentido), incluindo a tag de oferta no final, no formato EXATO [OFERTA_PESQUISA:TAG_DA_PESQUISA] (troque TAG_DA_PESQUISA pela tag real, ex: [OFERTA_PESQUISA:{$activeSurveys->first()->tag}]):\n\n";
-            $prompt .= "\"Antes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?\"\n\n";
-            $prompt .= "O sistema cuida de interpretar a resposta do cliente e conduzir o restante automaticamente - depois de enviar essa pergunta com a tag, não faça mais nada, apenas aguarde. Se você já tiver oferecido a pesquisa antes nesta mesma conversa (o cliente já respondeu sim ou não), NÃO ofereça de novo - siga direto para a mensagem de encerramento normal.\n";
-            $prompt .= "===============================================\n";
         }
 
         // 4. BASE DE CONHECIMENTO (COM TRAVA BLINDADA DE TOKENS)
