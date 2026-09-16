@@ -1604,9 +1604,9 @@ class AssistantController extends Controller
             $history = array_slice($history, -12);
 
             $systemPrompt = $this->buildSystemPromptWithKnowledge($assistant);
-            $aiResult = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
+            $response = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
 
-            return response()->json(['reply' => $aiResult['reply']]);
+            return response()->json(['reply' => $response]);
         } catch (\Throwable $e) {
             return response()->json(['reply' => '⚠️ Erro no Chat: ' . $e->getMessage()], 200);
         }
@@ -2097,45 +2097,6 @@ class AssistantController extends Controller
                 return response()->json(['status' => 'no_message']);
             }
 
-            // 🛑 VOLTAR AO MENU PRINCIPAL: atalho determinístico, sem passar pela IA. A IA vinha
-            // interpretando errado o "3" (ou o texto da opção) vindo do menu de continuação -
-            // tratava como se fosse "1 - continuar ajudando" em vez de voltar ao menu. Isso é
-            // uma navegação, não uma pergunta de conteúdo, então resolve 100% em código.
-            if (preg_match('/^\s*3\s*$/', $userMessage) || preg_match('/menu\s+(principal|inicial)/i', $userMessage)) {
-                $menuIntroText = "Vamos voltar ao menu principal! Por favor, escolha de novo sobre qual destes assuntos você gostaria de falar:";
-                $waResult = $this->sendWhatsappInteractiveMenu($assistant, $cleanSender, $menuIntroText);
-
-                DB::table('chat_messages')->insert([
-                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender, 'protocol' => null, 'role' => 'user', 'content' => $userMessage, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted],
-                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender, 'protocol' => null, 'role' => 'assistant', 'content' => $menuIntroText, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted],
-                ]);
-
-                DB::table('webhook_logs')->insert([
-                    'assistant_id' => $assistant->id,
-                    'sender' => substr($sender, 0, 255),
-                    'user_message' => $userMessage,
-                    'ai_reply' => $menuIntroText,
-                    'wa_send_result' => json_encode($waResult, JSON_INVALID_UTF8_IGNORE),
-                    'raw_snippet' => json_encode($request->all(), JSON_INVALID_UTF8_IGNORE),
-                    'timestamp' => $nowFormatted,
-                    'created_at' => $nowFormatted,
-                    'updated_at' => $nowFormatted,
-                ]);
-
-                return response()->json(['status' => 'success', 'reply' => $menuIntroText]);
-            }
-
-            // 🛑 DESAMBIGUAÇÃO DE "1"/"2": a IA vem confundindo o número "1" (quer continuar) com
-            // "2" (quer encerrar) quando o cliente só digita o número puro ou a frase curta do
-            // menu de continuação - já causou o atendimento sendo encerrado por engano mais de uma
-            // vez. Reescreve pra uma frase clara ANTES de mandar pra IA, removendo a ambiguidade na
-            // origem em vez de tentar corrigir a interpretação dela depois.
-            if (preg_match('/^\s*1\s*$/', $userMessage) || preg_match('/^\s*tenho mais d[uú]vidas\s*$/i', trim($userMessage))) {
-                $userMessage = 'Quero continuar a conversa, ainda tenho mais dúvidas ou preciso de mais alguma coisa.';
-            } elseif (preg_match('/^\s*2\s*$/', $userMessage) || preg_match('/^\s*encerrar( o atendimento)?\s*$/i', trim($userMessage))) {
-                $userMessage = 'Quero encerrar o atendimento, por favor finalize.';
-            }
-
             $rawPushName = $request->input('message.senderName')
                 ?? $request->input('senderName')
                 ?? $request->input('pushName')
@@ -2256,9 +2217,7 @@ class AssistantController extends Controller
             // ATIVA O 'DIGITANDO...' ENQUANTO A IA PROCESSA A RESPOSTA
             $this->sendWhatsappPresence($assistant, $cleanSender, 'composing');
 
-            $aiResult = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
-            $aiReply = $aiResult['reply'];
-            $aiConcluded = $aiResult['concluded']; // true/false (OpenAI) ou null (outros provedores/sem sinal)
+            $aiReply = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
 
             if (!empty($displayName) && $displayName !== 'Cliente') {
                 $aiReply = str_replace(['#NOME#', '[NOME]', '[Nome do Cliente]'], $displayName, $aiReply);
@@ -2310,62 +2269,6 @@ class AssistantController extends Controller
                 $aiReply = trim(preg_replace('/\[MENU_PRINCIPAL\]/i', '', $aiReply));
                 $isAudioMessage = false;
             }
-
-            // 🛑 MENU DE CONTINUAÇÃO: pedir pra IA lembrar de sinalizar "terminei o assunto" falhava
-            // (ela esquecia a tag na maioria das respostas, deixando o cliente sem opção nenhuma).
-            // Invertido: por padrão o sistema SEMPRE mostra o menu de continuação; a IA só precisa
-            // sinalizar [AGUARDANDO_CLIENTE] nos casos em que está ativamente esperando algo dela -
-            // ação mais fácil de lembrar, porque é o que ela está fazendo naquele exato momento.
-            $hasWaitingTag = (bool) preg_match('/\[AGUARDANDO_CLIENTE\]/i', $aiReply);
-
-            // DEBUG TEMPORÁRIO: captura o texto bruto da IA (com a tag, se houver) pra confirmar se
-            // ela está emitindo [AGUARDANDO_CLIENTE] em respostas que deveriam concluir o assunto.
-            // Remover assim que o comportamento do menu de continuação estiver confirmado correto.
-            DB::table('ai_tag_debug')->insert([
-                'user_message' => mb_substr($userMessage, 0, 255),
-                'raw_reply' => $aiReply,
-                'has_waiting_tag' => $hasWaitingTag,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            if ($hasWaitingTag) {
-                $aiReply = trim(preg_replace('/\[AGUARDANDO_CLIENTE\]/i', '', $aiReply));
-            }
-
-            // Não mostra o menu quando: a IA sinalizou que está aguardando algo do cliente; a
-            // mensagem é uma confirmação/erro de agendamento (processAppointmentTag já montou seu
-            // próprio menu embutido); é o menu principal (não faz sentido logo depois); é a
-            // mensagem final de despedida/pesquisa de satisfação (a conversa já terminou de vez);
-            // ou é o encaminhamento pra atendente humano (garantido em código, não só no prompt -
-            // colar "selecione uma opção" logo depois de "vou te encaminhar pra um humano" confunde
-            // o cliente sobre quem vai responder a seguir).
-            $isFarewellMessage = (bool) preg_match('/Agradecemos por entrar em contato com a InHouse/i', $aiReply);
-            $isHandoffMessage = (bool) preg_match('/Vou encaminhar sua solicitação para um de nossos atendentes/i', $aiReply);
-
-            // Garantia extra em código (não dá pra confiar só na IA lembrar de emitir a tag aqui):
-            // se o cliente ACABOU de escolher "1 - Tenho mais dúvidas", a resposta seguinte é
-            // sempre um convite pra ele contar a dúvida - nunca faz sentido perguntar de novo
-            // "quer continuar ou encerrar?" logo depois dele já ter dito que quer continuar.
-            $justPickedContinue = (bool) preg_match('/^\s*1\s*$/', $userMessage) || (bool) preg_match('/tenho mais d[uú]vidas/i', $userMessage);
-
-            // Sinal estruturado da OpenAI (ver callAiApi): $aiConcluded === false é a fonte mais
-            // confiável de "está aguardando o cliente" que existe aqui, porque é garantido pela API
-            // (json_schema strict), não uma instrução de prompt que a IA pode esquecer de seguir.
-            $aiSignaledWaiting = ($aiConcluded === false);
-
-            // Rede de segurança independente do que a IA disse: mesmo em modo estruturado ela pode
-            // errar o próprio julgamento (marcar "concluded" mesmo tendo feito uma pergunta, às
-            // vezes emendando uma frase de gentileza depois do "?", tipo "...falar? Estou aqui pra
-            // ajudar!"). Por isso checa se existe um "?" em QUALQUER lugar da resposta (não só no
-            // final) - é raríssimo um bot de atendimento usar "?" sem esperar resposta de verdade,
-            // então vale a pena ser permissivo aqui pra nunca cortar uma pergunta ao meio.
-            $replyStrippedForQuestionCheck = trim(preg_replace('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}\x{200D}]/u', '', $aiReply));
-            $hasQuestionMark = str_contains($replyStrippedForQuestionCheck, '?');
-
-            $closingMenuText = ($hasWaitingTag || $aiSignaledWaiting || $hasQuestionMark || $hasSchedulingTag || $hasMainMenuTag || $isFarewellMessage || $isHandoffMessage || $justPickedContinue)
-                ? null
-                : $this->getGenericClosingMenuText();
 
             // ENVIO PARA O OMNI COM A RESPOSTA FINAL TRATADA E FORMATADA
             $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $cleanSender, $assistant->id);
@@ -2426,6 +2329,16 @@ class AssistantController extends Controller
                 
                 // 4. Remove pontuações extras e ícones textuais que o TTS pode verbalizar
                 $textForAudio = str_replace(['*', '#', '_', '✅', '⚠️', '🎥', '🏢', '👤', '📅', '✉️', '📋', '🎫'], '', $textForAudio);
+
+                // 5. O menu de continuação (quando a IA decide incluí-lo, conforme o prompt) nunca
+                // vai na fala - soa estranho ler "1, tenho mais dúvidas..." em voz alta. Tira esse
+                // bloco do que vira áudio e guarda separado pra mandar como texto logo em seguida.
+                $menuBlockPattern = '/\n*(Restou mais alguma dúvida ou posso te ajudar em algo mais\?[\s\S]*)$/u';
+                $strippedMenuText = null;
+                if (preg_match($menuBlockPattern, $textForAudio, $menuBlockMatch)) {
+                    $strippedMenuText = trim($menuBlockMatch[1]);
+                    $textForAudio = trim(preg_replace($menuBlockPattern, '', $textForAudio));
+                }
                 // === FIM DO FILTRO DE ÁUDIO ===
 
                 $googleKey = env('GOOGLE_API_KEY_TTS') 
@@ -2442,22 +2355,17 @@ class AssistantController extends Controller
                         $this->sendWhatsappMessage($assistant, $cleanSender, $separated['extracted_links']);
                     }
 
-                    // Ler um menu numerado em voz alta fica estranho, então nunca vai no áudio - vai
-                    // em texto logo depois, mas só quando a IA sinalizou (via tag) que o assunto foi
-                    // concluído. Sem a tag, ela fez uma pergunta ou está aguardando algo do cliente.
-                    if ($closingMenuText !== null) {
-                        $this->sendWhatsappMessage($assistant, $cleanSender, $closingMenuText);
+                    if ($strippedMenuText !== null) {
+                        $this->sendWhatsappMessage($assistant, $cleanSender, $strippedMenuText);
                     }
                 } else {
-                    $replyWithMenu = $aiReply . ($closingMenuText !== null ? "\n\n" . $closingMenuText : '');
-                    $formattedReply = $this->formatTextForWhatsapp($replyWithMenu);
+                    $formattedReply = $this->formatTextForWhatsapp($aiReply);
                     $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
                 }
             } elseif ($hasMainMenuTag) {
                 $waResult = $this->sendWhatsappInteractiveMenu($assistant, $cleanSender, $aiReply);
             } else {
-                $replyWithMenu = $aiReply . ($closingMenuText !== null ? "\n\n" . $closingMenuText : '');
-                $formattedReply = $this->formatTextForWhatsapp($replyWithMenu);
+                $formattedReply = $this->formatTextForWhatsapp($aiReply);
                 $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
             }
 
@@ -2503,25 +2411,13 @@ class AssistantController extends Controller
         }
     }
 
-    /**
-     * @return array{reply: string, concluded: ?bool} 'concluded' é true (assunto encerrado, pode
-     *   mostrar o menu de continuação), false (a IA está esperando uma resposta específica do
-     *   cliente - não mostrar menu), ou null quando o provedor não suporta saída estruturada (nesse
-     *   caso o chamador cai de volta pras heurísticas de texto/tag como sinal secundário).
-     *
-     * Só a OpenAI usa "structured outputs" (json_schema com strict:true) pra isso: é uma garantia
-     * de formato imposta pela própria API (constrained decoding), não uma instrução de prompt que a
-     * IA pode esquecer de seguir - foi exatamente essa fragilidade (a IA "esquecendo" de sinalizar
-     * se ainda estava aguardando o cliente) que gerou repetidos bugs do menu de continuação
-     * aparecendo no meio de uma pergunta seguida da IA.
-     */
-    private function callAiApi(Assistant $assistant, string $systemPrompt, string $userMessage, array $history = []): array
+    private function callAiApi(Assistant $assistant, string $systemPrompt, string $userMessage, array $history = []): string
     {
         $provider = $assistant->provider ?? 'openai';
 
         if ($provider === 'openai') {
             $key = trim($assistant->openai_api_key ?? '');
-            if (!$key) return ['reply' => 'Erro: Chave API da OpenAI não configurada.', 'concluded' => null];
+            if (!$key) return 'Erro: Chave API da OpenAI não configurada.';
 
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
             foreach ($history as $msg) {
@@ -2531,79 +2427,31 @@ class AssistantController extends Controller
             }
             $messages[] = ['role' => 'user', 'content' => $userMessage];
 
-            $model = $assistant->model ?? 'gpt-4o-mini';
-
             $res = Http::withToken($key)->timeout(45)->post('https://api.openai.com/v1/chat/completions', [
-                'model' => $model,
+                'model' => $assistant->model ?? 'gpt-4o-mini',
                 'messages' => $messages,
-                'response_format' => [
-                    'type' => 'json_schema',
-                    'json_schema' => [
-                        'name' => 'assistant_reply',
-                        'strict' => true,
-                        'schema' => [
-                            'type' => 'object',
-                            'properties' => [
-                                'reply' => [
-                                    'type' => 'string',
-                                    'description' => 'A mensagem completa a ser enviada ao cliente, seguindo todas as instruções do prompt do sistema (incluindo qualquer tag técnica entre colchetes, quando aplicável).',
-                                ],
-                                'waiting_for_client_reply' => [
-                                    'type' => 'boolean',
-                                    'description' => 'true SOMENTE se essa mensagem termina fazendo uma pergunta direta ao cliente ou pedindo uma informação pontual que ele deve responder agora, na própria conversa. false se o assunto atual foi concluído nessa mensagem (mesmo que o cliente ainda precise fazer algo fora da conversa, como preencher um formulário externo ou aguardar um retorno da equipe).',
-                                ],
-                            ],
-                            'required' => ['reply', 'waiting_for_client_reply'],
-                            'additionalProperties' => false,
-                        ],
-                    ],
-                ],
             ]);
 
-            // Nem todo modelo da OpenAI suporta "structured outputs" (json_schema). Se a chamada
-            // falhar por causa disso, cai pra uma chamada comum em texto simples, sem quebrar o
-            // assistente - só perde o sinal extra de "concluded" e volta a depender das heurísticas.
-            if ($res->failed()) {
-                $res = Http::withToken($key)->timeout(45)->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => $model,
-                    'messages' => $messages,
-                ]);
-
-                if ($res->failed()) return ['reply' => 'Erro na API OpenAI: ' . json_encode($res->json()), 'concluded' => null];
-                return ['reply' => $res->json('choices.0.message.content') ?? 'Resposta vazia da OpenAI.', 'concluded' => null];
-            }
-
-            $rawContent = $res->json('choices.0.message.content');
-            $decoded = json_decode((string) $rawContent, true);
-
-            if (is_array($decoded) && array_key_exists('reply', $decoded)) {
-                return [
-                    'reply' => (string) $decoded['reply'],
-                    'concluded' => array_key_exists('waiting_for_client_reply', $decoded) ? !$decoded['waiting_for_client_reply'] : null,
-                ];
-            }
-
-            // Não deveria acontecer com json_schema em modo strict, mas por segurança: se vier algo
-            // fora do formato esperado, usa o texto cru e deixa o chamador decidir pelas heurísticas.
-            return ['reply' => (string) ($rawContent ?: 'Resposta vazia da OpenAI.'), 'concluded' => null];
+            if ($res->failed()) return 'Erro na API OpenAI: ' . json_encode($res->json());
+            return $res->json('choices.0.message.content') ?? 'Resposta vazia da OpenAI.';
         }
 
         if ($provider === 'gemini') {
             $key = trim($assistant->gemini_api_key ?? '');
-            if (!$key) return ['reply' => 'Erro: Chave API do Gemini não configurada.', 'concluded' => null];
+            if (!$key) return 'Erro: Chave API do Gemini não configurada.';
 
             $res = Http::timeout(45)->post("https://generativelanguage.googleapis.com/v1beta/models/{$assistant->model}:generateContent?key={$key}", [
                 'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
                 'contents' => [['parts' => [['text' => $userMessage]]]]
             ]);
 
-            if ($res->failed()) return ['reply' => 'Erro na API Gemini: ' . json_encode($res->json()), 'concluded' => null];
-            return ['reply' => $res->json('candidates.0.content.parts.0.text') ?? 'Resposta vazia do Gemini.', 'concluded' => null];
+            if ($res->failed()) return 'Erro na API Gemini: ' . json_encode($res->json());
+            return $res->json('candidates.0.content.parts.0.text') ?? 'Resposta vazia do Gemini.';
         }
 
         if ($provider === 'anthropic') {
             $key = trim($assistant->anthropic_api_key ?? '');
-            if (!$key) return ['reply' => 'Erro: Chave API do Claude não configurada.', 'concluded' => null];
+            if (!$key) return 'Erro: Chave API do Claude não configurada.';
 
             $res = Http::withHeaders([
                 'x-api-key' => $key,
@@ -2616,13 +2464,13 @@ class AssistantController extends Controller
                 'messages' => [['role' => 'user', 'content' => $userMessage]]
             ]);
 
-            if ($res->failed()) return ['reply' => 'Erro na API Anthropic: ' . json_encode($res->json()), 'concluded' => null];
-            return ['reply' => $res->json('content.0.text') ?? 'Resposta vazia da Anthropic.', 'concluded' => null];
+            if ($res->failed()) return 'Erro na API Anthropic: ' . json_encode($res->json());
+            return $res->json('content.0.text') ?? 'Resposta vazia da Anthropic.';
         }
 
         if ($provider === 'grok') {
             $key = trim($assistant->grok_api_key ?? '');
-            if (!$key) return ['reply' => 'Erro: Chave API do Grok não configurada.', 'concluded' => null];
+            if (!$key) return 'Erro: Chave API do Grok não configurada.';
 
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
             foreach ($history as $msg) {
@@ -2637,11 +2485,11 @@ class AssistantController extends Controller
                 'messages' => $messages
             ]);
 
-            if ($res->failed()) return ['reply' => 'Erro na API Grok: ' . json_encode($res->json()), 'concluded' => null];
-            return ['reply' => $res->json('choices.0.message.content') ?? 'Resposta vazia do Grok.', 'concluded' => null];
+            if ($res->failed()) return 'Erro na API Grok: ' . json_encode($res->json());
+            return $res->json('choices.0.message.content') ?? 'Resposta vazia do Grok.';
         }
 
-        return ['reply' => 'Provedor de IA não configurado.', 'concluded' => null];
+        return 'Provedor de IA não configurado.';
     }
 
     private function testAi(Request $request)
@@ -2751,20 +2599,6 @@ class AssistantController extends Controller
              . "4️⃣ Fornecedores (Oferecer produtos/serviços)\n"
              . "5️⃣ Agendar uma Reunião\n"
              . "6️⃣ Outros Assuntos";
-    }
-
-    /**
-     * Menu de continuação (texto/áudio) montado 100% em código. Aparece por padrão sempre que a
-     * IA não sinalizar [AGUARDANDO_CLIENTE] - ver comentário no webhook() sobre por que o padrão
-     * é "mostra, a menos que avisada" em vez de "só mostra se avisada".
-     */
-    private function getGenericClosingMenuText(): string
-    {
-        return "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\n"
-             . "Por favor, selecione uma das opções:\n"
-             . "1️⃣ Tenho mais dúvidas\n"
-             . "2️⃣ Encerrar o atendimento\n"
-             . "3️⃣ Voltar ao Menu Principal";
     }
 
     /**
