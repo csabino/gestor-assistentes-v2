@@ -6,6 +6,7 @@ use App\Models\Assistant;
 use App\Models\Survey;
 use App\Models\SurveyQuestion;
 use App\Models\SurveyQuestionOption;
+use App\Models\SurveyResponse;
 use Illuminate\Http\Request;
 
 class SurveyController extends Controller
@@ -35,9 +36,59 @@ class SurveyController extends Controller
             ? Survey::with('questions.options')->where('assistant_id', $assistantId)->find($editingSurveyId)
             : null;
 
+        if ($editingSurvey && $request->query('export') === 'csv') {
+            return $this->exportResponsesCsv($editingSurvey);
+        }
+
+        $responses = $editingSurvey
+            ? SurveyResponse::with('answers')
+                ->where('survey_id', $editingSurvey->id)
+                ->where('status', 'completed')
+                ->latest('completed_at')
+                ->get()
+            : collect();
+
         $currentView = 'surveys';
 
-        return view('surveys.index', compact('assistant', 'surveys', 'editingSurvey', 'currentView'));
+        return view('surveys.index', compact('assistant', 'surveys', 'editingSurvey', 'responses', 'currentView'));
+    }
+
+    private function exportResponsesCsv(Survey $survey)
+    {
+        $questions = $survey->questions;
+        $responses = SurveyResponse::with('answers')
+            ->where('survey_id', $survey->id)
+            ->where('status', 'completed')
+            ->latest('completed_at')
+            ->get();
+
+        $filename = 'pesquisa_' . preg_replace('/[^A-Za-z0-9_]/', '_', $survey->tag) . '.csv';
+
+        return response()->streamDownload(function () use ($questions, $responses) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM pra acentuação abrir certo no Excel
+
+            $header = ['Cliente', 'Telefone', 'Concluído em'];
+            foreach ($questions as $q) {
+                $header[] = $q->question_text;
+            }
+            fputcsv($out, $header, ';');
+
+            foreach ($responses as $response) {
+                $row = [
+                    $response->client_name ?: '',
+                    $response->phone_number,
+                    optional($response->completed_at)->format('d/m/Y H:i'),
+                ];
+                foreach ($questions as $q) {
+                    $answer = $response->answers->firstWhere('survey_question_id', $q->id);
+                    $row[] = $answer ? $answer->answer_text : '';
+                }
+                fputcsv($out, $row, ';');
+            }
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     private function redirectBack(int $assistantId, ?int $surveyId = null)

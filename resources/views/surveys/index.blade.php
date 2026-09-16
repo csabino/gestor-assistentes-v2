@@ -163,6 +163,38 @@
                         </form>
                     </div>
 
+                    <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Respostas Recebidas ({{ $responses->count() }})</h3>
+                            @if($responses->isNotEmpty())
+                                <a href="/?view=surveys&assistant_id={{ $assistant->id }}&survey_id={{ $editingSurvey->id }}&export=csv" class="bg-white border border-gray-200 hover:border-emerald-300 hover:text-emerald-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                                    Exportar CSV
+                                </a>
+                            @endif
+                        </div>
+
+                        @forelse($responses as $response)
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3">
+                                <div class="flex items-center justify-between mb-2 text-xs">
+                                    <span class="font-bold text-gray-700">{{ $response->client_name ?: $response->phone_number }}</span>
+                                    <span class="text-gray-400">{{ $response->phone_number }} • {{ optional($response->completed_at)->format('d/m/Y H:i') }}</span>
+                                </div>
+                                <div class="space-y-1.5">
+                                    @foreach($editingSurvey->questions as $q)
+                                        @php($answer = $response->answers->firstWhere('survey_question_id', $q->id))
+                                        <div class="text-xs">
+                                            <span class="text-gray-500">{{ $q->question_text }}:</span>
+                                            <span class="text-gray-800 font-medium">{{ $answer?->answer_text ?? '—' }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-sm text-gray-400 text-center py-6">Nenhuma resposta recebida ainda.</p>
+                        @endforelse
+                    </div>
+
                 @else
                     {{-- ====================== LISTA DE PESQUISAS ====================== --}}
                     <div class="light-surface bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
