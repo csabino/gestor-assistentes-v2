@@ -2585,7 +2585,7 @@ class AssistantController extends Controller
             }
             $messages[] = ['role' => 'user', 'content' => $userMessage];
 
-            $res = Http::withToken($key)->timeout(45)->post('https://api.openai.com/v1/chat/completions', [
+            $res = Http::withToken($key)->timeout(90)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $assistant->model ?? 'gpt-4o-mini',
                 'messages' => $messages,
             ]);
@@ -2598,7 +2598,7 @@ class AssistantController extends Controller
             $key = trim($assistant->gemini_api_key ?? '');
             if (!$key) return 'Erro: Chave API do Gemini não configurada.';
 
-            $res = Http::timeout(45)->post("https://generativelanguage.googleapis.com/v1beta/models/{$assistant->model}:generateContent?key={$key}", [
+            $res = Http::timeout(90)->post("https://generativelanguage.googleapis.com/v1beta/models/{$assistant->model}:generateContent?key={$key}", [
                 'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
                 'contents' => [['parts' => [['text' => $userMessage]]]]
             ]);
@@ -2615,7 +2615,7 @@ class AssistantController extends Controller
                 'x-api-key' => $key,
                 'anthropic-version' => '2023-06-01',
                 'content-type' => 'application/json'
-            ])->timeout(45)->post('https://api.anthropic.com/v1/messages', [
+            ])->timeout(90)->post('https://api.anthropic.com/v1/messages', [
                 'model' => $assistant->model ?? 'claude-3-haiku-20240307',
                 'system' => $systemPrompt,
                 'max_tokens' => 1024,
@@ -2638,7 +2638,7 @@ class AssistantController extends Controller
             }
             $messages[] = ['role' => 'user', 'content' => $userMessage];
 
-            $res = Http::withToken($key)->timeout(45)->post('https://api.x.ai/v1/chat/completions', [
+            $res = Http::withToken($key)->timeout(90)->post('https://api.x.ai/v1/chat/completions', [
                 'model' => $assistant->model ?? 'grok-2-mini',
                 'messages' => $messages
             ]);
