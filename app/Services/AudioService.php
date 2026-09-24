@@ -26,7 +26,6 @@ class AudioService
                     )
                     ->post('https://api.openai.com/v1/audio/transcriptions', [
                         'model' => 'whisper-1',
-                        'language' => 'pt'
                     ]);
 
                 if ($response->successful()) {
