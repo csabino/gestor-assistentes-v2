@@ -1513,8 +1513,14 @@ class AssistantController extends Controller
         // 4. BASE DE CONHECIMENTO (COM TRAVA BLINDADA DE TOKENS)
         $files = $assistant->knowledge_files;
         if (is_array($files) && !empty($files)) {
+            // Documentos enviados manualmente (Word/PDF/etc.) vêm sempre ANTES das páginas de site
+            // raspadas automaticamente: com dezenas/centenas de páginas raspadas, elas sozinhas já
+            // estouravam a trava de caracteres e os documentos oficiais (endereço, quem somos etc.)
+            // nunca chegavam a entrar no prompt.
+            usort($files, fn($a, $b) => str_starts_with($a['name'] ?? '', '🌐') <=> str_starts_with($b['name'] ?? '', '🌐'));
+
             $prompt .= "\n\n### BASE DE CONHECIMENTO OFICIAL DA EMPRESA ###\n";
-            
+
             $accumulatedChars = 0;
             $maxAllowedKbChars = 120000; // Trava máxima (~30k tokens) para evitar estouro da OpenAI
 
@@ -1531,15 +1537,18 @@ class AssistantController extends Controller
 
                 if (!empty($content)) {
                     $cleanUrl = str_replace('🌐 ', '', $name);
-                    // Limita a 1.200 caracteres por arquivo/página
-                    $trimmedContent = mb_substr($content, 0, 1200);
+                    $isWebPage = str_starts_with($name, '🌐');
+                    // Documentos enviados manualmente têm mais espaço (6.000 caracteres) por serem
+                    // poucos e terem sido escolhidos a dedo; páginas de site raspadas automaticamente
+                    // continuam limitadas a 1.200 pra não estourar a trava com dezenas delas.
+                    $trimmedContent = mb_substr($content, 0, $isWebPage ? 1200 : 6000);
                     $contentLength = mb_strlen($trimmedContent);
 
                     if ($accumulatedChars + $contentLength > $maxAllowedKbChars) {
                         $trimmedContent = mb_substr($trimmedContent, 0, $maxAllowedKbChars - $accumulatedChars);
                     }
 
-                    if (str_starts_with($name, '🌐')) {
+                    if ($isWebPage) {
                         $prompt .= "\n[TIPO: PAGINA_WEB]\n[URL: {$cleanUrl}]\n[CONTEÚDO]:\n" . $trimmedContent . "\n[FIM DE PAGINA_WEB]\n";
                     } else {
                         $prompt .= "\n[TIPO: DOCUMENTO_ARQUIVO]\n[NOME_ARQUIVO: {$name}]\n[CONTEÚDO]:\n" . $trimmedContent . "\n[FIM DE DOCUMENTO_ARQUIVO]\n";
