@@ -1644,6 +1644,43 @@ class AssistantController extends Controller
         }
     }
 
+    /**
+     * Detecta (por heurística simples de palavras/caracteres comuns, sem depender de nenhuma API
+     * externa) se o texto está em português, inglês ou espanhol, e devolve a voz + languageCode do
+     * Google TTS correspondente - a IA pode responder em qualquer idioma (regra de acompanhamento
+     * dinâmico), então a voz do áudio precisa acompanhar, senão o TTS lê palavras estrangeiras com
+     * fonética de português (soletrando acentos, travessões, etc.).
+     */
+    private function pickTtsVoiceForText(string $text): array
+    {
+        $lower = mb_strtolower($text);
+
+        $ptScore = 0;
+        $enScore = 0;
+        $esScore = 0;
+
+        if (preg_match('/[¿¡]/u', $lower)) $esScore += 3;
+        if (preg_match('/[ãõ]/u', $lower)) $ptScore += 3;
+
+        foreach (['você', 'não', 'está', 'muito', 'obrigad', 'também', 'então', 'aqui', 'para você'] as $w) {
+            if (str_contains($lower, $w)) $ptScore++;
+        }
+        foreach ([' the ', ' you ', 'please', 'thank', 'hello ', ' what ', ' with ', ' have ', ' this ', ' that '] as $w) {
+            if (str_contains($lower, $w)) $enScore++;
+        }
+        foreach (['usted', 'gracias', 'por favor', 'hola', 'está', 'más', 'qué', 'cómo', 'aquí', 'entonces'] as $w) {
+            if (str_contains($lower, $w)) $esScore++;
+        }
+
+        if ($esScore > $ptScore && $esScore > $enScore) {
+            return ['es-US-Wavenet-A', 'es-US'];
+        }
+        if ($enScore > $ptScore && $enScore > $esScore) {
+            return ['en-US-Wavenet-F', 'en-US'];
+        }
+        return ['pt-BR-Chirp3-HD-Erinome', 'pt-BR'];
+    }
+
     private function formatTextForWhatsapp(string $text): string
     {
         if (empty($text)) return '';
@@ -2444,12 +2481,17 @@ class AssistantController extends Controller
                 }
                 // === FIM DO FILTRO DE ÁUDIO ===
 
-                $googleKey = env('GOOGLE_API_KEY_TTS') 
-                    ?? env('GOOGLE_APIKEY_TTS') 
-                    ?? (defined('GOOGLE_APIKEY_TTS') ? GOOGLE_APIKEY_TTS : null) 
+                $googleKey = env('GOOGLE_API_KEY_TTS')
+                    ?? env('GOOGLE_APIKEY_TTS')
+                    ?? (defined('GOOGLE_APIKEY_TTS') ? GOOGLE_APIKEY_TTS : null)
                     ?? env('GOOGLE_API_KEY');
 
-                $audioData = $audioService->textToSpeech($textForAudio, $googleKey);
+                // A resposta pode vir em qualquer idioma (regra de acompanhamento dinâmico do prompt),
+                // então a voz do TTS precisa acompanhar - senão o texto sai lido com sotaque/fonética
+                // de português, soletrando acentos e travessões de outros idiomas.
+                [$ttsVoice, $ttsLangCode] = $this->pickTtsVoiceForText($aiReply);
+
+                $audioData = $audioService->textToSpeech($textForAudio, $googleKey, $ttsVoice, 'FEMALE', $ttsLangCode);
 
                 if ($audioData) {
                     $waResult = $this->sendWhatsappAudioMessage($assistant, $cleanSender, $audioData);
