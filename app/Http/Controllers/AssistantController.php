@@ -2227,7 +2227,7 @@ class AssistantController extends Controller
                 return response()->json(['status' => 'success']);
             }
 
-            $omniInputRes = $this->sendToOmni($userMessage, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'input', $cleanSender, $assistant->id);
+            $omniInputRes = $this->sendToOmni($userMessage, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'input', $sendTarget, $assistant->id);
 
             $protocolo = null;
             $isNewTicket = false;
@@ -2422,7 +2422,7 @@ class AssistantController extends Controller
             }
 
             // ENVIO PARA O OMNI COM A RESPOSTA FINAL TRATADA E FORMATADA
-            $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $cleanSender, $assistant->id);
+            $this->sendToOmni($aiReply, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'output', $sendTarget, $assistant->id);
 
             DB::table('chat_messages')->insert([
                 [
