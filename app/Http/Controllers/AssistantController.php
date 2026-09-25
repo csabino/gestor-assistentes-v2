@@ -1888,6 +1888,17 @@ class AssistantController extends Controller
 
             $cleanSender = preg_replace('/[^0-9]/', '', $sender);
 
+            // 🛑 CONTATO "LID": o WhatsApp vem migrando cada vez mais contatos (principalmente fora
+            // do Brasil) pra um identificador interno opaco ("@lid") em vez do número de telefone
+            // real - quando isso acontece, message.sender_pn some (fica null) e só sobra esse LID.
+            // Enviar de volta só os dígitos como se fosse um número de verdade não funciona (não é
+            // discável); é preciso mandar pro JID completo, com o sufixo @lid, pra UazAPI/Baileys
+            // resolver corretamente. $sendTarget é o que deve ser usado em qualquer envio de
+            // resposta pra esse contato; $cleanSender continua sendo só os dígitos, usado como
+            // identificador estável no banco (chat_messages, webhook_logs, agendamentos etc.).
+            $isLidSender = is_string($rawSender) && str_contains($rawSender, '@lid');
+            $sendTarget = $isLidSender ? ($cleanSender . '@lid') : $cleanSender;
+
             if ($request->input('message.fromMe') === true || $request->input('data.key.fromMe') === true || $request->input('key.fromMe') === true) {
                 return response()->json(['status' => 'ignored_from_me']);
             }
@@ -2118,7 +2129,7 @@ class AssistantController extends Controller
                     $nowFormatted = now()->setTimezone($this->getTimezone($assistant->id))->toDateTimeString();
                     $rejectMsg = "⚠️ " . $mediaErrorDetails;
                     
-                    $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $rejectMsg);
+                    $waResult = $this->sendWhatsappMessage($assistant, $sendTarget, $rejectMsg);
 
                     DB::table('webhook_logs')->insert([
                         'assistant_id' => $assistant->id,
@@ -2321,7 +2332,7 @@ class AssistantController extends Controller
             $systemPrompt .= "===============================================\n";
 
             // ATIVA O 'DIGITANDO...' ENQUANTO A IA PROCESSA A RESPOSTA
-            $this->sendWhatsappPresence($assistant, $cleanSender, 'composing');
+            $this->sendWhatsappPresence($assistant, $sendTarget, 'composing');
 
             $aiReply = $this->callAiApi($assistant, $systemPrompt, $userMessage, $history);
 
@@ -2494,24 +2505,24 @@ class AssistantController extends Controller
                 $audioData = $audioService->textToSpeech($textForAudio, $googleKey, $ttsVoice, 'FEMALE', $ttsLangCode);
 
                 if ($audioData) {
-                    $waResult = $this->sendWhatsappAudioMessage($assistant, $cleanSender, $audioData);
+                    $waResult = $this->sendWhatsappAudioMessage($assistant, $sendTarget, $audioData);
 
                     if (!empty($separated['extracted_links'])) {
-                        $this->sendWhatsappMessage($assistant, $cleanSender, $separated['extracted_links']);
+                        $this->sendWhatsappMessage($assistant, $sendTarget, $separated['extracted_links']);
                     }
 
                     if ($strippedMenuText !== null) {
-                        $this->sendWhatsappMessage($assistant, $cleanSender, $strippedMenuText);
+                        $this->sendWhatsappMessage($assistant, $sendTarget, $strippedMenuText);
                     }
                 } else {
                     $formattedReply = $this->formatTextForWhatsapp($aiReply);
-                    $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
+                    $waResult = $this->sendWhatsappMessage($assistant, $sendTarget, $formattedReply);
                 }
             } elseif ($hasMainMenuTag) {
-                $waResult = $this->sendWhatsappInteractiveMenu($assistant, $cleanSender, $aiReply);
+                $waResult = $this->sendWhatsappInteractiveMenu($assistant, $sendTarget, $aiReply);
             } else {
                 $formattedReply = $this->formatTextForWhatsapp($aiReply);
-                $waResult = $this->sendWhatsappMessage($assistant, $cleanSender, $formattedReply);
+                $waResult = $this->sendWhatsappMessage($assistant, $sendTarget, $formattedReply);
             }
 
             // A pergunta de oferta já foi enviada acima; cria o registro "aguardando confirmação"
@@ -2683,6 +2694,17 @@ class AssistantController extends Controller
         return response()->json(['success' => false, 'message' => 'Provedor inválido.']);
     }
 
+    /**
+     * Números "normais" (só dígitos) continuam limpos de qualquer formatação; mas se vier um JID
+     * completo (com "@", ex: "158243909329030@lid" de um contato LID, cujo número de telefone real
+     * o WhatsApp não expõe) o sufixo é preservado - a UazAPI/Baileys precisa do JID inteiro pra
+     * conseguir entregar a mensagem nesse caso, já que os dígitos sozinhos não são discáveis.
+     */
+    private function normalizeWaTarget(string $to): string
+    {
+        return str_contains($to, '@') ? $to : preg_replace('/[^0-9]/', '', $to);
+    }
+
     private function sendWhatsappMessage(Assistant $assistant, string $to, string $message): array
     {
         if (empty($assistant->whatsapp_url) || empty($assistant->whatsapp_token)) {
@@ -2690,7 +2712,7 @@ class AssistantController extends Controller
         }
 
         try {
-            $cleanTo = preg_replace('/[^0-9]/', '', $to);
+            $cleanTo = $this->normalizeWaTarget($to);
             $baseUrl = rtrim($assistant->whatsapp_url, '/');
             $token = trim($assistant->whatsapp_token);
 
@@ -2920,7 +2942,7 @@ class AssistantController extends Controller
         }
 
         try {
-            $cleanTo = preg_replace('/[^0-9]/', '', $to);
+            $cleanTo = $this->normalizeWaTarget($to);
             $token = trim($assistant->whatsapp_token);
             $endpoint = $baseUrl . '/send/menu';
 
@@ -2957,7 +2979,7 @@ class AssistantController extends Controller
         }
 
         try {
-            $cleanTo = preg_replace('/[^0-9]/', '', $to);
+            $cleanTo = $this->normalizeWaTarget($to);
             $baseUrl = rtrim($assistant->whatsapp_url, '/');
             $token = trim($assistant->whatsapp_token);
 
@@ -3048,7 +3070,7 @@ class AssistantController extends Controller
         }
 
         try {
-            $cleanTo = preg_replace('/[^0-9]/', '', $to);
+            $cleanTo = $this->normalizeWaTarget($to);
             $baseUrl = rtrim($assistant->whatsapp_url, '/');
             $token = trim($assistant->whatsapp_token);
             $instance = trim($assistant->whatsapp_instance ?? '');
