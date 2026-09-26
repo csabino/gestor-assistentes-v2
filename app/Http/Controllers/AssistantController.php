@@ -345,7 +345,7 @@ class AssistantController extends Controller
                 'updated_at' => now()
             ]);
 
-            $msg = "\n\n❌ *REUNIÃO CANCELADA COM SUCESSO!*\n\nO agendamento do dia " . Carbon::parse($appointment->start_time)->format('d/m/Y \à\s H:i') . " foi cancelado na agenda e os participantes foram notificados.\n\nRestou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento\n3️⃣ Voltar ao Menu Principal";
+            $msg = "\n\n❌ *REUNIÃO CANCELADA COM SUCESSO!*\n\nO agendamento do dia " . Carbon::parse($appointment->start_time)->format('d/m/Y \à\s H:i') . " foi cancelado na agenda e os participantes foram notificados.\n\nPosso te ajudar em mais alguma coisa, ou podemos encerrar por aqui? [ENCERRAMENTO]";
 
             return trim(preg_replace('/\[(?:CANCELAR_REUNIAO|Cancelar reunião|CANCELAR_AGENDAMENTO|CANCELAR):.*?\](.*)$/is', $msg, $aiReply));
         }
@@ -496,7 +496,7 @@ class AssistantController extends Controller
                 $msg .= "📅 *Nova Data/Hora:* " . $newStartTime->format('d/m/Y \à\s H:i') . "\n";
                 if ($meetingResult['meet_link'] ?? false) $msg .= "🎥 *Link do Google Meet:* " . $meetingResult['meet_link'] . "\n\n";
 
-                $msg .= "Restou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento\n3️⃣ Voltar ao Menu Principal";
+                $msg .= "Posso te ajudar em mais alguma coisa, ou podemos encerrar por aqui? [ENCERRAMENTO]";
 
                 return trim(preg_replace('/\[REAGENDAR_REUNIAO:.*?\](.*)$/s', $msg, $aiReply));
 
@@ -632,7 +632,7 @@ class AssistantController extends Controller
                     $msg .= "🎥 *Link do Google Meet:* " . $meetingResult['meet_link'] . "\n";
                 }
 
-                $msg .= "\nRestou mais alguma dúvida ou posso te ajudar em algo mais?\n\nPor favor, selecione uma das opções:\n1️⃣ Tenho mais dúvidas\n2️⃣ Encerrar o atendimento\n3️⃣ Voltar ao Menu Principal";
+                $msg .= "\nPosso te ajudar em mais alguma coisa, ou podemos encerrar por aqui? [ENCERRAMENTO]";
 
                 return trim(preg_replace('/\[AGENDAR_REUNIAO:.*?\](.*)$/s', $msg, $aiReply));
 
