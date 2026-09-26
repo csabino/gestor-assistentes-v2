@@ -7,6 +7,7 @@ use App\Models\Survey;
 use App\Models\SurveyQuestion;
 use App\Models\SurveyQuestionOption;
 use App\Models\SurveyResponse;
+use App\Models\SurveyResponseAnswer;
 use Illuminate\Http\Request;
 
 class SurveyController extends Controller
@@ -47,9 +48,57 @@ class SurveyController extends Controller
                 ->get()
             : collect();
 
+        $dashboard = $editingSurvey ? $this->buildDashboardData($editingSurvey, $responses) : null;
+
         $currentView = 'surveys';
 
-        return view('surveys.index', compact('assistant', 'surveys', 'editingSurvey', 'responses', 'currentView'));
+        return view('surveys.index', compact('assistant', 'surveys', 'editingSurvey', 'responses', 'dashboard', 'currentView'));
+    }
+
+    /**
+     * Monta os dados do dashboard dinâmico de uma pesquisa: para cada pergunta de múltipla
+     * escolha, a contagem de respostas por opção (pra um gráfico de barras); para pergunta de
+     * texto livre, só a lista das respostas em si (não dá pra "gráfico" texto livre sem NLP).
+     */
+    private function buildDashboardData(Survey $survey, $responses): array
+    {
+        $allAnswers = SurveyResponseAnswer::whereIn('survey_response_id', $responses->pluck('id'))->get();
+
+        $questions = [];
+        foreach ($survey->questions as $question) {
+            $questionAnswers = $allAnswers->where('survey_question_id', $question->id);
+
+            if ($question->type === 'multiple_choice') {
+                $counts = [];
+                foreach ($question->options as $option) {
+                    $counts[$option->option_text] = 0;
+                }
+                foreach ($questionAnswers as $answer) {
+                    $counts[$answer->answer_text] = ($counts[$answer->answer_text] ?? 0) + 1;
+                }
+                $questions[] = [
+                    'id' => $question->id,
+                    'text' => $question->question_text,
+                    'type' => 'multiple_choice',
+                    'labels' => array_keys($counts),
+                    'values' => array_values($counts),
+                    'total' => array_sum($counts),
+                ];
+            } else {
+                $questions[] = [
+                    'id' => $question->id,
+                    'text' => $question->question_text,
+                    'type' => 'free_text',
+                    'answers' => $questionAnswers->pluck('answer_text')->filter()->values()->all(),
+                ];
+            }
+        }
+
+        return [
+            'total_responses' => $responses->count(),
+            'last_response_at' => optional($responses->max('completed_at'))->format('d/m/Y H:i'),
+            'questions' => $questions,
+        ];
     }
 
     private function exportResponsesCsv(Survey $survey)

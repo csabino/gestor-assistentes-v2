@@ -35,17 +35,23 @@
 
                 @if($editingSurvey)
                     {{-- ====================== DETALHE DA PESQUISA ====================== --}}
-                    <div x-data="{ showResponsesModal: false }">
+                    <div x-data="{ showResponsesModal: false, showDashboardModal: false }">
                     <div class="flex items-center gap-3 mb-5">
                         <a href="/?view=surveys&assistant_id={{ $assistant->id }}" class="text-gray-400 hover:text-indigo-600 transition" title="Voltar para a lista de pesquisas">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
                         </a>
                         <h2 class="text-lg font-bold text-gray-800">{{ $editingSurvey->name }}</h2>
                         <span class="text-[11px] font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">[{{ $editingSurvey->tag }}]</span>
-                        <button type="button" @click="showResponsesModal = true" class="ml-auto bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
-                            Ver Respostas ({{ $responses->count() }})
-                        </button>
+                        <div class="ml-auto flex items-center gap-2">
+                            <button type="button" @click="showDashboardModal = true; $nextTick(() => initSurveyDashboardCharts())" class="bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                                Dashboard
+                            </button>
+                            <button type="button" @click="showResponsesModal = true" class="bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
+                                Ver Respostas ({{ $responses->count() }})
+                            </button>
+                        </div>
                     </div>
 
                     <div class="dark-card-invert bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
@@ -220,6 +226,55 @@
                             </div>
                         </div>
                     </div>
+
+                    <div x-show="showDashboardModal" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                        <div @click.away="showDashboardModal = false" class="dark-card-invert bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col border border-slate-200">
+                            <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                                <h3 class="text-base font-bold text-gray-800">Dashboard — {{ $editingSurvey->name }}</h3>
+                                <button type="button" @click="showDashboardModal = false" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg transition">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            <div class="flex-1 min-h-0 overflow-y-auto custom-scroll p-5 space-y-5">
+                                <div class="flex items-center gap-6 pb-4 border-b border-gray-100">
+                                    <div>
+                                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Respostas concluídas</p>
+                                        <p class="text-3xl font-semibold text-gray-800">{{ $dashboard['total_responses'] ?? 0 }}</p>
+                                    </div>
+                                    @if($dashboard['last_response_at'] ?? null)
+                                        <div>
+                                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Última resposta</p>
+                                            <p class="text-sm font-semibold text-gray-600">{{ $dashboard['last_response_at'] }}</p>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                @if(($dashboard['total_responses'] ?? 0) === 0)
+                                    <p class="text-sm text-gray-400 text-center py-10">Nenhuma resposta concluída ainda — o dashboard aparece assim que a primeira pesquisa for respondida.</p>
+                                @else
+                                    @foreach($dashboard['questions'] as $q)
+                                        <div class="border border-gray-200 rounded-lg p-4">
+                                            <h4 class="text-xs font-bold text-gray-700 mb-3">{{ $q['text'] }}</h4>
+                                            @if($q['type'] === 'multiple_choice')
+                                                <div style="height: {{ max(count($q['labels']) * 34 + 20, 60) }}px">
+                                                    <canvas id="survey-chart-{{ $q['id'] }}"></canvas>
+                                                </div>
+                                            @else
+                                                <div class="space-y-1.5 max-h-40 overflow-y-auto custom-scroll">
+                                                    @forelse($q['answers'] as $answer)
+                                                        <p class="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-md px-2.5 py-1.5">{{ $answer }}</p>
+                                                    @empty
+                                                        <p class="text-xs text-gray-400 italic">Nenhuma resposta de texto ainda.</p>
+                                                    @endforelse
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                     </div>
 
                 @else
@@ -280,7 +335,64 @@
             </div>
         </div>
 
+        @if($editingSurvey)
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+        @endif
+
         <script>
+            let surveyChartsInitialized = false;
+            function initSurveyDashboardCharts() {
+                if (surveyChartsInitialized || typeof Chart === 'undefined') return;
+                surveyChartsInitialized = true;
+
+                const questions = @json($editingSurvey ? ($dashboard['questions'] ?? []) : []);
+                const barColor = '#2a78d6';
+
+                questions.forEach(function (q) {
+                    if (q.type !== 'multiple_choice') return;
+                    const canvas = document.getElementById('survey-chart-' + q.id);
+                    if (!canvas) return;
+
+                    new Chart(canvas, {
+                        type: 'bar',
+                        data: {
+                            labels: q.labels,
+                            datasets: [{
+                                data: q.values,
+                                backgroundColor: barColor,
+                                borderRadius: 4,
+                                borderSkipped: false,
+                                maxBarThickness: 24,
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (ctx) { return ctx.parsed.x + ' resposta(s)'; }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    beginAtZero: true,
+                                    ticks: { precision: 0, color: '#898781' },
+                                    grid: { color: '#e1e0d9' }
+                                },
+                                y: {
+                                    ticks: { color: '#52514e', font: { size: 11 } },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+
             function saveSurveyScrollPosition() {
                 const scrollArea = document.getElementById('surveysScrollArea');
                 if (scrollArea) {
