@@ -2437,6 +2437,29 @@ class AssistantController extends Controller
 
             $aiReply = str_replace('..', '.', $aiReply);
 
+            // 🛑 REDE DE SEGURANÇA: a IA às vezes afirma que agendou/confirmou/cancelou uma reunião e
+            // já mandou o convite, em texto livre, SEM emitir a tag técnica que de fato aciona o
+            // Google Calendar - resultado: ela mente pro cliente que está tudo certo e nenhum convite
+            // é enviado de verdade. Reforçar a instrução no prompt não bastou (aconteceu de novo mesmo
+            // depois disso), então aqui detectamos essa alegação falsa e forçamos uma segunda tentativa
+            // pedindo pra ela emitir a tag de verdade, antes de deixar essa resposta ir pro cliente.
+            $hasAnySchedulingTagYet = (bool) preg_match('/\[(VERIFICAR_AGENDA|AGENDAR_REUNIAO|CANCELAR_REUNIAO|REAGENDAR_REUNIAO)\s*:/is', $aiReply);
+            if (!$hasAnySchedulingTagYet && preg_match('/\b(reuni[ãa]o (foi )?agendada|reuni[ãa]o confirmada|convite (foi |j[áa] )?enviado|agendei (a |sua )?reuni[ãa]o|confirmei (a |sua )?reuni[ãa]o)\b/iu', $aiReply)) {
+                try {
+                    $retryReply = $this->callAiApi(
+                        $assistant,
+                        $systemPrompt,
+                        '[SISTEMA: Na sua última resposta você disse que a reunião foi agendada/confirmada e que um convite foi enviado, mas você NÃO emitiu a tag técnica [AGENDAR_REUNIAO:...] (ou [CANCELAR_REUNIAO:...]/[REAGENDAR_REUNIAO:...], conforme o caso) necessária pra isso realmente acontecer - ou seja, NADA foi agendado de verdade e NENHUM convite foi enviado. Refaça agora essa resposta, dessa vez EMITINDO CORRETAMENTE a tag correspondente, com os dados já confirmados nesta conversa (departamento, data/hora, e-mail do cliente).]',
+                        $history
+                    );
+                    if (preg_match('/\[(VERIFICAR_AGENDA|AGENDAR_REUNIAO|CANCELAR_REUNIAO|REAGENDAR_REUNIAO)\s*:/is', $retryReply)) {
+                        $aiReply = $retryReply;
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Erro na segunda tentativa de emitir tag de agendamento: ' . $e->getMessage());
+                }
+            }
+
             // 🛑 DETECÇÃO BLINDADA: Identifica tags de agendamento (ignorando maiúsculas, espaços e quebras de linha)
             $hasSchedulingTag = preg_match('/\[(VERIFICAR_AGENDA|AGENDAR_REUNIAO|CANCELAR_REUNIAO|REAGENDAR_REUNIAO)\s*:/is', $aiReply);
 
