@@ -176,6 +176,52 @@
                             </label>
                         </div>
 
+                        <!-- Feriados (dias sem agendamento) - os campos abaixo usam o atributo
+                             form="..." pra submeter em formulários próprios definidos fora do
+                             #settingsForm (não dá pra aninhar <form>, mas o atributo form deixa o
+                             campo/botão fisicamente aqui mesmo, associado a um form em outro lugar
+                             da página). -->
+                        <div class="md:col-span-3 border-t border-gray-100 pt-5">
+                            <label class="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+                                Feriados (dias sem agendamento)
+                            </label>
+
+                            <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3 items-end mb-3">
+                                <div>
+                                    <input type="text" form="addHolidayForm" name="holiday_name" placeholder="Nome (ex: Natal)" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs outline-none focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <input type="date" form="addHolidayForm" name="holiday_date" required class="border border-gray-300 rounded-lg px-3 py-2 text-xs outline-none focus:border-indigo-500">
+                                </div>
+                                <label class="flex items-center gap-2 text-xs font-semibold text-gray-700 pb-2.5 cursor-pointer whitespace-nowrap">
+                                    <input type="checkbox" form="addHolidayForm" name="holiday_recurring" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                                    Repete todo ano
+                                </label>
+                                <button type="submit" form="addHolidayForm" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg transition whitespace-nowrap">+ Adicionar</button>
+                            </div>
+                            <p class="text-[11px] text-gray-400 mb-3">"Repete todo ano" bloqueia sempre esse dia/mês (ex: 25/12), qualquer que seja o ano. Sem marcar, bloqueia só essa data exata (ex: Carnaval de um ano específico, que muda de data).</p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                                @forelse($holidays as $holiday)
+                                    <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                        <div class="text-xs text-gray-700">
+                                            <span class="font-bold">{{ $holiday->name }}</span>
+                                            <span class="text-gray-400 ml-2">{{ $holiday->date->format('d/m/Y') }}</span>
+                                            @if($holiday->is_recurring)
+                                                <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 ml-2">Todo ano</span>
+                                            @endif
+                                        </div>
+                                        <button type="submit" form="deleteHolidayForm{{ $holiday->id }}" class="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Remover">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                @empty
+                                    <p class="text-xs text-gray-400 md:col-span-2 text-center py-4">Nenhum feriado cadastrado ainda.</p>
+                                @endforelse
+                            </div>
+                        </div>
+
                         <!-- Prompt/Diretriz Customizada do Agendamento -->
                         <div class="md:col-span-3">
                             <label for="scheduling_custom_prompt" class="block text-xs font-semibold text-gray-700 mb-1">Instruções Customizadas para Agendamento (Opcional)</label>
@@ -336,65 +382,25 @@
             </div>
         </form>
 
-        <div class="container mx-auto px-6 max-w-6xl pb-8">
-            <!-- Card: Feriados (dias sem agendamento) - fora do form principal porque tem os
-                 próprios botões de adicionar/remover, que precisam submeter na hora. -->
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h2 class="text-base font-bold text-gray-800 border-b border-gray-100 pb-3 mb-5 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                    </svg>
-                    Feriados (dias sem agendamento)
-                </h2>
-
-                <form action="/" method="POST" class="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3 items-end mb-5">
-                    @csrf
-                    <input type="hidden" name="view" value="settings">
-                    <input type="hidden" name="action" value="add_holiday">
-                    <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nome</label>
-                        <input type="text" name="holiday_name" placeholder="Ex: Natal" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs outline-none focus:border-indigo-500">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Data</label>
-                        <input type="date" name="holiday_date" required class="border border-gray-300 rounded-lg px-3 py-2 text-xs outline-none focus:border-indigo-500">
-                    </div>
-                    <label class="flex items-center gap-2 text-xs font-semibold text-gray-700 pb-2.5 cursor-pointer whitespace-nowrap">
-                        <input type="checkbox" name="holiday_recurring" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
-                        Repete todo ano
-                    </label>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg transition whitespace-nowrap">+ Adicionar</button>
-                </form>
-                <p class="text-[11px] text-gray-400 -mt-3 mb-4">"Repete todo ano" bloqueia sempre esse dia/mês (ex: 25/12), qualquer que seja o ano. Sem marcar, bloqueia só essa data exata (ex: Carnaval de um ano específico, que muda de data).</p>
-
-                <div class="space-y-1.5">
-                    @forelse($holidays as $holiday)
-                        <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                            <div class="text-xs text-gray-700">
-                                <span class="font-bold">{{ $holiday->name }}</span>
-                                <span class="text-gray-400 ml-2">{{ $holiday->date->format('d/m/Y') }}</span>
-                                @if($holiday->is_recurring)
-                                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 ml-2">Todo ano</span>
-                                @endif
-                            </div>
-                            <form action="/" method="POST" onsubmit="return confirm('Remover este feriado?');">
-                                @csrf
-                                <input type="hidden" name="view" value="settings">
-                                <input type="hidden" name="action" value="delete_holiday">
-                                <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                                <input type="hidden" name="holiday_id" value="{{ $holiday->id }}">
-                                <button type="submit" class="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="Remover">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </form>
-                        </div>
-                    @empty
-                        <p class="text-xs text-gray-400 text-center py-4">Nenhum feriado cadastrado ainda.</p>
-                    @endforelse
-                </div>
-            </div>
-        </div>
+        {{-- Forms "invisíveis" dos feriados: ficam fora do #settingsForm (não dá pra aninhar
+             <form>), mas os campos visíveis de verdade estão lá em cima, logo após Horário de
+             Atendimento, ligados aqui via atributo form="...". onsubmit da confirmação de exclusão
+             fica aqui porque é o form que efetivamente é submetido. --}}
+        <form id="addHolidayForm" action="/" method="POST" class="hidden" aria-hidden="true">
+            @csrf
+            <input type="hidden" name="view" value="settings">
+            <input type="hidden" name="action" value="add_holiday">
+            <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
+        </form>
+        @foreach($holidays as $holiday)
+            <form id="deleteHolidayForm{{ $holiday->id }}" action="/" method="POST" class="hidden" aria-hidden="true" onsubmit="return confirm('Remover este feriado?');">
+                @csrf
+                <input type="hidden" name="view" value="settings">
+                <input type="hidden" name="action" value="delete_holiday">
+                <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
+                <input type="hidden" name="holiday_id" value="{{ $holiday->id }}">
+            </form>
+        @endforeach
 
         <script>
             function saveSettingsScrollPosition() {
