@@ -2031,6 +2031,12 @@ class AssistantController extends Controller
                 ? ($rawMessage['text'] ?? $rawMessage['body'] ?? $rawMessage['title'] ?? '')
                 : (string)$rawMessage;
 
+            // Guarda o texto "limpo" (sem o embrulho "Mensagem de Voz: ... 🔊 Link do Áudio: ...",
+            // usado só pra exibição no histórico) - é isso que deve ir pro casamento de resposta de
+            // pesquisa (ver mais abaixo), senão uma resposta por áudio tipo "Oito" chega lá como toda
+            // aquela string formatada e não casa com nenhuma opção nem faz sentido como texto livre.
+            $cleanUserMessage = $userMessage;
+
             $mediaErrorDetails = null;
             $mediaSaved = false;
             $mediaUrlPublic = null;
@@ -2219,6 +2225,9 @@ class AssistantController extends Controller
 
                 if ($mediaSaved) {
                     $caption = trim($userMessage);
+                    // Recaptura aqui, pois pra áudio $userMessage só virou o texto transcrito
+                    // ("Oito") depois da captura lá em cima - agora sim reflete a transcrição real.
+                    $cleanUserMessage = $caption;
                     if ($isAudioMessage) {
                         $userMessage = (!empty($caption) && !str_starts_with($caption, '[')) ? "Mensagem de Voz: \"" . $caption . "\"" : $caption;
                         $userMessage .= "\n🔊 Link do Áudio: " . $mediaUrlPublic;
@@ -2272,10 +2281,13 @@ class AssistantController extends Controller
                 ->first();
 
             if ($pendingSurveyResponse) {
+                // Usa o texto limpo (pré-embrulho de áudio), não $userMessage - por essa altura
+                // $userMessage já pode estar formatado como "Mensagem de Voz: \"Oito\"\n🔊 Link do
+                // Áudio: ..." pra exibição no histórico, o que quebra o casamento com as opções.
                 if ($pendingSurveyResponse->status === 'awaiting_confirmation') {
-                    $this->handleSurveyConfirmation($assistant, $pendingSurveyResponse, $userMessage);
+                    $this->handleSurveyConfirmation($assistant, $pendingSurveyResponse, $cleanUserMessage);
                 } else {
-                    $this->handleSurveyAnswer($assistant, $pendingSurveyResponse, $userMessage);
+                    $this->handleSurveyAnswer($assistant, $pendingSurveyResponse, $cleanUserMessage);
                 }
 
                 DB::table('chat_messages')->insert([
