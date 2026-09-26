@@ -228,7 +228,7 @@
                     </div>
 
                     <div x-show="showDashboardModal" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                        <div @click.away="showDashboardModal = false" class="dark-card-invert bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col border border-slate-200">
+                        <div @click.away="showDashboardModal = false" class="dark-card-invert bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[88vh] flex flex-col border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800">Dashboard — {{ $editingSurvey->name }}</h3>
                                 <button type="button" @click="showDashboardModal = false" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg transition">
@@ -236,41 +236,57 @@
                                 </button>
                             </div>
 
-                            <div class="flex-1 min-h-0 overflow-y-auto custom-scroll p-5 space-y-5">
-                                <div class="flex items-center gap-6 pb-4 border-b border-gray-100">
-                                    <div>
+                            <div class="flex-1 min-h-0 overflow-y-auto custom-scroll p-5 space-y-6 bg-gray-50/60">
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div class="bg-white border border-gray-200 rounded-xl p-4">
                                         <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Respostas concluídas</p>
-                                        <p class="text-3xl font-semibold text-gray-800">{{ $dashboard['total_responses'] ?? 0 }}</p>
+                                        <p class="text-3xl font-semibold text-gray-800 mt-1">{{ $dashboard['total_responses'] ?? 0 }}</p>
                                     </div>
-                                    @if($dashboard['last_response_at'] ?? null)
-                                        <div>
-                                            <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Última resposta</p>
-                                            <p class="text-sm font-semibold text-gray-600">{{ $dashboard['last_response_at'] }}</p>
-                                        </div>
-                                    @endif
+                                    <div class="bg-white border border-gray-200 rounded-xl p-4">
+                                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Perguntas na pesquisa</p>
+                                        <p class="text-3xl font-semibold text-gray-800 mt-1">{{ count($dashboard['questions'] ?? []) }}</p>
+                                    </div>
+                                    <div class="bg-white border border-gray-200 rounded-xl p-4">
+                                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Última resposta</p>
+                                        <p class="text-lg font-semibold text-gray-700 mt-1">{{ $dashboard['last_response_at'] ?? '—' }}</p>
+                                    </div>
                                 </div>
 
                                 @if(($dashboard['total_responses'] ?? 0) === 0)
                                     <p class="text-sm text-gray-400 text-center py-10">Nenhuma resposta concluída ainda — o dashboard aparece assim que a primeira pesquisa for respondida.</p>
                                 @else
-                                    @foreach($dashboard['questions'] as $q)
-                                        <div class="border border-gray-200 rounded-lg p-4">
-                                            <h4 class="text-xs font-bold text-gray-700 mb-3">{{ $q['text'] }}</h4>
-                                            @if($q['type'] === 'multiple_choice')
-                                                <div style="height: {{ max(count($q['labels']) * 34 + 20, 60) }}px">
-                                                    <canvas id="survey-chart-{{ $q['id'] }}"></canvas>
+                                    @php($mcQuestions = collect($dashboard['questions'])->where('type', 'multiple_choice'))
+                                    @php($textQuestions = collect($dashboard['questions'])->where('type', 'free_text'))
+
+                                    @if($mcQuestions->isNotEmpty())
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            @foreach($mcQuestions as $q)
+                                                <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                                                    <h4 class="text-xs font-bold text-gray-700 mb-3">{{ $q['text'] }}</h4>
+                                                    <div style="height: {{ max(count($q['labels']) * 34 + 20, 60) }}px">
+                                                        <canvas id="survey-chart-{{ $q['id'] }}"></canvas>
+                                                    </div>
                                                 </div>
-                                            @else
-                                                <div class="space-y-1.5 max-h-40 overflow-y-auto custom-scroll">
-                                                    @forelse($q['answers'] as $answer)
-                                                        <p class="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-md px-2.5 py-1.5">{{ $answer }}</p>
-                                                    @empty
-                                                        <p class="text-xs text-gray-400 italic">Nenhuma resposta de texto ainda.</p>
-                                                    @endforelse
-                                                </div>
-                                            @endif
+                                            @endforeach
                                         </div>
-                                    @endforeach
+                                    @endif
+
+                                    @if($textQuestions->isNotEmpty())
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            @foreach($textQuestions as $q)
+                                                <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                                                    <h4 class="text-xs font-bold text-gray-700 mb-3">{{ $q['text'] }}</h4>
+                                                    <div class="space-y-1.5 max-h-40 overflow-y-auto custom-scroll">
+                                                        @forelse($q['answers'] as $answer)
+                                                            <p class="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-md px-2.5 py-1.5">{{ $answer }}</p>
+                                                        @empty
+                                                            <p class="text-xs text-gray-400 italic">Nenhuma resposta de texto ainda.</p>
+                                                        @endforelse
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 @endif
                             </div>
                         </div>

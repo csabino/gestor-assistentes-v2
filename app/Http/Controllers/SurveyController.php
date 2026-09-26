@@ -73,8 +73,23 @@ class SurveyController extends Controller
                 foreach ($question->options as $option) {
                     $counts[$option->option_text] = 0;
                 }
+                // Respostas antigas dadas por voz podem ter ficado gravadas como a frase inteira
+                // ("eu acho que foi excelente"), não o texto exato da opção ("Excelente") - antes de
+                // desistir e jogar numa categoria "outros", tenta achar a opção como um trecho dentro
+                // da frase, mais longa primeiro.
+                $sortedOptionTexts = $question->options->sortByDesc(fn($o) => mb_strlen($o->option_text))->pluck('option_text');
                 foreach ($questionAnswers as $answer) {
-                    $counts[$answer->answer_text] = ($counts[$answer->answer_text] ?? 0) + 1;
+                    $label = $answer->answer_text;
+                    if (!array_key_exists($label, $counts)) {
+                        $normalized = mb_strtolower(trim($label));
+                        foreach ($sortedOptionTexts as $optionText) {
+                            if ($optionText !== '' && mb_stripos($normalized, mb_strtolower($optionText)) !== false) {
+                                $label = $optionText;
+                                break;
+                            }
+                        }
+                    }
+                    $counts[$label] = ($counts[$label] ?? 0) + 1;
                 }
                 $questions[] = [
                     'id' => $question->id,

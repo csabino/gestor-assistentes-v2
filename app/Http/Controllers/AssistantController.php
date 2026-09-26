@@ -2926,11 +2926,30 @@ class AssistantController extends Controller
                 $option = $options->get(((int) $m[1]) - 1);
                 if ($option) $answerText = $option->option_text;
             } else {
+                $normalizedAnswer = mb_strtolower(trim($answerText));
+                $matchedOption = null;
                 foreach ($options as $option) {
-                    if (mb_strtolower(trim($option->option_text)) === mb_strtolower($answerText)) {
-                        $answerText = $option->option_text;
+                    if (mb_strtolower(trim($option->option_text)) === $normalizedAnswer) {
+                        $matchedOption = $option;
                         break;
                     }
+                }
+                // Resposta por voz costuma vir como frase completa ("eu acho que foi excelente"),
+                // não bate exato com "Excelente" - se não achou igualdade exata, tenta achar a opção
+                // como um trecho dentro da frase (a mais longa primeiro, pra "ótimo" não roubar de
+                // "muito ótimo" se ambas existirem).
+                if (!$matchedOption) {
+                    $sortedOptions = $options->sortByDesc(fn($o) => mb_strlen($o->option_text));
+                    foreach ($sortedOptions as $option) {
+                        $optionText = mb_strtolower(trim($option->option_text));
+                        if ($optionText !== '' && mb_stripos($normalizedAnswer, $optionText) !== false) {
+                            $matchedOption = $option;
+                            break;
+                        }
+                    }
+                }
+                if ($matchedOption) {
+                    $answerText = $matchedOption->option_text;
                 }
             }
         }
