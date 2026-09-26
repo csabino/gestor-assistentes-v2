@@ -2484,7 +2484,11 @@ class AssistantController extends Controller
 
                     if (!$hasPendingSurvey) {
                         $offeredSurvey = $candidateSurvey;
-                        $aiReply = 'Antes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?';
+                        // Acrescenta a pergunta da pesquisa ao que já estava na mensagem (em vez de
+                        // substituir tudo) - essencial pra não jogar fora conteúdo importante que
+                        // também termina com [ENCERRAMENTO], como o resumo de um agendamento
+                        // confirmado (atendente, setor, convites enviados, link do Meet).
+                        $aiReply = trim($aiReply . "\n\nAntes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?");
                         $hasMainMenuTag = false;
                     }
                 }
