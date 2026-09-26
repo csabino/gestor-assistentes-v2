@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Assistant;
+use App\Models\Holiday;
 use App\Models\Setting;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
@@ -253,6 +254,23 @@ class AssistantController extends Controller
         $blockWeekends = (Setting::where('assistant_id', $assistantId)->where('key', 'business_block_weekends')->value('value') ?? '1') === '1';
         if ($blockWeekends && $startTime->isWeekend()) {
             return "\n\n⚠️ Poxa, não realizamos reuniões aos finais de semana - nosso atendimento é de segunda a sexta. Você teria disponibilidade em outro dia?";
+        }
+
+        $holiday = Holiday::where('assistant_id', $assistantId)
+            ->where(function ($q) use ($startTime) {
+                $q->where(function ($q2) use ($startTime) {
+                    $q2->where('is_recurring', true)
+                       ->whereMonth('date', $startTime->month)
+                       ->whereDay('date', $startTime->day);
+                })->orWhere(function ($q2) use ($startTime) {
+                    $q2->where('is_recurring', false)
+                       ->whereDate('date', $startTime->toDateString());
+                });
+            })
+            ->first();
+
+        if ($holiday) {
+            return "\n\n⚠️ Poxa, o dia " . $startTime->format('d/m/Y') . " é feriado (*{$holiday->name}*) e não temos atendimento. Você teria disponibilidade em outro dia?";
         }
 
         $hoursStart = trim(Setting::where('assistant_id', $assistantId)->where('key', 'business_hours_start')->value('value') ?? '09:00');
@@ -1514,6 +1532,15 @@ class AssistantController extends Controller
                     $prompt .= "• Setor: {$d->name}\n";
                 }
                 $prompt .= "\nHORÁRIO DE ATENDIMENTO: reuniões só podem ser marcadas das {$businessHoursStart} às {$businessHoursEnd}" . ($blockWeekends ? ", de segunda a sexta (não atendemos aos sábados e domingos)" : "") . ". Se o cliente pedir um horário fora dessa janela, avise educadamente ANTES de tentar verificar a agenda, e peça outro dia/horário dentro do expediente.\n";
+
+                $holidays = Holiday::where('assistant_id', $assistant->id)->orderBy('date')->get();
+                if ($holidays->isNotEmpty()) {
+                    $prompt .= "\nFERIADOS (não atendemos nesses dias):\n";
+                    foreach ($holidays as $h) {
+                        $prompt .= "• " . ($h->is_recurring ? $h->date->format('d/m') . " (todo ano)" : $h->date->format('d/m/Y')) . " - {$h->name}\n";
+                    }
+                    $prompt .= "Se o cliente pedir um desses dias, avise educadamente ANTES de tentar verificar a agenda, e peça outro dia.\n";
+                }
 
                 if ($defaultDept) {
                     $otherDepts = array_values(array_filter($deptNames, fn($n) => $n !== $defaultDept->name));

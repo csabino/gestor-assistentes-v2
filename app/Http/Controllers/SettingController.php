@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Setting;
 use App\Models\Assistant;
+use App\Models\Holiday;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Http;
@@ -26,6 +27,12 @@ class SettingController extends Controller
         }
 
         if ($request->isMethod('post')) {
+            if ($request->input('action') === 'add_holiday') {
+                return $this->addHoliday($request);
+            }
+            if ($request->input('action') === 'delete_holiday') {
+                return $this->deleteHoliday($request);
+            }
             return $this->update($request);
         }
 
@@ -95,6 +102,8 @@ class SettingController extends Controller
         // Carrega departamentos cadastrados no sistema
         $departments = DB::table('departments')->get();
 
+        $holidays = Holiday::where('assistant_id', $assistantId)->orderBy('date')->get();
+
         $currentView = 'settings';
 
         return view('settings.index', compact(
@@ -111,6 +120,7 @@ class SettingController extends Controller
             'defaultDepartmentId',
             'schedulingCustomPrompt',
             'meetingDurationMinutes',
+            'holidays',
             'businessHoursStart',
             'businessHoursEnd',
             'businessBlockWeekends',
@@ -227,6 +237,33 @@ class SettingController extends Controller
         );
 
         return redirect()->to('/?view=settings&assistant_id=' . $assistantId)->with('success', 'Configurações atualizadas para este assistente!');
+    }
+
+    private function addHoliday(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'holiday_name' => 'required|string|max:255',
+            'holiday_date' => 'required|date',
+        ]);
+
+        Holiday::create([
+            'assistant_id' => $request->input('assistant_id'),
+            'name' => trim($request->input('holiday_name')),
+            'date' => $request->input('holiday_date'),
+            'is_recurring' => $request->boolean('holiday_recurring'),
+        ]);
+
+        return redirect()->to('/?view=settings&assistant_id=' . $request->input('assistant_id'))->with('success', 'Feriado cadastrado!');
+    }
+
+    private function deleteHoliday(Request $request)
+    {
+        $assistantId = $request->input('assistant_id');
+
+        Holiday::where('id', $request->input('holiday_id'))->where('assistant_id', $assistantId)->delete();
+
+        return redirect()->to('/?view=settings&assistant_id=' . $assistantId)->with('success', 'Feriado removido!');
     }
 
     private function redirectToGoogle(Request $request)
