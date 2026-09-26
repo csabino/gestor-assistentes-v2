@@ -241,6 +241,31 @@ class AssistantController extends Controller
         return $minutes > 0 ? $minutes : 60;
     }
 
+    /**
+     * Confere se um horário pedido pro cliente cai dentro do expediente configurado (dias úteis +
+     * janela de horário). A checagem de disponibilidade (allocateAgentRoundRobin) só olha se já tem
+     * OUTRO compromisso marcado ali - ela não sabe nada sobre dia da semana ou horário comercial, e
+     * por isso um sábado de madrugada sem nada marcado passava como "livre". Retorna null se estiver
+     * tudo certo, ou a mensagem pra IA mandar ao cliente se estiver fora do expediente.
+     */
+    private function validateBusinessHours(Carbon $startTime, int $assistantId): ?string
+    {
+        $blockWeekends = (Setting::where('assistant_id', $assistantId)->where('key', 'business_block_weekends')->value('value') ?? '1') === '1';
+        if ($blockWeekends && $startTime->isWeekend()) {
+            return "\n\n⚠️ Poxa, não realizamos reuniões aos finais de semana - nosso atendimento é de segunda a sexta. Você teria disponibilidade em outro dia?";
+        }
+
+        $hoursStart = trim(Setting::where('assistant_id', $assistantId)->where('key', 'business_hours_start')->value('value') ?? '09:00');
+        $hoursEnd = trim(Setting::where('assistant_id', $assistantId)->where('key', 'business_hours_end')->value('value') ?? '17:00');
+        $timeStr = $startTime->format('H:i');
+
+        if ($timeStr < $hoursStart || $timeStr >= $hoursEnd) {
+            return "\n\n⚠️ Esse horário está fora do nosso período de atendimento ({$hoursStart} às {$hoursEnd}). Você teria disponibilidade em outro horário dentro desse período?";
+        }
+
+        return null;
+    }
+
     private function processAppointmentTag(Assistant $assistant, string $aiReply, string $displayName, string $cleanSender): string
     {
         // 1. CHECAGEM PRÉVIA DA AGENDA
@@ -255,6 +280,10 @@ class AssistantController extends Controller
             try {
                 $startTime = Carbon::parse($checkDateStr);
                 $endTime = (clone $startTime)->addMinutes($this->getMeetingDurationMinutes($assistant->id));
+
+                if ($businessHoursError = $this->validateBusinessHours($startTime, $assistant->id)) {
+                    return trim(preg_replace('/\[VERIFICAR_AGENDA:.*?\]/s', $businessHoursError, $aiReply));
+                }
 
                 $dept = null;
                 if (!empty($deptName)) {
@@ -381,6 +410,10 @@ class AssistantController extends Controller
             try {
                 $newStartTime = Carbon::parse($newDateStr);
                 $newEndTime = (clone $newStartTime)->addMinutes($this->getMeetingDurationMinutes($assistant->id));
+
+                if ($businessHoursError = $this->validateBusinessHours($newStartTime, $assistant->id)) {
+                    return trim(preg_replace('/\[REAGENDAR_REUNIAO:.*?\]/s', $businessHoursError, $aiReply));
+                }
 
                 $dept = null;
                 if (!empty($deptName)) {
@@ -531,6 +564,10 @@ class AssistantController extends Controller
             try {
                 $startTime = Carbon::parse($startDateTimeStr);
                 $endTime = (clone $startTime)->addMinutes($this->getMeetingDurationMinutes($assistant->id));
+
+                if ($businessHoursError = $this->validateBusinessHours($startTime, $assistant->id)) {
+                    return trim(preg_replace('/\[AGENDAR_REUNIAO:.*?\]/s', $businessHoursError, $aiReply));
+                }
 
                 $dept = null;
                 if (!empty($deptName)) {
@@ -1466,12 +1503,17 @@ class AssistantController extends Controller
                 
                 $defaultDept = $defaultDeptId ? $depts->firstWhere('id', (int)$defaultDeptId) : $depts->first();
 
+                $businessHoursStart = trim(Setting::where('assistant_id', $assistant->id)->where('key', 'business_hours_start')->value('value') ?? '09:00');
+                $businessHoursEnd = trim(Setting::where('assistant_id', $assistant->id)->where('key', 'business_hours_end')->value('value') ?? '17:00');
+                $blockWeekends = (Setting::where('assistant_id', $assistant->id)->where('key', 'business_block_weekends')->value('value') ?? '1') === '1';
+
                 $prompt .= "\n\n===============================================\n";
                 $prompt .= "MÓDULO DE AGENDAMENTO E VERIFICAÇÃO DE AGENDA:\n";
                 $prompt .= "Departamentos disponíveis no sistema:\n";
                 foreach ($depts as $d) {
                     $prompt .= "• Setor: {$d->name}\n";
                 }
+                $prompt .= "\nHORÁRIO DE ATENDIMENTO: reuniões só podem ser marcadas das {$businessHoursStart} às {$businessHoursEnd}" . ($blockWeekends ? ", de segunda a sexta (não atendemos aos sábados e domingos)" : "") . ". Se o cliente pedir um horário fora dessa janela, avise educadamente ANTES de tentar verificar a agenda, e peça outro dia/horário dentro do expediente.\n";
 
                 if ($defaultDept) {
                     $otherDepts = array_values(array_filter($deptNames, fn($n) => $n !== $defaultDept->name));

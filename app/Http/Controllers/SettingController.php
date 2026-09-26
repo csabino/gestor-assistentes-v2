@@ -88,6 +88,9 @@ class SettingController extends Controller
         $defaultDepartmentId = Setting::where('assistant_id', $assistantId)->where('key', 'default_department_id')->value('value') ?? '';
         $schedulingCustomPrompt = Setting::where('assistant_id', $assistantId)->where('key', 'scheduling_custom_prompt')->value('value') ?? '';
         $meetingDurationMinutes = Setting::where('assistant_id', $assistantId)->where('key', 'meeting_duration_minutes')->value('value') ?? '60';
+        $businessHoursStart = Setting::where('assistant_id', $assistantId)->where('key', 'business_hours_start')->value('value') ?? '09:00';
+        $businessHoursEnd = Setting::where('assistant_id', $assistantId)->where('key', 'business_hours_end')->value('value') ?? '17:00';
+        $businessBlockWeekends = Setting::where('assistant_id', $assistantId)->where('key', 'business_block_weekends')->value('value') ?? '1';
 
         // Carrega departamentos cadastrados no sistema
         $departments = DB::table('departments')->get();
@@ -108,6 +111,9 @@ class SettingController extends Controller
             'defaultDepartmentId',
             'schedulingCustomPrompt',
             'meetingDurationMinutes',
+            'businessHoursStart',
+            'businessHoursEnd',
+            'businessBlockWeekends',
             'departments',
             'currentView', 
             'assistant'
@@ -130,6 +136,9 @@ class SettingController extends Controller
             'default_department_id' => 'nullable|string',
             'scheduling_custom_prompt' => 'nullable|string',
             'meeting_duration_minutes' => 'required|integer|min:15|max:480',
+            'business_hours_start' => 'required|date_format:H:i',
+            'business_hours_end' => 'required|date_format:H:i',
+            'business_block_weekends' => 'nullable|in:0,1',
         ]);
 
         $assistantId = $request->input('assistant_id');
@@ -200,6 +209,21 @@ class SettingController extends Controller
         Setting::updateOrCreate(
             ['assistant_id' => $assistantId, 'key' => 'meeting_duration_minutes'],
             ['value' => (string) $request->input('meeting_duration_minutes', 60)]
+        );
+
+        Setting::updateOrCreate(
+            ['assistant_id' => $assistantId, 'key' => 'business_hours_start'],
+            ['value' => $request->input('business_hours_start', '09:00')]
+        );
+
+        Setting::updateOrCreate(
+            ['assistant_id' => $assistantId, 'key' => 'business_hours_end'],
+            ['value' => $request->input('business_hours_end', '17:00')]
+        );
+
+        Setting::updateOrCreate(
+            ['assistant_id' => $assistantId, 'key' => 'business_block_weekends'],
+            ['value' => $request->boolean('business_block_weekends') ? '1' : '0']
         );
 
         return redirect()->to('/?view=settings&assistant_id=' . $assistantId)->with('success', 'Configurações atualizadas para este assistente!');

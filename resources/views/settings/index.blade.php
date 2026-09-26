@@ -157,6 +157,25 @@
                             <p class="text-[11px] text-gray-400 mt-1">Usada pra calcular o horário de término e verificar conflitos de agenda.</p>
                         </div>
 
+                        <!-- Horário Comercial -->
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Horário de Atendimento</label>
+                            <div class="flex items-center gap-2">
+                                <input type="time" name="business_hours_start" value="{{ $businessHoursStart ?? '09:00' }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <span class="text-xs text-gray-400">às</span>
+                                <input type="time" name="business_hours_end" value="{{ $businessHoursEnd ?? '17:00' }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <p class="text-[11px] text-gray-400 mt-1">Reuniões fora dessa janela são recusadas automaticamente, mesmo que o horário esteja livre.</p>
+                        </div>
+
+                        <!-- Bloquear Fins de Semana -->
+                        <div class="md:col-span-1 flex items-end pb-1">
+                            <label class="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                                <input type="checkbox" name="business_block_weekends" value="1" {{ ($businessBlockWeekends ?? '1') == '1' ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                                Não agendar aos sábados e domingos
+                            </label>
+                        </div>
+
                         <!-- Prompt/Diretriz Customizada do Agendamento -->
                         <div class="md:col-span-3">
                             <label for="scheduling_custom_prompt" class="block text-xs font-semibold text-gray-700 mb-1">Instruções Customizadas para Agendamento (Opcional)</label>
