@@ -2444,7 +2444,10 @@ class AssistantController extends Controller
             }
 
             // 🛑 FORÇA TEXTO: Se houver tag de agendamento OU se a resposta contiver termos de confirmação da reunião
-            if ($hasSchedulingTag || preg_match('/(REUNIÃO CONFIRMADA|REUNIÃO CANCELADA|REUNIÃO REAGENDADA|está \*?LIVRE\*?|Google Meet|Atendente:)/i', $aiReply)) {
+            // (o modificador /u é essencial aqui - sem ele, o /i não faz o "case-fold" direito de
+            // letras acentuadas tipo Ã/ã, e "Reunião confirmada" em case normal não batia com o
+            // padrão em maiúsculas, mesmo sendo "case insensitive").
+            if ($hasSchedulingTag || preg_match('/(reuni[ãa]o confirmada|reuni[ãa]o cancelada|reuni[ãa]o reagendada|est[áa] \*?livre\*?|google meet|atendente:)/iu', $aiReply)) {
                 $isAudioMessage = false;
             }
 
@@ -2942,7 +2945,13 @@ class AssistantController extends Controller
         $pushName = $pending->client_name ?: $pending->phone_number;
         $this->sendToOmni($userMessage, $pushName, 'input', $pending->phone_number, $assistant->id);
 
-        $accepted = (bool) preg_match('/\b(sim|s|quero|claro|pode|ok|okay|beleza|bora|vamos|topo|aceito|com certeza)\b/iu', trim($userMessage));
+        // A negação tem prioridade: "não quero" contém a palavra "quero" (afirmativa), então checar
+        // só a presença de palavras afirmativas dava falso positivo nesse tipo de frase - muito comum
+        // em respostas por voz transcritas ("Não, não quero."), raro em respostas digitadas curtas.
+        $normalizedMessage = trim($userMessage);
+        $hasNegative = (bool) preg_match('/\b(não|nao|num|agora não|depois|não posso)\b/iu', $normalizedMessage);
+        $hasAffirmative = (bool) preg_match('/\b(sim|s|quero|claro|pode|ok|okay|beleza|bora|vamos|topo|aceito|com certeza)\b/iu', $normalizedMessage);
+        $accepted = $hasAffirmative && !$hasNegative;
         $survey = $pending->survey;
         $firstQuestion = $survey ? $survey->questions()->first() : null;
 
