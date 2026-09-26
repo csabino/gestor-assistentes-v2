@@ -1567,8 +1567,10 @@ class AssistantController extends Controller
                 $prompt .= "1. CHECAGEM DE AGENDA (Imediata após o cliente informar DATA e HORA):\n";
                 $prompt .= "Emita no final da mensagem: [VERIFICAR_AGENDA: departamento=\"NOME_DO_SETOR\", data_hora=\"YYYY-MM-DD HH:MM:SS\"]\n\n";
 
-                $prompt .= "2. FINALIZAÇÃO DO AGENDAMENTO (Emitida APENAS após o cliente confirmar que NÃO há mais e-mails/convidados):\n";
-                $prompt .= "Emita no final da mensagem: [AGENDAR_REUNIAO: departamento=\"NOME_DO_SETOR\", data_hora_inicio=\"YYYY-MM-DD HH:MM:SS\", email_cliente=\"email@cliente.com\", emails_adicionais=\"email1@...,email2@...\"]\n\n";
+                $prompt .= "2. FINALIZAÇÃO DO AGENDAMENTO - REGRA ABSOLUTA, SEM EXCEÇÃO:\n";
+                $prompt .= "No exato momento em que o cliente confirmar que NÃO há mais e-mails/convidados a adicionar (ex: responder \"não\", \"pode ser só eu\", \"sem mais ninguém\", etc.), você é OBRIGADA a emitir a tag abaixo NA MESMA MENSAGEM DE RESPOSTA - nunca deixe pra depois, nunca pule essa etapa, e NUNCA diga que a reunião foi agendada/confirmada sem emitir essa tag: é ela que aciona o sistema que realmente cria o evento e manda os convites. Se você disser \"confirmado\" sem emitir a tag, NENHUM convite é enviado e o cliente fica sem reunião de verdade.\n";
+                $prompt .= "Emita no final da mensagem: [AGENDAR_REUNIAO: departamento=\"NOME_DO_SETOR\", data_hora_inicio=\"YYYY-MM-DD HH:MM:SS\", email_cliente=\"email@cliente.com\", emails_adicionais=\"email1@...,email2@...\"]\n";
+                $prompt .= "O sistema, ao processar essa tag, substitui automaticamente sua mensagem pelo resumo real da reunião (com atendente, setor, data e confirmação de convites enviados) - você não precisa escrever esse resumo você mesma, só precisa garantir que a tag seja emitida nesse momento exato.\n\n";
 
                 $prompt .= "3. CANCELAMENTO:\n";
                 $prompt .= "Emita EXATAMENTE nesse formato (não use variações como 'Cancelar reunião' ou 'CANCELAR'): [CANCELAR_REUNIAO: email_cliente=\"email@cliente.com\", data_hora=\"YYYY-MM-DD HH:MM:SS\"]\n\n";
