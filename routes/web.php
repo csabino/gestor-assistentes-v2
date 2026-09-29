@@ -12,6 +12,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\EnvironmentController;
 use App\Http\Controllers\ThemeController;
 use App\Http\Controllers\SurveyController;
+use App\Http\Controllers\AutomationController;
 
 // Webhook do WhatsApp: chamado pelo provedor externo (Evolution/UazAPI), sem sessão de navegador.
 // A UazAPI (uazapiGO) acrescenta um sufixo com o tipo de evento na URL configurada
@@ -52,6 +53,7 @@ Route::middleware('auth')->group(function () {
         if ($request->input('view') === 'agenda') return app(CalendarController::class)->handle($request);
         if ($request->input('view') === 'settings') return app(SettingController::class)->handle($request);
         if ($request->input('view') === 'surveys') return app(SurveyController::class)->handle($request);
+        if ($request->input('view') === 'automation') return app(AutomationController::class)->handle($request);
 
         return app(AssistantController::class)->index($request);
     });

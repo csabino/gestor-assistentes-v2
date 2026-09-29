@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Assistant;
 use App\Models\Holiday;
+use App\Models\AutomationFollowup;
 use App\Models\Setting;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
@@ -1990,6 +1991,16 @@ class AssistantController extends Controller
                 }
             }
 
+            // Automação de retomada: o cliente acabou de falar, então zera o relógio de silêncio
+            // (se a automação estiver ligada pra esse assistente) - não importa em qual fluxo o
+            // resto do webhook vai cair (mensagem normal, mídia, resposta de pesquisa etc.).
+            if (Setting::where('assistant_id', $assistant->id)->where('key', 'automation_enabled')->value('value') === '1') {
+                AutomationFollowup::updateOrCreate(
+                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender],
+                    ['send_target' => $sendTarget, 'attempts_sent' => 0, 'last_activity_at' => now()]
+                );
+            }
+
             $audioService = new \App\Services\AudioService();
 
             $msgType = strtolower(
@@ -3060,6 +3071,75 @@ class AssistantController extends Controller
             $this->sendWhatsappMessage($assistant, $phone, $formatted);
         } catch (\Throwable $e) {
             Log::error('Erro ao gerar mensagem de encerramento via IA: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Chamado periodicamente (via comando artisan automation:process-followups, sem nenhuma
+     * requisição HTTP em andamento) pra varrer conversas paradas e tocar a automação de retomada:
+     * manda a próxima mensagem configurada quando o intervalo estoura, ou encerra o atendimento
+     * (via sendAiGeneratedClosing) depois de esgotar todas as tentativas configuradas.
+     */
+    public function processFollowupAutomations(): void
+    {
+        $assistantIds = Setting::where('key', 'automation_enabled')->where('value', '1')->pluck('assistant_id');
+
+        foreach ($assistantIds as $assistantId) {
+            $assistant = Assistant::find($assistantId);
+            if (!$assistant) continue;
+
+            $intervalMinutes = (int) (Setting::where('assistant_id', $assistantId)->where('key', 'automation_interval_minutes')->value('value') ?? 30);
+            $messages = json_decode(Setting::where('assistant_id', $assistantId)->where('key', 'automation_messages')->value('value') ?? '[]', true) ?: [];
+            if ($intervalMinutes < 1 || empty($messages)) continue;
+
+            $dueFollowups = AutomationFollowup::where('assistant_id', $assistantId)
+                ->where('last_activity_at', '<=', now()->subMinutes($intervalMinutes))
+                ->get();
+
+            foreach ($dueFollowups as $followup) {
+                if ($this->validateBusinessHours(now(), $assistantId)) {
+                    continue; // Fora do horário comercial/feriado: tenta de novo no próximo ciclo.
+                }
+
+                $nowFormatted = now()->setTimezone($this->getTimezone($assistantId))->toDateTimeString();
+
+                if ($followup->attempts_sent < count($messages)) {
+                    $message = trim((string) $messages[$followup->attempts_sent]);
+                    if ($message === '') {
+                        $followup->update(['attempts_sent' => $followup->attempts_sent + 1, 'last_activity_at' => now()]);
+                        continue;
+                    }
+
+                    $waResult = $this->sendWhatsappMessage($assistant, $followup->send_target, $message);
+                    $this->sendToOmni($message, $followup->phone_number, 'output', $followup->send_target, $assistantId);
+
+                    DB::table('chat_messages')->insert([
+                        'assistant_id' => $assistantId, 'phone_number' => $followup->phone_number, 'protocol' => null,
+                        'role' => 'assistant', 'content' => $message, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted,
+                    ]);
+                    DB::table('webhook_logs')->insert([
+                        'assistant_id' => $assistantId,
+                        'sender' => substr($followup->phone_number, 0, 255),
+                        'user_message' => '[AUTOMAÇÃO] sem resposta do cliente',
+                        'ai_reply' => '[RETOMADA ' . ($followup->attempts_sent + 1) . '] ' . $message,
+                        'wa_send_result' => json_encode($waResult, JSON_INVALID_UTF8_IGNORE),
+                        'raw_snippet' => null,
+                        'timestamp' => $nowFormatted,
+                        'created_at' => $nowFormatted,
+                        'updated_at' => $nowFormatted,
+                    ]);
+
+                    $followup->update(['attempts_sent' => $followup->attempts_sent + 1, 'last_activity_at' => now()]);
+                } else {
+                    $this->sendAiGeneratedClosing(
+                        $assistant,
+                        $followup->send_target,
+                        $followup->phone_number,
+                        '[SISTEMA: o cliente não respondeu depois de todas as tentativas de retomada de atendimento. Encerre o atendimento agora, seguindo estritamente as suas instruções de encerramento. Não pergunte mais nada.]'
+                    );
+                    $followup->delete();
+                }
+            }
         }
     }
 
