@@ -3,10 +3,12 @@
 @section('title', 'Automação - ' . $assistant->name)
 
 @section('content')
-        <form action="/?view=automation" method="POST" class="container mx-auto px-6 max-w-4xl flex flex-col h-[calc(100vh-8rem)] pt-4"
+        <form action="/" method="POST" class="container mx-auto px-6 max-w-4xl flex flex-col h-[calc(100vh-8rem)] pt-4"
               x-data="{ messages: @js(count($automationMessages) ? $automationMessages : ['']) }">
             @csrf
 
+            <input type="hidden" name="view" value="automation">
+            <input type="hidden" name="action" value="update_automation">
             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
 
             <!-- CABEÇALHO FIXO -->
