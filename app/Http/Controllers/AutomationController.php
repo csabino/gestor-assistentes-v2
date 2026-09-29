@@ -38,10 +38,16 @@ class AutomationController extends Controller
         ]);
 
         $messages = array_values(array_filter(array_map('trim', $request->input('messages', []))));
+        $enabled = $request->boolean('automation_enabled');
+
+        if ($enabled && empty($messages)) {
+            return redirect("/?view=automation&assistant_id={$assistantId}")
+                ->with('error', 'Pra ativar a automação, cadastre pelo menos uma mensagem de retomada preenchida.');
+        }
 
         Setting::updateOrCreate(
             ['assistant_id' => $assistantId, 'key' => 'automation_enabled'],
-            ['value' => $request->boolean('automation_enabled') ? '1' : '0']
+            ['value' => $enabled ? '1' : '0']
         );
         Setting::updateOrCreate(
             ['assistant_id' => $assistantId, 'key' => 'automation_interval_minutes'],

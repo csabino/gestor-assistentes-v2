@@ -4,7 +4,27 @@
 
 @section('content')
         <form action="/" method="POST" class="container mx-auto px-6 max-w-4xl flex flex-col h-[calc(100vh-8rem)] pt-4"
-              x-data="{ messages: @js(count($automationMessages) ? $automationMessages : ['']) }">
+              x-data="{
+                  messages: @js(count($automationMessages) ? $automationMessages : ['']),
+                  confirmSave(event) {
+                      event.preventDefault();
+                      const filled = this.messages.map(m => m.trim()).filter(m => m !== '');
+                      const hasBlank = this.messages.some(m => m.trim() === '');
+
+                      if (this.$refs.enabledToggle.checked && filled.length === 0) {
+                          alert('Pra ativar a automação, cadastre pelo menos uma mensagem de retomada preenchida.');
+                          return;
+                      }
+                      if (hasBlank) {
+                          if (!confirm('Uma ou mais mensagens de tentativa estão vazias. Clique OK pra remover essas tentativas vazias e salvar assim mesmo, ou Cancelar pra voltar e preenchê-las.')) {
+                              return;
+                          }
+                          this.messages = filled.length ? filled : [''];
+                      }
+                      this.$nextTick(() => this.$el.submit());
+                  }
+              }"
+              @submit="confirmSave($event)">
             @csrf
 
             <input type="hidden" name="view" value="automation">
@@ -39,6 +59,13 @@
                 </div>
             @endif
 
+            @if(session('error'))
+                <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
+                    <svg class="w-5 h-5 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                    {{ session('error') }}
+                </div>
+            @endif
+
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
                 <div class="flex items-start justify-between gap-4 mb-5">
                     <div>
@@ -52,14 +79,14 @@
                         </p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input type="checkbox" name="automation_enabled" value="1" class="sr-only peer" {{ $automationEnabled === '1' ? 'checked' : '' }}>
+                        <input type="checkbox" name="automation_enabled" value="1" x-ref="enabledToggle" class="sr-only peer" {{ $automationEnabled === '1' ? 'checked' : '' }}>
                         <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                     </label>
                 </div>
 
                 <div class="mb-6">
                     <label class="block text-xs font-semibold text-gray-700 mb-1.5">Intervalo entre tentativas (minutos)</label>
-                    <input type="number" name="automation_interval_minutes" min="1" value="{{ $automationIntervalMinutes }}"
+                    <input type="number" name="automation_interval_minutes" min="1" required value="{{ $automationIntervalMinutes }}"
                            class="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500">
                     <p class="text-xs text-gray-400 mt-1">Tempo de silêncio do cliente antes de cada nova tentativa (e antes do encerramento, após a última).</p>
                 </div>
