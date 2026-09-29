@@ -22,6 +22,19 @@ Route::match(['get', 'post', 'patch', 'put', 'delete'], '/webhook/whatsapp/{id}/
     ->where('path', '.*')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
+// Disparo da automação de retomada de atendimento: como esta implantação (EasyPanel/Nixpacks) não
+// roda nenhum cron/scheduler, essa rota é chamada de fora por um serviço gratuito de agendamento de
+// URL (ex: cron-job.org) a cada 5 minutos. Protegida por um segredo na própria URL (não por sessão de
+// login, já que quem chama é um serviço externo) - configure AUTOMATION_CRON_SECRET no .env.
+Route::get('/cron/automation-followups/{secret}', function (string $secret) {
+    $expected = env('AUTOMATION_CRON_SECRET', '');
+    if (empty($expected) || !hash_equals($expected, $secret)) {
+        abort(404);
+    }
+    app(AssistantController::class)->processFollowupAutomations();
+    return response()->json(['status' => 'ok']);
+})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
 // Encaminhamento para o sistema Omni: endpoint público chamado por integração externa.
 Route::post('/omni/send', [OmniController::class, 'forwardToOmni'])
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
