@@ -380,7 +380,7 @@
             }
         },
         async deleteUser(u) {
-            if (!confirm('Remover o usuário ' + u.name + '?')) return;
+            if (!(await confirmModal('Remover o usuário ' + u.name + '?'))) return;
             this.usersLoading = true;
             try {
                 const res = await fetch('/settings/users/' + u.id, {
@@ -849,6 +849,78 @@
             </div>
         </div>
     </div>
+
+    <!-- TOASTS GLOBAIS -->
+    <div class="fixed top-20 right-4 z-[100] flex flex-col gap-2 w-full max-w-xs" x-data>
+        <template x-for="t in $store.toast.items" :key="t.id">
+            <div class="rounded-lg shadow-lg px-4 py-3 text-sm flex items-start gap-2 border"
+                 :class="t.type === 'error' ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200' : 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200'">
+                <svg x-show="t.type !== 'error'" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <svg x-show="t.type === 'error'" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                <span class="flex-1" x-text="t.message"></span>
+                <button type="button" @click="$store.toast.remove(t.id)" class="shrink-0 opacity-60 hover:opacity-100">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+        </template>
+    </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO GLOBAL (substitui o confirm() nativo do navegador) -->
+    <div x-show="$store.confirmDialog.visible" x-cloak x-transition class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200 dark:border-gray-700">
+            <p class="text-sm text-gray-800 dark:text-gray-100 mb-5" x-text="$store.confirmDialog.message"></p>
+            <div class="flex justify-end gap-2">
+                <button type="button" @click="$store.confirmDialog.cancel()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-lg transition">Cancelar</button>
+                <button type="button" @click="$store.confirmDialog.confirm()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('toast', {
+                items: [],
+                show(message, type = 'success') {
+                    const id = Date.now() + Math.random();
+                    this.items.push({ id, message, type });
+                    setTimeout(() => this.remove(id), type === 'error' ? 6000 : 4000);
+                },
+                remove(id) {
+                    this.items = this.items.filter(t => t.id !== id);
+                },
+            });
+
+            Alpine.store('confirmDialog', {
+                visible: false,
+                message: '',
+                resolvePromise: null,
+                ask(message) {
+                    this.message = message;
+                    this.visible = true;
+                    return new Promise(resolve => { this.resolvePromise = resolve; });
+                },
+                confirm() {
+                    this.visible = false;
+                    if (this.resolvePromise) this.resolvePromise(true);
+                },
+                cancel() {
+                    this.visible = false;
+                    if (this.resolvePromise) this.resolvePromise(false);
+                },
+            });
+
+            @if(session('success'))
+                Alpine.store('toast').show(@js(session('success')), 'success');
+            @endif
+            @if(session('error'))
+                Alpine.store('toast').show(@js(session('error')), 'error');
+            @endif
+        });
+
+        // Atalho global: funciona tanto de dentro de componentes Alpine (await confirmModal(...))
+        // quanto direto num onsubmit/onclick simples, sem precisar escrever Alpine.store(...) toda vez.
+        window.confirmModal = (message) => Alpine.store('confirmDialog').ask(message);
+    </script>
 
     @stack('scripts')
 </body>

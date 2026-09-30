@@ -275,7 +275,8 @@
                         calendar.unselect();
                         return;
                     }
-                    if (confirm('Criar BLOQUEIO neste horário?')) {
+                    confirmModal('Criar BLOQUEIO neste horário?').then(ok => {
+                        if (!ok) return;
                         fetch('/?view=agenda', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
@@ -290,7 +291,7 @@
                             if(data.success) calendar.refetchEvents();
                             else alert(data.message || 'Erro ao criar bloqueio.');
                         });
-                    }
+                    });
                 },
 
                 eventDrop: function(info) {
@@ -338,7 +339,8 @@
 
             // FUNÇÃO GLOBAL DE EXCLUSÃO DO EVENTO VIA MODAL
             window.deleteCurrentEvent = function(id) {
-                if (confirm('Deseja realmente excluir este registro?')) {
+                confirmModal('Deseja realmente excluir este registro?').then(ok => {
+                    if (!ok) return;
                     fetch('/?view=agenda', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
@@ -352,7 +354,7 @@
                             alert('Erro ao excluir evento.');
                         }
                     });
-                }
+                });
             };
 
             document.getElementById('btn-prev').addEventListener('click', () => calendar.prev());

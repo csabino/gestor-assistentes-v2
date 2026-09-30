@@ -29,19 +29,6 @@
 
             <div id="settingsScrollArea" class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 pb-8">
 
-            @if(session('success'))
-                <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
-                    <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
-                    <svg class="w-5 h-5 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-                    {{ session('error') }}
-                </div>
-            @endif
 
             @if($errors->any())
                 <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm shadow-sm">
@@ -393,7 +380,7 @@
             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
         </form>
         @foreach($holidays as $holiday)
-            <form id="deleteHolidayForm{{ $holiday->id }}" action="/" method="POST" class="hidden" aria-hidden="true" onsubmit="return confirm('Remover este feriado?');">
+            <form id="deleteHolidayForm{{ $holiday->id }}" action="/" method="POST" class="hidden" aria-hidden="true" onsubmit="event.preventDefault(); confirmModal('Remover este feriado?').then(ok => { if (ok) this.submit(); }); return false;">
                 @csrf
                 <input type="hidden" name="view" value="settings">
                 <input type="hidden" name="action" value="delete_holiday">

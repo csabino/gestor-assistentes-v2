@@ -6,7 +6,7 @@
         <form action="/" method="POST" class="container mx-auto px-6 max-w-4xl flex flex-col h-[calc(100vh-8rem)] pt-4"
               x-data="{
                   messages: @js(count($automationMessages) ? $automationMessages : ['']),
-                  confirmSave(event) {
+                  async confirmSave(event) {
                       event.preventDefault();
                       const filled = this.messages.map(m => m.trim()).filter(m => m !== '');
                       const hasBlank = this.messages.some(m => m.trim() === '');
@@ -16,7 +16,7 @@
                           return;
                       }
                       if (hasBlank) {
-                          if (!confirm('Uma ou mais mensagens de tentativa estão vazias. Clique OK pra remover essas tentativas vazias e salvar assim mesmo, ou Cancelar pra voltar e preenchê-las.')) {
+                          if (!(await confirmModal('Uma ou mais mensagens de tentativa estão vazias. Clique OK pra remover essas tentativas vazias e salvar assim mesmo, ou Cancelar pra voltar e preenchê-las.'))) {
                               return;
                           }
                           this.messages = filled.length ? filled : [''];
@@ -51,20 +51,6 @@
             </div>
 
             <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 pb-8">
-
-            @if(session('success'))
-                <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
-                    <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
-                    <svg class="w-5 h-5 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-                    {{ session('error') }}
-                </div>
-            @endif
 
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
                 <div class="flex items-start justify-between gap-4 mb-5">

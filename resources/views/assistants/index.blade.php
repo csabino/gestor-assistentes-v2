@@ -53,20 +53,6 @@
 @section('content')
         <div class="container mx-auto px-6 max-w-6xl py-8">
 
-            @if(session('success'))
-                <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
-                    <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
-                    <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-                    {{ session('error') }}
-                </div>
-            @endif
-
             @if($currentView === 'equipe')
                 <div class="space-y-6">
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -376,7 +362,7 @@
                         },
 
                         async disconnectWa() {
-                            if(!confirm('Tem certeza que deseja desconectar a sessão do WhatsApp?')) return;
+                            if(!(await confirmModal('Tem certeza que deseja desconectar a sessão do WhatsApp?'))) return;
                             this.waStatus = 'checking';
                             try {
                                 const response = await fetch('/', {
@@ -564,8 +550,8 @@
                                         this.selectedFiles = Array.from({length: this.totalFiles}, (_, i) => String(i));
                                     }
                                 },
-                                submitBulkDelete() {
-                                    if(!confirm('Tem certeza que deseja apagar os ' + this.selectedFiles.length + ' itens selecionados?')) return;
+                                async submitBulkDelete() {
+                                    if(!(await confirmModal('Tem certeza que deseja apagar os ' + this.selectedFiles.length + ' itens selecionados?'))) return;
                                     saveScrollPosition();
                                     const form = document.getElementById('bulkDeleteForm');
                                     form.innerHTML = '<input type=\'hidden\' name=\'_token\' value=\'{{ csrf_token() }}\'><input type=\'hidden\' name=\'_method\' value=\'DELETE\'><input type=\'hidden\' name=\'assistant_id\' value=\'{{ $configuring->id }}\'>';
@@ -613,7 +599,7 @@
                                                             </div>
                                                         </div>
                                                         
-                                                        <button type="button" onclick="if(confirm('Remover esta fonte de conhecimento?')) { saveScrollPosition(); document.getElementById('deleteFileForm_{{ $index }}').submit(); }" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition shrink-0 ml-2">
+                                                        <button type="button" onclick="confirmModal('Remover esta fonte de conhecimento?').then(ok => { if (ok) { saveScrollPosition(); document.getElementById('deleteFileForm_{{ $index }}').submit(); } })" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition shrink-0 ml-2">
                                                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                                         </button>
                                                     </li>
@@ -1128,7 +1114,7 @@
                                     </a>
                                 </div>
 
-                                <form action="/" method="POST" onsubmit="return confirm('Tem certeza?');">
+                                <form action="/" method="POST" onsubmit="event.preventDefault(); confirmModal('Tem certeza?').then(ok => { if (ok) this.submit(); }); return false;">
                                     @csrf @method('DELETE')
                                     <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                     <button type="submit" class="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition flex items-center justify-center" title="Excluir">
@@ -1194,7 +1180,7 @@
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008z" /></svg> Agenda
                                         </a>
                                         
-                                        <form action="/" method="POST" onsubmit="return confirm('Tem certeza?');">
+                                        <form action="/" method="POST" onsubmit="event.preventDefault(); confirmModal('Tem certeza?').then(ok => { if (ok) this.submit(); }); return false;">
                                             @csrf @method('DELETE')
                                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
                                             <button type="submit" class="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition text-xs flex items-center justify-center" title="Excluir">
@@ -1264,7 +1250,7 @@
                         },
                         async bulkDelete() {
                             if (this.selectedPhones.length === 0) return;
-                            if (!confirm('Excluir o histórico de ' + this.selectedPhones.length + ' conversa(s) selecionada(s)? Essa ação não pode ser desfeita.')) return;
+                            if (!(await confirmModal('Excluir o histórico de ' + this.selectedPhones.length + ' conversa(s) selecionada(s)? Essa ação não pode ser desfeita.'))) return;
                             this.bulkDeleting = true;
                             try {
                                 const res = await fetch('/assistants/{{ $conversationsAssistant->id }}/clear-context', {

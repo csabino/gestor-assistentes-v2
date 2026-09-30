@@ -10,20 +10,6 @@
             }"
         >
 
-            @if(session('success'))
-                <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
-                    <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2 shadow-sm">
-                    <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
-                    {{ session('error') }}
-                </div>
-            @endif
-
             <div class="flex-1 min-h-0 flex flex-col">
                 <!-- CABEÇALHO COM O FILTRO GLOBAL (STATUS E ASSISTENTE) -->
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex-1 min-h-0 flex flex-col">
@@ -100,7 +86,7 @@
                                                 Editar
                                             </button>
                                             <!-- BOTÃO EXCLUIR DEPARTAMENTO COM ÍCONE -->
-                                            <form action="/?view=equipe" method="POST" class="flex-1" onsubmit="return confirm('Excluir departamento e TODOS os agentes vinculados?');">
+                                            <form action="/?view=equipe" method="POST" class="flex-1" onsubmit="event.preventDefault(); confirmModal('Excluir departamento e TODOS os agentes vinculados?').then(ok => { if (ok) this.submit(); }); return false;">
                                                 @csrf 
                                                 <input type="hidden" name="action" value="delete_department">
                                                 <input type="hidden" name="department_id" value="{{ $dept->id }}">
@@ -159,7 +145,7 @@
 
                                                     <!-- FOOTER DO CARD -->
                                                     <div class="mt-2 pt-1.5 border-t border-gray-50 flex justify-end gap-1.5">
-                                                        <form action="/?view=equipe" method="POST" onsubmit="return confirm('Desvincular este usuário do departamento?');">
+                                                        <form action="/?view=equipe" method="POST" onsubmit="event.preventDefault(); confirmModal('Desvincular este usuário do departamento?').then(ok => { if (ok) this.submit(); }); return false;">
                                                             @csrf
                                                             <input type="hidden" name="action" value="unlink_user">
                                                             <input type="hidden" name="user_id" value="{{ $agent->id }}">
