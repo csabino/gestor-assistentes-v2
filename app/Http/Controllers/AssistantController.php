@@ -832,17 +832,17 @@ class AssistantController extends Controller
     private function buildKnowledgeBaseRows(Assistant $assistant): array
     {
         $rows = [];
-        $crawledByPath = CrawledPage::where('assistant_id', $assistant->id)->get()->keyBy('file_path');
         foreach ((is_array($assistant->knowledge_files) ? $assistant->knowledge_files : []) as $i => $f) {
             $path = $f['path'] ?? null;
-            $crawled = $path ? $crawledByPath->get($path) : null;
+            $isSiteCrawl = $path && str_starts_with($path, 'site_crawls/');
+            $addedAt = isset($f['added_at']) ? \Carbon\Carbon::parse($f['added_at']) : null;
             $rows[] = [
                 'index' => $i,
                 'name' => $f['name'] ?? '',
-                'type' => $crawled ? 'Varredura de site' : (str_starts_with($f['name'] ?? '', '🌐') ? 'Extração simples' : 'Upload'),
-                'size' => $crawled ? $crawled->content_size : (isset($f['content']) ? strlen($f['content']) : null),
-                'crawled_at' => $crawled ? $crawled->crawled_at->format('d/m/Y H:i') : null,
-                'crawled_at_sort' => $crawled ? $crawled->crawled_at->timestamp : 0,
+                'type' => $isSiteCrawl ? 'Varredura de site' : (str_starts_with($f['name'] ?? '', '🌐') ? 'Extração simples' : 'Upload'),
+                'size' => isset($f['content']) ? strlen($f['content']) : null,
+                'crawled_at' => $addedAt ? $addedAt->format('d/m/Y H:i') : null,
+                'crawled_at_sort' => $addedAt ? $addedAt->timestamp : 0,
             ];
         }
         return $rows;
@@ -1319,16 +1319,19 @@ class AssistantController extends Controller
             foreach ($files as &$f) {
                 if (($f['name'] ?? '') === '🌐 ' . $url) {
                     $f['content'] = $content;
+                    $f['added_at'] = now()->toDateTimeString();
                     $exists = true;
                     break;
                 }
             }
+            unset($f);
 
             if (!$exists) {
                 $files[] = [
                     'name' => '🌐 ' . $url,
                     'path' => null,
-                    'content' => $content
+                    'content' => $content,
+                    'added_at' => now()->toDateTimeString(),
                 ];
             }
             
@@ -1534,13 +1537,14 @@ class AssistantController extends Controller
             if (($f['path'] ?? null) === $relativePath) {
                 $f['content'] = $content;
                 $f['name'] = $displayName;
+                $f['added_at'] = $now->toDateTimeString();
                 $exists = true;
                 break;
             }
         }
         unset($f);
         if (!$exists) {
-            $files[] = ['name' => $displayName, 'path' => $relativePath, 'content' => $content];
+            $files[] = ['name' => $displayName, 'path' => $relativePath, 'content' => $content, 'added_at' => $now->toDateTimeString()];
         }
         $assistant->forceFill(['knowledge_files' => array_values($files)])->save();
 
@@ -1681,7 +1685,8 @@ class AssistantController extends Controller
                         $existingFiles[] = [
                             'name' => $fileName,
                             'path' => $path,
-                            'content' => $extractedText
+                            'content' => $extractedText,
+                            'added_at' => now()->toDateTimeString(),
                         ];
                         $hasKnowledgeChanges = true;
                     } catch (\Throwable $e) {
