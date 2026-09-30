@@ -2645,10 +2645,13 @@ class AssistantController extends Controller
 
                     if (!$hasPendingSurvey) {
                         $offeredSurvey = $candidateSurvey;
-                        // Acrescenta a pergunta da pesquisa ao que já estava na mensagem (em vez de
-                        // substituir tudo) - essencial pra não jogar fora conteúdo importante que
-                        // também termina com [ENCERRAMENTO], como o resumo de um agendamento
-                        // confirmado (atendente, setor, convites enviados, link do Meet).
+                        // Tira a frase fixa de despedida ("Agradecemos por entrar em contato...")
+                        // dessa mensagem - ela vai ser reenviada sozinha pelo sendAiGeneratedClosing()
+                        // depois que o cliente responder a oferta da pesquisa (aceitar/recusar), e
+                        // sem isso a despedida saía duplicada (uma aqui, outra ali). Preserva
+                        // qualquer conteúdo substancial que viesse antes dela na mesma mensagem (ex:
+                        // resumo de um agendamento confirmado - atendente, setor, link do Meet).
+                        $aiReply = trim(preg_replace('/Agradecemos por entrar em contato com a InHouse\.[\s\S]*?Tenha um[a]? ótim[oa] (dia|tarde|noite)!?/iu', '', $aiReply));
                         $aiReply = trim($aiReply . "\n\nAntes de finalizarmos, você poderia nos ajudar respondendo uma breve pesquisa de satisfação, bem rapidinha, aqui mesmo pelo WhatsApp?");
                         $hasMainMenuTag = false;
                     }
