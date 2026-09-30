@@ -1113,24 +1113,24 @@
                             </button>
                         </div>
 
-                        <div class="px-5 pt-4 shrink-0 space-y-3 border-b border-gray-100 pb-4">
-                            <div>
-                                <label class="block text-[11px] font-semibold text-gray-700 mb-1">Anexar Arquivos (PDF, Word, TXT)</label>
-                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                    <input type="file" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="block w-full text-sm text-gray-500 border border-gray-200 rounded-lg p-1">
-                                    <button type="submit" form="configForm" onclick="saveScrollPosition(); this.innerHTML='Salvando...'" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Anexar
-                                    </button>
+                        <div class="px-5 pt-4 shrink-0 border-b border-gray-100 pb-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Anexar Arquivos (PDF, Word, TXT)</label>
+                                    <div class="flex flex-col gap-2">
+                                        <input type="file" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="block w-full text-sm text-gray-500 border border-gray-200 rounded-lg p-1 bg-white">
+                                        <button type="submit" form="configForm" onclick="saveScrollPosition(); this.innerHTML='Salvando...'" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Anexar
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                     <label class="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
                                         🌐 Importar Site (Extração de Conteúdo)
                                         <svg class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" title="O sistema irá varrer a URL, identificar as páginas internas e extrair o texto útil automaticamente."><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
                                     </label>
-                                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                    <div class="flex flex-col gap-2">
                                         <input type="url" x-model="websiteToCrawl" placeholder="https://www.site.com" class="block w-full text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
 
                                         <button type="button" @click="startCrawler()" :disabled="crawling" :class="crawling ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'" class="text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm whitespace-nowrap">
@@ -1156,7 +1156,7 @@
                                         🗂️ Varrer Site (Estrutura de Menu)
                                         <svg class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" title="Entende a estrutura de menu do site (home, itens e submenus) e salva cada página como um documento organizado nessa mesma hierarquia."><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
                                     </label>
-                                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                    <div class="flex flex-col gap-2">
                                         <input type="url" x-model="siteMenuUrl" placeholder="https://www.site.com" class="block w-full text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
 
                                         <button type="button" @click="startMenuCrawler()" :disabled="menuCrawling" :class="menuCrawling ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'" class="text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm whitespace-nowrap">
