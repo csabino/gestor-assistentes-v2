@@ -833,10 +833,11 @@ class AssistantController extends Controller
     {
         $rows = [];
         $crawledByPath = CrawledPage::where('assistant_id', $assistant->id)->get()->keyBy('file_path');
-        foreach ((is_array($assistant->knowledge_files) ? $assistant->knowledge_files : []) as $f) {
+        foreach ((is_array($assistant->knowledge_files) ? $assistant->knowledge_files : []) as $i => $f) {
             $path = $f['path'] ?? null;
             $crawled = $path ? $crawledByPath->get($path) : null;
             $rows[] = [
+                'index' => $i,
                 'name' => $f['name'] ?? '',
                 'type' => $crawled ? 'Varredura de site' : (str_starts_with($f['name'] ?? '', '🌐') ? 'Extração simples' : 'Upload'),
                 'size' => $crawled ? $crawled->content_size : (isset($f['content']) ? strlen($f['content']) : null),

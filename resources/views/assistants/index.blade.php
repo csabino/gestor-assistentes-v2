@@ -263,6 +263,26 @@
                         kbModalOpen: false,
                         kbSortField: 'name',
                         kbSortDir: 'asc',
+                        selectedFiles: [],
+                        get allSelected() { return this.selectedFiles.length === this.kbRows.length && this.kbRows.length > 0; },
+                        toggleAll() {
+                            if (this.selectedFiles.length === this.kbRows.length) {
+                                this.selectedFiles = [];
+                            } else {
+                                this.selectedFiles = this.kbRows.map(r => String(r.index));
+                            }
+                        },
+                        async submitBulkDelete() {
+                            if (this.selectedFiles.length === 0) return;
+                            if (!(await confirmModal('Tem certeza que deseja apagar os ' + this.selectedFiles.length + ' itens selecionados?'))) return;
+                            saveScrollPosition();
+                            const form = document.getElementById('bulkDeleteForm');
+                            form.innerHTML = '<input type=\'hidden\' name=\'_token\' value=\'{{ csrf_token() }}\'><input type=\'hidden\' name=\'_method\' value=\'DELETE\'><input type=\'hidden\' name=\'assistant_id\' value=\'{{ $configuring->id ?? '' }}\'>';
+                            this.selectedFiles.forEach(idx => {
+                                form.innerHTML += '<input type=\'hidden\' name=\'file_indexes[]\' value=\'' + idx + '\'>';
+                            });
+                            form.submit();
+                        },
 
                         getApiKey() {
                             if (this.provider === 'openai') return document.querySelector('input[name=\'openai_api_key\']').value;
@@ -636,86 +656,17 @@
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                         
                         <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-full flex flex-col">
-                            <h2 class="text-lg font-bold text-gray-800 border-b border-gray-100 pb-3 mb-4 flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" /></svg>
-                                Base de Conhecimento
+                            <h2 class="text-lg font-bold text-gray-800 border-b border-gray-100 pb-3 mb-4 flex items-center justify-between gap-2">
+                                <span class="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" /></svg>
+                                    Base de Conhecimento
+                                </span>
+                                <button type="button" @click="kbModalOpen = true; loadKbRows()" title="Ver Base de Conhecimento" class="text-gray-400 hover:text-indigo-600 p-1 rounded-md hover:bg-indigo-50 transition">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.573 16.49 16.638 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                </button>
                             </h2>
                             
-                            <div class="flex-1" x-data="{ 
-                                selectedFiles: [], 
-                                totalFiles: {{ count($configuring->knowledge_files ?? []) }},
-                                get allSelected() { return this.selectedFiles.length === this.totalFiles && this.totalFiles > 0; },
-                                toggleAll() { 
-                                    if (this.selectedFiles.length === this.totalFiles) {
-                                        this.selectedFiles = [];
-                                    } else {
-                                        this.selectedFiles = Array.from({length: this.totalFiles}, (_, i) => String(i));
-                                    }
-                                },
-                                async submitBulkDelete() {
-                                    if(!(await confirmModal('Tem certeza que deseja apagar os ' + this.selectedFiles.length + ' itens selecionados?'))) return;
-                                    saveScrollPosition();
-                                    const form = document.getElementById('bulkDeleteForm');
-                                    form.innerHTML = '<input type=\'hidden\' name=\'_token\' value=\'{{ csrf_token() }}\'><input type=\'hidden\' name=\'_method\' value=\'DELETE\'><input type=\'hidden\' name=\'assistant_id\' value=\'{{ $configuring->id }}\'>';
-                                    this.selectedFiles.forEach(idx => {
-                                        form.innerHTML += '<input type=\'hidden\' name=\'file_indexes[]\' value=\'' + idx + '\'>';
-                                    });
-                                    form.submit();
-                                }
-                            }">
-                                @if($configuring->knowledge_files && count($configuring->knowledge_files) > 0)
-                                    <div class="mb-5 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                        <div class="flex justify-between items-center mb-3 border-b border-gray-200 pb-2">
-                                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Fontes ({{ count($configuring->knowledge_files) }})</h4>
-                                            
-                                            <div class="flex items-center gap-3">
-                                                <button type="button" @click="kbModalOpen = true; loadKbRows()" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition">
-                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.573 16.49 16.638 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                    Ver Base de Conhecimento
-                                                </button>
-
-                                                <label class="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition">
-                                                    <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                                                           :checked="allSelected" @click="toggleAll()">
-                                                    <span class="font-bold">Selecionar Todos</span>
-                                                </label>
-
-                                                <button type="button" x-show="selectedFiles.length > 0" x-transition @click="submitBulkDelete()" class="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2 py-1 rounded font-bold flex items-center gap-1 transition shadow-sm">
-                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                                                    Apagar (<span x-text="selectedFiles.length"></span>)
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div class="max-h-[115px] overflow-y-auto pr-1 custom-scroll">
-                                            <ul class="space-y-1.5 text-sm text-gray-700">
-                                                @foreach($configuring->knowledge_files as $index => $file)
-                                                    <li class="flex items-center justify-between bg-white px-3 py-1.5 border rounded-md shadow-sm transition"
-                                                        :class="selectedFiles.includes('{{ $index }}') ? 'border-indigo-300 bg-indigo-50/50' : 'border-gray-200'">
-                                                        
-                                                        <div class="flex items-center gap-3 truncate w-full">
-                                                            <input type="checkbox" value="{{ $index }}" x-model="selectedFiles" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0">
-                                                            
-                                                            <div class="flex items-center gap-2 truncate">
-                                                                @if(str_starts_with($file['name'], '🌐'))
-                                                                    <span class="text-blue-500 shrink-0 text-[14px]">🌐</span>
-                                                                @else
-                                                                    <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
-                                                                @endif
-                                                                <span class="truncate font-medium text-xs">{{ str_replace('🌐 ', '', $file['name']) }}</span>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <button type="button" onclick="confirmModal('Remover esta fonte de conhecimento?').then(ok => { if (ok) { saveScrollPosition(); document.getElementById('deleteFileForm_{{ $index }}').submit(); } })" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition shrink-0 ml-2">
-                                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                        </button>
-                                                    </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    </div>
-                                @endif
-                            </div>
+                            <div class="flex-1"></div>
 
                             <div class="mt-auto border-t border-gray-100 pt-4 space-y-4">
                                 <div>
@@ -1138,13 +1089,24 @@
                     </div>
                 </div>
 
-                <!-- MODAL VER BASE DE CONHECIMENTO (grid ordenavel + export CSV, novo/adicional) -->
+                <!-- MODAL VER BASE DE CONHECIMENTO (unica forma de consultar/gerenciar a base agora - grid ordenavel, exclusao individual/lote, export CSV) -->
                 <div x-show="kbModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div @click.away="kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col relative border border-slate-200">
+                    <div @click.away="kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col relative border border-slate-200">
                         <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-                            <h3 class="text-base font-bold text-gray-800">Base de Conhecimento — {{ $configuring->name }}</h3>
+                            <h3 class="text-base font-bold text-gray-800">Base de Conhecimento — {{ $configuring->name ?? '' }}</h3>
                             <button type="button" @click="kbModalOpen = false" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between px-5 pt-4 shrink-0">
+                            <label class="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition">
+                                <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" :checked="allSelected" @click="toggleAll()">
+                                <span class="font-bold">Selecionar Todos</span>
+                            </label>
+                            <button type="button" x-show="selectedFiles.length > 0" x-transition @click="submitBulkDelete()" class="text-[11px] bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 transition shadow-sm">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                Apagar (<span x-text="selectedFiles.length"></span>)
                             </button>
                         </div>
 
@@ -1152,35 +1114,45 @@
                             <table class="w-full text-xs text-left">
                                 <thead>
                                     <tr class="border-b border-gray-200 text-gray-500 uppercase text-[10px] tracking-wide">
+                                        <th class="py-2 pr-3 w-8"></th>
                                         <template x-for="col in [{ key: 'name', label: 'Nome' }, { key: 'type', label: 'Tipo' }, { key: 'size', label: 'Tamanho' }, { key: 'crawled_at', label: 'Data/Hora' }]" :key="col.key">
                                             <th class="py-2 pr-3 cursor-pointer select-none hover:text-indigo-600 transition" @click="toggleKbSort(col.key)">
                                                 <span x-text="col.label"></span>
                                                 <span x-show="kbSortField === col.key" x-text="kbSortDir === 'asc' ? '▲' : '▼'" class="ml-0.5"></span>
                                             </th>
                                         </template>
+                                        <th class="py-2 pr-3 w-8"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <template x-for="(row, i) in kbSortedRows()" :key="i">
+                                    <template x-for="row in kbSortedRows()" :key="row.index">
                                         <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                            <td class="py-2 pr-3">
+                                                <input type="checkbox" :value="String(row.index)" x-model="selectedFiles" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                            </td>
                                             <td class="py-2 pr-3 font-medium text-gray-800 max-w-[280px] truncate" x-text="row.name"></td>
                                             <td class="py-2 pr-3 text-gray-500" x-text="row.type"></td>
                                             <td class="py-2 pr-3 text-gray-500" x-text="row.size ? (row.size > 1024 ? Math.round(row.size / 1024) + ' KB' : row.size + ' B') : '—'"></td>
                                             <td class="py-2 pr-3 text-gray-500" x-text="row.crawled_at || '—'"></td>
+                                            <td class="py-2 pr-3">
+                                                <button type="button" @click="confirmModal('Remover esta fonte de conhecimento?').then(ok => { if (ok) { saveScrollPosition(); document.getElementById('deleteFileForm_' + row.index).submit(); } })" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </button>
+                                            </td>
                                         </tr>
                                     </template>
                                     <tr x-show="kbLoading">
-                                        <td colspan="4" class="py-8 text-center text-gray-400">Carregando...</td>
+                                        <td colspan="6" class="py-8 text-center text-gray-400">Carregando...</td>
                                     </tr>
                                     <tr x-show="!kbLoading && kbRows.length === 0">
-                                        <td colspan="4" class="py-8 text-center text-gray-400">Nenhum documento na base de conhecimento.</td>
+                                        <td colspan="6" class="py-8 text-center text-gray-400">Nenhum documento na base de conhecimento.</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
                         <div class="flex justify-between items-center p-4 border-t border-gray-100 shrink-0">
-                            <a href="/?action=export_knowledge_base&assistant_id={{ $configuring->id }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5">
+                            <a href="/?action=export_knowledge_base&assistant_id={{ $configuring->id ?? '' }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                                 Exportar CSV
                             </a>
