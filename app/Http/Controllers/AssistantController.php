@@ -1463,6 +1463,15 @@ class AssistantController extends Controller
         $prompt .= "• Data e Hora Atual: " . $now->format('d/m/Y \à\s H:i:s') . " ({$diaPt})\n";
         $prompt .= "• Data Formato ISO: " . $now->format('Y-m-d') . "\n";
         $prompt .= "• Ano Corrente: " . $now->year . "\n";
+        // Calendário pronto dos próximos dias: NÃO calcule de cabeça em que dia da semana cai uma
+        // data (é um erro comum e recorrente) - sempre consulte esta lista antes de responder algo
+        // como "próxima segunda", "quinta que vem" etc.
+        $prompt .= "• Calendário dos próximos 14 dias (use para responder \"próxima segunda\", \"quinta que vem\" etc. - NUNCA calcule de cabeça):\n";
+        for ($i = 1; $i <= 14; $i++) {
+            $futureDay = $now->copy()->addDays($i);
+            $futureDiaPt = $diasSemana[$futureDay->format('l')] ?? $futureDay->format('l');
+            $prompt .= "   " . $futureDay->format('d/m/Y') . " = {$futureDiaPt}\n";
+        }
         $prompt .= "===============================================\n\n";
 
         // 0. MÓDULO DE PESQUISAS DE OPINIÃO (SE HOUVER PESQUISA ATIVA). A IA NÃO decide mais nada
