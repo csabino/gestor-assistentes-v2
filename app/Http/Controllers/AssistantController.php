@@ -823,6 +823,36 @@ class AssistantController extends Controller
         return response()->json(['success' => true, 'name' => $assistant->name, 'company_name' => $assistant->company_name]);
     }
 
+    /**
+     * Apaga o histórico de conversa (chat_messages), estado de pesquisa/automação pendente e logs
+     * de um número específico, só para este assistente - usado pra reiniciar um teste do zero sem
+     * a IA "lembrar" de conversas anteriores.
+     */
+    public function clearContext(Request $request, $id)
+    {
+        $request->validate(['phone' => 'required|string|max:50']);
+
+        $assistant = Assistant::findOrFail($id);
+        $phone = preg_replace('/[^0-9]/', '', $request->input('phone'));
+
+        if (empty($phone)) {
+            return response()->json(['message' => 'Número inválido.'], 422);
+        }
+
+        $chatMessages = DB::table('chat_messages')->where('assistant_id', $assistant->id)->where('phone_number', $phone)->delete();
+        $automationFollowups = AutomationFollowup::where('assistant_id', $assistant->id)->where('phone_number', $phone)->delete();
+        $surveyResponses = SurveyResponse::where('assistant_id', $assistant->id)->where('phone_number', $phone)->delete();
+        $webhookLogs = DB::table('webhook_logs')->where('assistant_id', $assistant->id)->where('sender', 'like', '%' . $phone . '%')->delete();
+
+        return response()->json([
+            'success' => true,
+            'chat_messages' => $chatMessages,
+            'automation_followups' => $automationFollowups,
+            'survey_responses' => $surveyResponses,
+            'webhook_logs' => $webhookLogs,
+        ]);
+    }
+
     private function servePublicFile($relativePath)
     {
         $cleanPath = ltrim(str_replace(['..', '\\'], ['', '/'], (string)$relativePath), '/');

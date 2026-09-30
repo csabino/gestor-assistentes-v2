@@ -186,6 +186,36 @@
                         } finally {
                             this.renameSaving = false;
                         }
+                    },
+                    clearContextModalOpen: false,
+                    clearContextPhone: '',
+                    clearContextSaving: false,
+                    clearContextError: null,
+                    clearContextResult: null,
+                    async clearContext() {
+                        this.clearContextSaving = true;
+                        this.clearContextError = null;
+                        try {
+                            const res = await fetch('/assistants/{{ $configuring->id }}/clear-context', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                },
+                                body: JSON.stringify({ phone: this.clearContextPhone }),
+                            });
+                            const json = await res.json();
+                            if (!res.ok) {
+                                this.clearContextError = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message || 'Erro ao limpar.');
+                                return;
+                            }
+                            this.clearContextResult = json;
+                        } catch (e) {
+                            this.clearContextError = 'Erro de conexão. Tente novamente.';
+                        } finally {
+                            this.clearContextSaving = false;
+                        }
                     }
                 }">
                 <div class="shrink-0 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -223,6 +253,15 @@
                             </svg>
                             <span class="hidden sm:inline">Automação</span>
                         </a>
+
+                        <button type="button" @click="clearContextModalOpen = true; clearContextPhone = ''; clearContextError = null; clearContextResult = null"
+                                class="text-slate-700 bg-white hover:bg-amber-50 hover:text-amber-600 border border-gray-300 text-xs px-3.5 py-2 rounded-lg font-semibold transition shadow-sm flex justify-center items-center gap-2 shrink-0"
+                                title="Limpar contexto de conversa de um número">
+                            <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l6.75 6.75M3 20.25l3.5-1 11.05-11.05a1.5 1.5 0 000-2.12l-1.13-1.13a1.5 1.5 0 00-2.12 0L3.25 16.02l-1 3.5a.75.75 0 00.92.92l.58-.19z" />
+                            </svg>
+                            <span class="hidden sm:inline">Limpar Contexto</span>
+                        </button>
 
                         <form action="/" method="POST" class="flex-1 md:flex-none">
                             @csrf @method('PATCH')
@@ -1013,6 +1052,43 @@
                                 <span x-text="renameSaving ? 'Salvando...' : 'Salvar'"></span>
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- MODAL LIMPAR CONTEXTO DE CONVERSA -->
+                <div x-show="clearContextModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div @click.away="clearContextModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200">
+                        <h3 class="text-base font-bold text-gray-800 mb-1">Limpar Contexto de Conversa</h3>
+                        <p class="text-xs text-gray-500 mb-4">Apaga o histórico de chat, pesquisa pendente, automação de retomada e logs de um número específico, só para este assistente. Útil pra reiniciar um teste do zero.</p>
+
+                        <div x-show="clearContextError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-3" x-text="clearContextError"></div>
+
+                        <template x-if="!clearContextResult">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Número (só dígitos, com DDI e DDD)</label>
+                                <input type="text" x-model="clearContextPhone" @keydown.enter="clearContext()" placeholder="Ex: 5513981264044" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-5 outline-none focus:border-indigo-500">
+                                <div class="flex justify-end gap-2">
+                                    <button type="button" @click="clearContextModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
+                                    <button type="button" @click="clearContext()" :disabled="clearContextSaving || !clearContextPhone" :class="(clearContextSaving || !clearContextPhone) ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition">
+                                        <span x-text="clearContextSaving ? 'Limpando...' : 'Limpar'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="clearContextResult">
+                            <div>
+                                <ul class="text-xs text-gray-700 space-y-1.5 mb-5 bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                    <li>📨 <span x-text="clearContextResult.chat_messages" class="font-bold"></span> mensagens de chat removidas</li>
+                                    <li>🤖 <span x-text="clearContextResult.automation_followups" class="font-bold"></span> registros de automação removidos</li>
+                                    <li>📋 <span x-text="clearContextResult.survey_responses" class="font-bold"></span> respostas de pesquisa pendentes removidas</li>
+                                    <li>🧾 <span x-text="clearContextResult.webhook_logs" class="font-bold"></span> logs removidos</li>
+                                </ul>
+                                <div class="flex justify-end">
+                                    <button type="button" @click="clearContextModalOpen = false" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">Fechar</button>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
                 </div>
