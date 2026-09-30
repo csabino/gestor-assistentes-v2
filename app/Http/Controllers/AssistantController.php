@@ -6,6 +6,8 @@ use App\Models\Assistant;
 use App\Models\Holiday;
 use App\Models\AutomationFollowup;
 use App\Models\WaContactName;
+use App\Models\PendingMessageBuffer;
+use Illuminate\Support\Str;
 use App\Models\Setting;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
@@ -23,6 +25,11 @@ use Carbon\Carbon;
 
 class AssistantController extends Controller
 {
+    // Quantos segundos esperar antes de processar uma mensagem de texto, pra dar chance de
+    // mensagens seguidas do mesmo número (ex: cliente digita em duas ou três partes) serem
+    // agrupadas num único turno de IA - ver bloco de debounce em webhook().
+    private const DEBOUNCE_SECONDS = 5;
+
     private function getTimezone($assistantId = null): string
     {
         if ($assistantId) {
@@ -2386,6 +2393,36 @@ class AssistantController extends Controller
                 ]);
 
                 return response()->json(['status' => 'success']);
+            }
+
+            // 🕓 DEBOUNCE: agrupa mensagens de texto mandadas em sequência rápida (ex: cliente
+            // digita "Isso" e, dois segundos depois, o e-mail, como duas mensagens separadas) num
+            // único turno de IA - evita que cada uma dispare sua própria resposta em paralelo, uma
+            // "pisando" na outra. Não se aplica a mídia (já tratada acima) nem a resposta de
+            // pesquisa (já retornou antes de chegar aqui).
+            if (!$isMediaMessage) {
+                $debounceToken = Str::random(20);
+
+                $existingBuffer = PendingMessageBuffer::where('assistant_id', $assistant->id)->where('phone_number', $cleanSender)->first();
+                $combinedText = $existingBuffer ? trim($existingBuffer->buffered_text . "\n" . $userMessage) : $userMessage;
+
+                PendingMessageBuffer::updateOrCreate(
+                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender],
+                    ['buffered_text' => $combinedText, 'token' => $debounceToken]
+                );
+
+                sleep(self::DEBOUNCE_SECONDS);
+
+                $currentBuffer = PendingMessageBuffer::where('assistant_id', $assistant->id)->where('phone_number', $cleanSender)->first();
+
+                if (!$currentBuffer || $currentBuffer->token !== $debounceToken) {
+                    // Chegou mensagem mais nova durante a espera - essa requisição perdeu a
+                    // corrida, quem vai processar o lote é a mais recente.
+                    return response()->json(['status' => 'debounced']);
+                }
+
+                $userMessage = trim($currentBuffer->buffered_text);
+                $currentBuffer->delete();
             }
 
             $omniInputRes = $this->sendToOmni($userMessage, $displayName !== 'Cliente' ? $displayName : $cleanSender, 'input', $sendTarget, $assistant->id);
