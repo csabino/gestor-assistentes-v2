@@ -246,7 +246,6 @@
                     personalidadeModalOpen: false,
                     conexaoModalOpen: false,
                     canalWhatsappModalOpen: false,
-                    savedFlash: null,
 
                     provider: '{{ $configuring->provider ?? 'openai' }}',
                     wa_provider: '{{ $configuring->whatsapp_provider ?? '' }}',
@@ -255,7 +254,6 @@
                     wa_token: '{{ $configuring->whatsapp_token ?? '' }}',
 
                     testing: false,
-                    testResult: null,
                     showWaModal: false,
                     showWebhookModal: new URLSearchParams(window.location.search).get('modal') === 'webhook',
                     showLeadModal: false,
@@ -400,16 +398,16 @@
 
                     async testConnection() {
                         this.testing = true;
-                        this.testResult = null;
                         try {
                             const response = await fetch('/', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                                 body: JSON.stringify({ action: 'test_ai', provider: this.provider, api_key: this.getApiKey() })
                             });
-                            this.testResult = await response.json();
+                            const result = await response.json();
+                            Alpine.store('toast').show(result.message, result.success ? 'success' : 'error');
                         } catch (e) {
-                            this.testResult = { success: false, message: 'Erro ao processar requisição.' };
+                            Alpine.store('toast').show('Erro ao processar requisição.', 'error');
                         } finally {
                             this.testing = false;
                         }
@@ -443,18 +441,12 @@
                         }
                     },
 
-                    flashSaved(name) {
-                        this.savedFlash = name;
-                        setTimeout(() => { if (this.savedFlash === name) this.savedFlash = null; }, 4000);
-                    },
-
                     restoreOpenModal() {
                         const key = 'openmodal_config_' + {{ $configuring->id }};
                         const saved = sessionStorage.getItem(key);
-                        const hasSuccess = {{ session('success') ? 'true' : 'false' }};
-                        if (saved === 'personalidade') { this.personalidadeModalOpen = true; if (hasSuccess) this.flashSaved('personalidade'); }
-                        if (saved === 'conexao') { this.conexaoModalOpen = true; if (hasSuccess) this.flashSaved('conexao'); }
-                        if (saved === 'canal') { this.canalWhatsappModalOpen = true; if (hasSuccess) this.flashSaved('canal'); }
+                        if (saved === 'personalidade') this.personalidadeModalOpen = true;
+                        if (saved === 'conexao') this.conexaoModalOpen = true;
+                        if (saved === 'canal') this.canalWhatsappModalOpen = true;
                         if (saved === 'kb') { this.kbModalOpen = true; this.loadKbRows(); }
                         this.$watch('personalidadeModalOpen', v => this.persistOpenModal('personalidade', v));
                         this.$watch('conexaoModalOpen', v => this.persistOpenModal('conexao', v));
@@ -668,10 +660,6 @@
                                 </button>
                             </div>
                             <div class="flex-1 min-h-0 overflow-auto p-5">
-                                <div x-show="savedFlash === 'personalidade'" x-transition class="mb-3 p-3 rounded-lg text-xs border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center gap-2">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    Configurações salvas com sucesso!
-                                </div>
                                 <div class="flex items-center justify-end mb-2">
                                     <button type="button" x-on:click="showLeadModal = true" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-200 flex items-center gap-1.5 transition">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
@@ -680,11 +668,12 @@
                                 </div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-1">Instruções do Sistema</label>
                                 <textarea form="configForm" name="system_prompt" rows="6"
-                                    x-data="{ resize() { $el.style.height = 'auto'; $el.style.height = ($el.scrollHeight + 4) + 'px'; } }"
+                                    x-data="{ resize() { $el.style.height = 'auto'; $el.style.height = ($el.scrollHeight + 28) + 'px'; } }"
                                     x-init="resize(); setTimeout(() => resize(), 50); setTimeout(() => resize(), 250)"
                                     x-effect="personalidadeModalOpen; $nextTick(() => resize()); setTimeout(() => resize(), 50); setTimeout(() => resize(), 250)"
                                     x-on:input="resize()"
-                                    class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none overflow-hidden" placeholder="Ex: Você é um vendedor especializado na loja X...">{{ $configuring->system_prompt }}</textarea>
+                                    class="w-full border border-gray-300 rounded-lg p-3 pb-6 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none max-h-[55vh] overflow-y-auto" placeholder="Ex: Você é um vendedor especializado na loja X...">{{ $configuring->system_prompt }}</textarea>
+                                <div class="h-4"></div>
                             </div>
                             <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
                                 <button type="submit" form="configForm" onclick="saveScrollPosition()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
@@ -707,19 +696,10 @@
                                 </button>
                             </div>
                             <div class="flex-1 min-h-0 overflow-auto p-5">
-                                <div x-show="savedFlash === 'conexao'" x-transition class="mb-3 p-3 rounded-lg text-xs border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center gap-2">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    Configurações salvas com sucesso!
-                                </div>
                                 <div class="flex justify-end mb-3">
                                     <button type="button" x-on:click="testConnection()" :disabled="testing" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-200 flex items-center shrink-0">
                                         <span x-text="testing ? '⌛ Testando...' : '⚡ Testar'"></span>
                                     </button>
-                                </div>
-
-                                <div x-show="testResult !== null" x-transition class="mb-4 p-3 rounded-lg text-xs border" :class="testResult?.success ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'">
-                                    <p class="font-bold mb-0.5" x-text="testResult?.success ? '✅ Sucesso!' : '❌ Falha'"></p>
-                                    <p x-text="testResult?.message"></p>
                                 </div>
 
                                 <div class="flex gap-3 mb-4">
@@ -802,10 +782,6 @@
                                 </button>
                             </div>
                             <div class="flex-1 min-h-0 overflow-auto p-5">
-                                <div x-show="savedFlash === 'canal'" x-transition class="mb-3 p-3 rounded-lg text-xs border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center gap-2">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    Configurações salvas com sucesso!
-                                </div>
                                 <div class="flex items-center gap-1.5 mb-3" x-show="wa_provider !== ''" x-cloak>
                                     <span x-show="waStatus === 'checking'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 animate-pulse border border-gray-200">Verificando...</span>
                                     <span x-show="waStatus === 'connected'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 flex items-center gap-1 border border-emerald-200 shadow-sm">
@@ -1160,19 +1136,25 @@
                     <div @click.away="kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[88vh] flex flex-col relative border border-slate-200">
                         <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                             <h3 class="text-base font-bold text-gray-800">Base de Conhecimento — {{ $configuring->name ?? '' }}</h3>
-                            <button type="button" @click="kbModalOpen = false" class="text-gray-400 hover:text-gray-600">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
+                            <div class="flex items-center gap-4">
+                                <a href="/?action=export_knowledge_base&assistant_id={{ $configuring->id ?? '' }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                                    Exportar CSV
+                                </a>
+                                <button type="button" @click="kbModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
                         </div>
 
                         <div class="px-5 pt-4 shrink-0 border-b border-gray-100 pb-4">
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                     <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Anexar Arquivos (PDF, Word, TXT)</label>
-                                    <div class="flex flex-col gap-2">
-                                        <input type="file" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="block w-full text-sm text-gray-500 border border-gray-200 rounded-lg p-1 bg-white">
-                                        <button type="submit" form="configForm" onclick="saveScrollPosition(); this.innerHTML='Salvando...'" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Anexar
+                                    <div class="flex items-stretch gap-2">
+                                        <input type="file" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="block w-full min-w-0 text-sm text-gray-500 border border-gray-200 rounded-lg p-1 bg-white">
+                                        <button type="submit" form="configForm" onclick="saveScrollPosition()" title="Anexar arquivos selecionados" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                         </button>
                                     </div>
                                 </div>
@@ -1182,12 +1164,12 @@
                                         🌐 Importar Site (Extração de Conteúdo)
                                         <svg class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" title="O sistema irá varrer a URL, identificar as páginas internas e extrair o texto útil automaticamente."><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
                                     </label>
-                                    <div class="flex flex-col gap-2">
-                                        <input type="url" x-model="websiteToCrawl" placeholder="https://www.site.com" class="block w-full text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <div class="flex items-stretch gap-2">
+                                        <input type="url" x-model="websiteToCrawl" placeholder="https://www.site.com" class="block w-full min-w-0 text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
 
-                                        <button type="button" @click="startCrawler()" :disabled="crawling" :class="crawling ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'" class="text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm whitespace-nowrap">
-                                            <span x-show="!crawling" class="flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /></svg> Extrair Site</span>
-                                            <span x-show="crawling" class="flex items-center gap-1.5"><span class="inline-block animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span> Extraindo...</span>
+                                        <button type="button" @click="startCrawler()" :disabled="crawling" :class="crawling ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'" title="Extrair conteúdo do site" class="text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
+                                            <svg x-show="!crawling" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /></svg>
+                                            <span x-show="crawling" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                                         </button>
                                     </div>
 
@@ -1208,12 +1190,12 @@
                                         🗂️ Varrer Site (Estrutura de Menu)
                                         <svg class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" title="Entende a estrutura de menu do site (home, itens e submenus) e salva cada página como um documento organizado nessa mesma hierarquia."><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
                                     </label>
-                                    <div class="flex flex-col gap-2">
-                                        <input type="url" x-model="siteMenuUrl" placeholder="https://www.site.com" class="block w-full text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <div class="flex items-stretch gap-2">
+                                        <input type="url" x-model="siteMenuUrl" placeholder="https://www.site.com" class="block w-full min-w-0 text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
 
-                                        <button type="button" @click="startMenuCrawler()" :disabled="menuCrawling" :class="menuCrawling ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'" class="text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm whitespace-nowrap">
-                                            <span x-show="!menuCrawling" class="flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg> Varrer Site</span>
-                                            <span x-show="menuCrawling" class="flex items-center gap-1.5"><span class="inline-block animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span> Varrendo...</span>
+                                        <button type="button" @click="startMenuCrawler()" :disabled="menuCrawling" :class="menuCrawling ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'" title="Varrer estrutura de menu do site" class="text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
+                                            <svg x-show="!menuCrawling" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.159.69.159 1.006 0z" /></svg>
+                                            <span x-show="menuCrawling" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                                         </button>
                                     </div>
 
@@ -1282,13 +1264,6 @@
                                     </tr>
                                 </tbody>
                             </table>
-                        </div>
-
-                        <div class="flex items-center p-4 border-t border-gray-100 shrink-0">
-                            <a href="/?action=export_knowledge_base&assistant_id={{ $configuring->id ?? '' }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                                Exportar CSV
-                            </a>
                         </div>
                     </div>
                 </div>
