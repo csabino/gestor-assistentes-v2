@@ -27,7 +27,7 @@
     @if($configuring)
         <script>
             function saveScrollPosition() {
-                const scrollArea = document.getElementById('configScrollArea');
+                const scrollArea = document.getElementById('mainContent');
                 if (scrollArea) {
                     sessionStorage.setItem('scrollpos_config_{{ $configuring->id }}', scrollArea.scrollTop);
                 }
@@ -38,7 +38,7 @@
                 const scrollpos = sessionStorage.getItem(key);
                 if (scrollpos !== null) {
                     setTimeout(() => {
-                        const scrollArea = document.getElementById('configScrollArea');
+                        const scrollArea = document.getElementById('mainContent');
                         if (scrollArea) {
                             scrollArea.scrollTop = parseInt(scrollpos);
                         }
@@ -142,12 +142,75 @@
                 </div>
 
             @elseif($configuring)
-                <div class="flex flex-col h-[calc(100vh-10rem)]" x-data="{
+                <div x-data="{
                     renameModalOpen: false,
                     renameValue: @js($configuring->name),
                     companyValue: @js($configuring->company_name),
                     renameSaving: false,
                     renameError: null,
+
+                    // Estado do modal Ver Base de Conhecimento - fica aqui (no escopo mais externo,
+                    // nao dentro do form configForm) porque o modal em si e renderizado fora desse
+                    // form no HTML; se ficasse no x-data do form, o modal nunca enxergaria essas
+                    // variaveis (foi exatamente isso que quebrou na primeira tentativa).
+                    kbModalOpen: false,
+                    kbSortField: 'name',
+                    kbSortDir: 'asc',
+                    kbRows: [],
+                    kbLoading: false,
+                    selectedFiles: [],
+                    get allSelected() { return this.selectedFiles.length === this.kbRows.length && this.kbRows.length > 0; },
+                    async loadKbRows() {
+                        this.kbLoading = true;
+                        try {
+                            const res = await fetch('/?action=knowledge_base_rows&assistant_id={{ $configuring->id ?? '' }}');
+                            this.kbRows = await res.json();
+                        } catch (e) {
+                            this.kbRows = [];
+                        } finally {
+                            this.kbLoading = false;
+                        }
+                    },
+                    kbSortedRows() {
+                        const dir = this.kbSortDir === 'asc' ? 1 : -1;
+                        const field = this.kbSortField;
+                        return [...this.kbRows].sort((a, b) => {
+                            let av, bv;
+                            if (field === 'size') { av = a.size ?? -1; bv = b.size ?? -1; }
+                            else if (field === 'crawled_at') { av = a.crawled_at_sort; bv = b.crawled_at_sort; }
+                            else { av = (a[field] || '').toString().toLowerCase(); bv = (b[field] || '').toString().toLowerCase(); }
+                            if (av < bv) return -1 * dir;
+                            if (av > bv) return 1 * dir;
+                            return 0;
+                        });
+                    },
+                    toggleKbSort(field) {
+                        if (this.kbSortField === field) {
+                            this.kbSortDir = this.kbSortDir === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            this.kbSortField = field;
+                            this.kbSortDir = 'asc';
+                        }
+                    },
+                    toggleAll() {
+                        if (this.selectedFiles.length === this.kbRows.length) {
+                            this.selectedFiles = [];
+                        } else {
+                            this.selectedFiles = this.kbRows.map(r => String(r.index));
+                        }
+                    },
+                    async submitBulkDelete() {
+                        if (this.selectedFiles.length === 0) return;
+                        if (!(await confirmModal('Tem certeza que deseja apagar os ' + this.selectedFiles.length + ' itens selecionados?'))) return;
+                        saveScrollPosition();
+                        const form = document.getElementById('bulkDeleteForm');
+                        form.innerHTML = '<input type=\'hidden\' name=\'_token\' value=\'{{ csrf_token() }}\'><input type=\'hidden\' name=\'_method\' value=\'DELETE\'><input type=\'hidden\' name=\'assistant_id\' value=\'{{ $configuring->id ?? '' }}\'>';
+                        this.selectedFiles.forEach(idx => {
+                            form.innerHTML += '<input type=\'hidden\' name=\'file_indexes[]\' value=\'' + idx + '\'>';
+                        });
+                        form.submit();
+                    },
+
                     async saveRename() {
                         this.renameSaving = true;
                         this.renameError = null;
@@ -174,7 +237,7 @@
                         }
                     }
                 }">
-                <div class="shrink-0 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="sticky top-0 z-10 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
                         <a href="/" class="dark-btn-fix text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 text-sm transition bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg> Voltar
@@ -231,7 +294,7 @@
                     </div>
                 </div>
 
-                <div id="configScrollArea" class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1">
+                <div id="configScrollArea">
                 <form id="configForm" action="/" method="POST" enctype="multipart/form-data" onsubmit="saveScrollPosition()"
                     x-data="{
                         provider: '{{ $configuring->provider ?? 'openai' }}',
@@ -260,30 +323,6 @@
                         siteMenuUrl: '',
                         menuCrawling: false,
                         menuCrawlLog: [],
-                        kbModalOpen: false,
-                        kbSortField: 'name',
-                        kbSortDir: 'asc',
-                        selectedFiles: [],
-                        get allSelected() { return this.selectedFiles.length === this.kbRows.length && this.kbRows.length > 0; },
-                        toggleAll() {
-                            if (this.selectedFiles.length === this.kbRows.length) {
-                                this.selectedFiles = [];
-                            } else {
-                                this.selectedFiles = this.kbRows.map(r => String(r.index));
-                            }
-                        },
-                        async submitBulkDelete() {
-                            if (this.selectedFiles.length === 0) return;
-                            if (!(await confirmModal('Tem certeza que deseja apagar os ' + this.selectedFiles.length + ' itens selecionados?'))) return;
-                            saveScrollPosition();
-                            const form = document.getElementById('bulkDeleteForm');
-                            form.innerHTML = '<input type=\'hidden\' name=\'_token\' value=\'{{ csrf_token() }}\'><input type=\'hidden\' name=\'_method\' value=\'DELETE\'><input type=\'hidden\' name=\'assistant_id\' value=\'{{ $configuring->id ?? '' }}\'>';
-                            this.selectedFiles.forEach(idx => {
-                                form.innerHTML += '<input type=\'hidden\' name=\'file_indexes[]\' value=\'' + idx + '\'>';
-                            });
-                            form.submit();
-                        },
-
                         getApiKey() {
                             if (this.provider === 'openai') return document.querySelector('input[name=\'openai_api_key\']').value;
                             if (this.provider === 'gemini') return document.querySelector('input[name=\'gemini_api_key\']').value;
@@ -409,41 +448,6 @@
                             } catch (e) {
                                 alert('Erro de conexão durante a varredura.');
                                 this.menuCrawling = false;
-                            }
-                        },
-
-                        kbRows: [],
-                        kbLoading: false,
-                        async loadKbRows() {
-                            this.kbLoading = true;
-                            try {
-                                const res = await fetch('/?action=knowledge_base_rows&assistant_id={{ $configuring->id ?? '' }}');
-                                this.kbRows = await res.json();
-                            } catch (e) {
-                                this.kbRows = [];
-                            } finally {
-                                this.kbLoading = false;
-                            }
-                        },
-                        kbSortedRows() {
-                            const dir = this.kbSortDir === 'asc' ? 1 : -1;
-                            const field = this.kbSortField;
-                            return [...this.kbRows].sort((a, b) => {
-                                let av, bv;
-                                if (field === 'size') { av = a.size ?? -1; bv = b.size ?? -1; }
-                                else if (field === 'crawled_at') { av = a.crawled_at_sort; bv = b.crawled_at_sort; }
-                                else { av = (a[field] || '').toString().toLowerCase(); bv = (b[field] || '').toString().toLowerCase(); }
-                                if (av < bv) return -1 * dir;
-                                if (av > bv) return 1 * dir;
-                                return 0;
-                            });
-                        },
-                        toggleKbSort(field) {
-                            if (this.kbSortField === field) {
-                                this.kbSortDir = this.kbSortDir === 'asc' ? 'desc' : 'asc';
-                            } else {
-                                this.kbSortField = field;
-                                this.kbSortDir = 'asc';
                             }
                         },
 
