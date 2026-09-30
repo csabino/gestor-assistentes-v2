@@ -332,10 +332,10 @@
                             }
                         },
 
-                        // "Varrer Site": modulo novo e separado do "Extrair Site" acima - descobre a
+                        // Varrer Site: modulo novo e separado do Extrair Site acima - descobre a
                         // estrutura de menu (home -> item -> submenu) e salva cada pagina num
                         // arquivo em disco organizado nessa hierarquia (ver crawlMenuPage() no
-                        // controller). Nao mexe em nada do startCrawler()/"Extrair Site" de cima.
+                        // controller). Nao mexe em nada do startCrawler()/Extrair Site de cima.
                         async startMenuCrawler() {
                             if (!this.siteMenuUrl) return alert('Por favor, digite a URL do site para varrer.');
 
