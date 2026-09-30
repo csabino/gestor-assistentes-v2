@@ -200,6 +200,9 @@
                                 <button type="button" @click="renameValue = @js($configuring->name); companyValue = @js($configuring->company_name); renameError = null; renameModalOpen = true" title="Editar assistente" class="text-gray-400 hover:text-indigo-600 p-1 rounded-md hover:bg-indigo-50 transition">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" /></svg>
                                 </button>
+                                <a href="/?configure={{ $configuring->id }}&conversations_id={{ $configuring->id }}" title="Conversas" class="text-gray-400 hover:text-indigo-600 p-1 rounded-md hover:bg-indigo-50 transition">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.573 16.49 16.638 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                </a>
                             </h1>
                             @if($configuring->company_name)
                                 <p class="text-xs text-gray-500 font-medium">{{ $configuring->company_name }}</p>
@@ -1266,7 +1269,7 @@
                                     <p class="text-xs text-slate-500 font-medium">Veja os atendimentos e interações capturados pelo WhatsApp.</p>
                                 </div>
                             </div>
-                            <a href="/" class="dark-btn-fix-neutral text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-200 transition">
+                            <a href="{{ ($configuring ?? null) ? '/?configure=' . $configuring->id : '/' }}" class="dark-btn-fix-neutral text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-200 transition">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </a>
                         </div>
@@ -1283,23 +1286,18 @@
                                             $threadDateObj = \Carbon\Carbon::parse($thread->last_activity)->setTimezone($assistantTz ?? 'America/Sao_Paulo')->locale('pt_BR');
                                             $threadDisplayDate = $threadDateObj->format('d/m/Y H:i');
                                         @endphp
-                                        <a href="/?conversations_id={{ $conversationsAssistant->id }}&phone={{ $thread->phone_number }}"
-                                            class="p-4 flex items-center gap-3 transition hover:bg-white {{ ($activePhone ?? '') === $thread->phone_number ? 'bg-white border-l-4 border-indigo-600 shadow-sm' : '' }}">
-                                            <span class="w-9 h-9 shrink-0 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center">
-                                                {{ $thread->contact_name ? mb_strtoupper(mb_substr($thread->contact_name, 0, 1)) : '#' }}
-                                            </span>
-                                            <div class="flex-1 min-w-0 flex items-center justify-between gap-2">
-                                                <div class="min-w-0">
-                                                    <p class="font-bold text-slate-800 text-sm truncate">
-                                                        {{ $thread->contact_name ?: ('+' . $thread->phone_number) }}
-                                                    </p>
-                                                    @if($thread->contact_name)
-                                                        <span class="text-[10px] text-slate-400 font-medium">+{{ $thread->phone_number }}</span>
-                                                    @endif
-                                                    <span class="text-[10px] text-slate-400 font-medium block mt-0.5">Última fala: {{ $threadDisplayDate }}</span>
-                                                </div>
-                                                <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-bold border border-slate-200 shrink-0">{{ $thread->total_messages }} msgs</span>
+                                        <a href="{{ ($configuring ?? null) ? '/?configure=' . $configuring->id . '&' : '/?' }}conversations_id={{ $conversationsAssistant->id }}&phone={{ $thread->phone_number }}"
+                                            class="p-4 flex items-center justify-between gap-2 transition hover:bg-white {{ ($activePhone ?? '') === $thread->phone_number ? 'bg-white border-l-4 border-indigo-600 shadow-sm' : '' }}">
+                                            <div class="min-w-0">
+                                                @if($thread->contact_name)
+                                                    <p class="font-bold text-slate-800 text-sm truncate">{{ $thread->contact_name }}</p>
+                                                    <span class="text-[11px] text-slate-500 font-medium">+{{ $thread->phone_number }}</span>
+                                                @else
+                                                    <p class="font-bold text-slate-800 text-sm truncate">+{{ $thread->phone_number }}</p>
+                                                @endif
+                                                <span class="text-[10px] text-slate-400 font-medium block mt-0.5">Última fala: {{ $threadDisplayDate }}</span>
                                             </div>
+                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-bold border border-slate-200 shrink-0">{{ $thread->total_messages }} msgs</span>
                                         </a>
                                     @empty
                                         <div class="p-8 text-center text-xs text-slate-400">Nenhuma conversa gravada no banco.</div>
@@ -1310,16 +1308,13 @@
                             <div class="w-2/3 bg-slate-100 flex flex-col justify-between overflow-hidden">
                                 @if(isset($activePhone) && $activePhone && isset($activeThreadMessages) && count($activeThreadMessages) > 0)
                                     <div class="p-3 bg-white border-b border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-700 shrink-0 shadow-sm z-10 relative">
-                                        <div class="flex items-center gap-2.5">
-                                            <span class="w-8 h-8 shrink-0 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center">
-                                                {{ ($activeContactName ?? null) ? mb_strtoupper(mb_substr($activeContactName, 0, 1)) : '#' }}
-                                            </span>
-                                            <span>
-                                                {{ $activeContactName ?? ('+' . $activePhone) }}
-                                                @if($activeContactName ?? null)
-                                                    <span class="text-slate-400 font-medium">— +{{ $activePhone }}</span>
-                                                @endif
-                                            </span>
+                                        <div>
+                                            @if($activeContactName ?? null)
+                                                <p class="font-bold text-slate-800 leading-tight">{{ $activeContactName }}</p>
+                                                <span class="text-slate-400 font-medium text-[11px]">+{{ $activePhone }}</span>
+                                            @else
+                                                <p class="font-bold text-slate-800 leading-tight">+{{ $activePhone }}</p>
+                                            @endif
                                         </div>
                                         <div class="flex items-center gap-3">
                                             <button type="button" @click="clearContextModalOpen = true; clearContextPhone = @js($activePhone); clearContextError = null; clearContextResult = null"
@@ -1382,7 +1377,7 @@
                         </div>
 
                         <div class="p-3 border-t border-slate-100 bg-white flex justify-end shrink-0 z-10 relative">
-                            <a href="/" class="dark-btn-fix-neutral bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-5 py-2 rounded-lg text-xs transition">
+                            <a href="{{ ($configuring ?? null) ? '/?configure=' . $configuring->id : '/' }}" class="dark-btn-fix-neutral bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-5 py-2 rounded-lg text-xs transition">
                                 Fechar
                             </a>
                         </div>
@@ -1418,7 +1413,7 @@
                                         <li>🧾 <span x-text="clearContextResult.webhook_logs" class="font-bold"></span> logs removidos</li>
                                     </ul>
                                     <div class="flex justify-end gap-2">
-                                        <a href="/?conversations_id={{ $conversationsAssistant->id }}" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">Fechar e atualizar</a>
+                                        <a href="{{ ($configuring ?? null) ? '/?configure=' . $configuring->id . '&conversations_id=' . $conversationsAssistant->id : '/?conversations_id=' . $conversationsAssistant->id }}" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">Fechar e atualizar</a>
                                     </div>
                                 </div>
                             </template>
