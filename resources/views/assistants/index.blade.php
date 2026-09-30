@@ -17,9 +17,9 @@
         function copyChatLink(id) {
             const url = window.location.origin + '/chat/' + id;
             navigator.clipboard.writeText(url).then(() => {
-                alert('Link copiado!');
+                alertModal('Link copiado!');
             }).catch(() => {
-                alert('Não foi possível copiar o link.');
+                alertModal('Não foi possível copiar o link.');
             });
         }
     </script>
@@ -254,10 +254,12 @@
                     wa_token: '{{ $configuring->whatsapp_token ?? '' }}',
 
                     testing: false,
+                    saving: false,
                     showWaModal: false,
                     showWebhookModal: new URLSearchParams(window.location.search).get('modal') === 'webhook',
                     showLeadModal: false,
                     leadFields: {{ json_encode($configuring->lead_fields) }},
+                    systemPromptText: @js($configuring->system_prompt),
 
                     waLoading: false,
                     waResult: null,
@@ -291,7 +293,7 @@
                     },
 
                     async startCrawler() {
-                        if (!this.websiteToCrawl) return alert('Por favor, digite a URL do site para importar.');
+                        if (!this.websiteToCrawl) { alertModal('Por favor, digite a URL do site para importar.'); return; }
 
                         this.crawling = true;
                         this.crawlPercent = 5;
@@ -306,7 +308,7 @@
                             const mapData = await mapRes.json();
 
                             if (!mapData.success || !mapData.urls || mapData.urls.length === 0) {
-                                alert(mapData.message || 'Não foi possível mapear o site. Tente colocar uma URL específica.');
+                                alertModal(mapData.message || 'Não foi possível mapear o site. Tente colocar uma URL específica.');
                                 this.crawling = false;
                                 return;
                             }
@@ -335,13 +337,13 @@
                             window.location.reload();
 
                         } catch (e) {
-                            alert('Erro de conexão durante a extração.');
+                            alertModal('Erro de conexão durante a extração.');
                             this.crawling = false;
                         }
                     },
 
                     async startMenuCrawler() {
-                        if (!this.siteMenuUrl) return alert('Por favor, digite a URL do site para varrer.');
+                        if (!this.siteMenuUrl) { alertModal('Por favor, digite a URL do site para varrer.'); return; }
 
                         this.menuCrawling = true;
                         this.menuCrawlLog = [];
@@ -355,7 +357,7 @@
                             const discoverData = await discoverRes.json();
 
                             if (!discoverData.success) {
-                                alert(discoverData.message || 'Não foi possível acessar o site.');
+                                alertModal(discoverData.message || 'Não foi possível acessar o site.');
                                 this.menuCrawling = false;
                                 return;
                             }
@@ -391,7 +393,7 @@
                             saveScrollPosition();
                             setTimeout(() => window.location.reload(), 1200);
                         } catch (e) {
-                            alert('Erro de conexão durante a varredura.');
+                            alertModal('Erro de conexão durante a varredura.');
                             this.menuCrawling = false;
                         }
                     },
@@ -410,6 +412,30 @@
                             Alpine.store('toast').show('Erro ao processar requisição.', 'error');
                         } finally {
                             this.testing = false;
+                        }
+                    },
+
+                    async saveConfig() {
+                        if (this.saving) return;
+                        this.saving = true;
+                        try {
+                            const form = document.getElementById('configForm');
+                            const formData = new FormData(form);
+                            const response = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                                body: formData
+                            });
+                            const data = await response.json();
+                            if (response.ok) {
+                                Alpine.store('toast').show(data.message || 'Configurações atualizadas!', 'success');
+                            } else {
+                                Alpine.store('toast').show(data.message || 'Não foi possível salvar as configurações.', 'error');
+                            }
+                        } catch (e) {
+                            Alpine.store('toast').show('Erro ao salvar configurações.', 'error');
+                        } finally {
+                            this.saving = false;
                         }
                     },
 
@@ -470,11 +496,11 @@
                                 saveScrollPosition();
                                 window.location.reload();
                             } else {
-                                alert('A API não conseguiu desconectar:\n\n' + (data.message || 'Erro desconhecido.'));
+                                alertModal('A API não conseguiu desconectar: ' + (data.message || 'Erro desconhecido.'));
                                 this.checkWaStatusSilent();
                             }
                         } catch(e) {
-                            alert('Erro na requisição.');
+                            alertModal('Erro na requisição.');
                             this.checkWaStatusSilent();
                         }
                     },
@@ -649,7 +675,7 @@
 
                     <!-- MODAL PERSONALIDADE E PROMPT -->
                     <div x-show="personalidadeModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                        <div @click.away="personalidadeModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                        <div @click.away="if (!showLeadModal) personalidadeModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
@@ -667,17 +693,18 @@
                                     </button>
                                 </div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-1">Instruções do Sistema</label>
-                                <textarea form="configForm" name="system_prompt" rows="6"
-                                    x-data="{ resize() { $el.style.height = 'auto'; $el.style.height = ($el.scrollHeight + 28) + 'px'; } }"
-                                    x-init="resize(); setTimeout(() => resize(), 50); setTimeout(() => resize(), 250)"
-                                    x-effect="personalidadeModalOpen; $nextTick(() => resize()); setTimeout(() => resize(), 50); setTimeout(() => resize(), 250)"
-                                    x-on:input="resize()"
-                                    class="w-full border border-gray-300 rounded-lg p-3 pb-6 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none max-h-[55vh] overflow-y-auto" placeholder="Ex: Você é um vendedor especializado na loja X...">{{ $configuring->system_prompt }}</textarea>
+                                <div class="grid">
+                                    <textarea form="configForm" name="system_prompt" x-model="systemPromptText"
+                                        class="[grid-area:1/1] w-full min-h-[160px] border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none overflow-hidden" placeholder="Ex: Você é um vendedor especializado na loja X..."></textarea>
+                                    <div class="[grid-area:1/1] invisible min-h-[160px] whitespace-pre-wrap break-words border border-transparent p-3 text-sm" x-text="systemPromptText + ' '"></div>
+                                </div>
                                 <div class="h-4"></div>
                             </div>
                             <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
-                                <button type="submit" form="configForm" onclick="saveScrollPosition()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Salvar
+                                <button type="button" @click="saveConfig()" :disabled="saving" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
+                                    <svg x-show="!saving" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                    <span x-show="saving" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                                    <span x-text="saving ? 'Salvando...' : 'Salvar'"></span>
                                 </button>
                             </div>
                         </div>
@@ -759,8 +786,10 @@
                                 </div>
                             </div>
                             <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
-                                <button type="submit" form="configForm" onclick="saveScrollPosition()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Salvar
+                                <button type="button" @click="saveConfig()" :disabled="saving" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
+                                    <svg x-show="!saving" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                    <span x-show="saving" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                                    <span x-text="saving ? 'Salvando...' : 'Salvar'"></span>
                                 </button>
                             </div>
                         </div>
@@ -768,10 +797,10 @@
 
                     <!-- MODAL CANAL WHATSAPP -->
                     <div x-show="canalWhatsappModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                        <div @click.away="canalWhatsappModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                        <div @click.away="if (!showWebhookModal && !showWaModal) canalWhatsappModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-green-500"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-emerald-500"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
                                     Canal: WhatsApp
                                     <button type="button" x-show="wa_provider !== ''" x-cloak x-on:click="showWebhookModal = true" class="ml-1 bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 px-2 py-1 rounded-md transition text-xs font-medium flex items-center gap-1 shadow-sm" title="Diagnóstico e Webhook">
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -864,8 +893,10 @@
                                 </div>
                             </div>
                             <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
-                                <button type="submit" form="configForm" onclick="saveScrollPosition()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Salvar
+                                <button type="button" @click="saveConfig()" :disabled="saving" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
+                                    <svg x-show="!saving" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                    <span x-show="saving" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                                    <span x-text="saving ? 'Salvando...' : 'Salvar'"></span>
                                 </button>
                             </div>
                         </div>
@@ -951,7 +982,7 @@
                                 <label class="block text-xs font-semibold text-slate-600 mb-1.5">URL do Webhook do Assistente</label>
                                 <div class="flex items-center gap-2">
                                     <input type="text" readonly id="modalWebhookUrl" value="{{ request()->schemeAndHttpHost() }}/webhook/whatsapp/{{ $configuring->id }}" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 font-mono outline-none">
-                                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('modalWebhookUrl').value); alert('URL copiada!');" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition shrink-0">Copiar</button>
+                                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('modalWebhookUrl').value); alertModal('URL copiada!');" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition shrink-0">Copiar</button>
                                 </div>
                             </div>
 
@@ -1133,9 +1164,12 @@
 
                 <!-- MODAL VER BASE DE CONHECIMENTO (unica forma de consultar/gerenciar a base agora - grid ordenavel, exclusao individual/lote, export CSV) -->
                 <div x-show="kbModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div @click.away="kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[88vh] flex flex-col relative border border-slate-200">
+                    <div @click.away="if (!$store.confirmDialog.visible) kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[88vh] flex flex-col relative border border-slate-200">
                         <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-                            <h3 class="text-base font-bold text-gray-800">Base de Conhecimento — {{ $configuring->name ?? '' }}</h3>
+                            <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" /></svg>
+                                Base de Conhecimento — {{ $configuring->name ?? '' }}
+                            </h3>
                             <div class="flex items-center gap-4">
                                 <a href="/?action=export_knowledge_base&assistant_id={{ $configuring->id ?? '' }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
@@ -1149,10 +1183,14 @@
 
                         <div class="px-5 pt-4 shrink-0 border-b border-gray-100 pb-4">
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200" x-data="{ docsCount: 0 }">
                                     <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Anexar Arquivos (PDF, Word, TXT)</label>
                                     <div class="flex items-stretch gap-2">
-                                        <input type="file" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="block w-full min-w-0 text-sm text-gray-500 border border-gray-200 rounded-lg p-1 bg-white">
+                                        <button type="button" @click="$refs.docsInput.click()" title="Escolher arquivos" class="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:text-indigo-600 hover:border-indigo-300 bg-white transition shrink-0">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                                        </button>
+                                        <input type="file" x-ref="docsInput" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="hidden" @change="docsCount = $event.target.files.length">
+                                        <span class="flex-1 min-w-0 flex items-center text-sm text-gray-500 border border-gray-200 rounded-lg px-3 bg-white truncate" x-text="docsCount + (docsCount === 1 ? ' arquivo' : ' arquivos')"></span>
                                         <button type="submit" form="configForm" onclick="saveScrollPosition()" title="Anexar arquivos selecionados" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
                                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                         </button>
@@ -1162,7 +1200,9 @@
                                 <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                     <label class="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
                                         🌐 Importar Site (Extração de Conteúdo)
-                                        <svg class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" title="O sistema irá varrer a URL, identificar as páginas internas e extrair o texto útil automaticamente."><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                                        <span title="O sistema irá varrer a URL, identificar as páginas internas e extrair o texto útil automaticamente." class="cursor-help shrink-0">
+                                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                                        </span>
                                     </label>
                                     <div class="flex items-stretch gap-2">
                                         <input type="url" x-model="websiteToCrawl" placeholder="https://www.site.com" class="block w-full min-w-0 text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
@@ -1188,7 +1228,9 @@
                                 <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                     <label class="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
                                         🗂️ Varrer Site (Estrutura de Menu)
-                                        <svg class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" title="Entende a estrutura de menu do site (home, itens e submenus) e salva cada página como um documento organizado nessa mesma hierarquia."><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                                        <span title="Entende a estrutura de menu do site (home, itens e submenus) e salva cada página como um documento organizado nessa mesma hierarquia." class="cursor-help shrink-0">
+                                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                                        </span>
                                     </label>
                                     <div class="flex items-stretch gap-2">
                                         <input type="url" x-model="siteMenuUrl" placeholder="https://www.site.com" class="block w-full min-w-0 text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
@@ -1527,12 +1569,12 @@
                                 });
                                 if (!res.ok) {
                                     const json = await res.json();
-                                    alert(json.message || 'Erro ao excluir.');
+                                    alertModal(json.message || 'Erro ao excluir.');
                                     return;
                                 }
                                 window.location.href = '{{ ($configuring ?? null) ? "/?configure=" . $configuring->id . "&conversations_id=" . $conversationsAssistant->id : "/?conversations_id=" . $conversationsAssistant->id }}';
                             } catch (e) {
-                                alert('Erro de conexão. Tente novamente.');
+                                alertModal('Erro de conexão. Tente novamente.');
                             } finally {
                                 this.bulkDeleting = false;
                             }

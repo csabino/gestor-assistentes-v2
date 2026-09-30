@@ -12,7 +12,7 @@
                       const hasBlank = this.messages.some(m => m.trim() === '');
 
                       if (this.$refs.enabledToggle.checked && filled.length === 0) {
-                          alert('Pra ativar a automação, cadastre pelo menos uma mensagem de retomada preenchida.');
+                          alertModal('Pra ativar a automação, cadastre pelo menos uma mensagem de retomada preenchida.');
                           return;
                       }
                       if (hasBlank) {
@@ -39,7 +39,12 @@
                     </a>
                     <div class="h-6 w-px bg-gray-300 hidden md:block"></div>
                     <div>
-                        <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">Automação — {{ $assistant->name }}</h1>
+                        <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500 shrink-0">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                            </svg>
+                            Automação — {{ $assistant->name }}
+                        </h1>
                         <p class="text-xs text-gray-500 mt-0.5">Retomada automática de atendimento quando o cliente para de responder.</p>
                     </div>
                 </div>

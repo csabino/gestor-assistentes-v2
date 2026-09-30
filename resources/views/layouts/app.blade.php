@@ -175,7 +175,7 @@
 
     @stack('head')
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-100 min-h-screen flex flex-col overflow-hidden" x-data="{
+<body class="bg-gray-50 dark:bg-gray-900 font-sans text-gray-900 dark:text-gray-100 h-screen flex flex-col overflow-hidden" x-data="{
         theme: '{{ $effectiveTheme }}',
         logoLightUrl: @js($branding['logo_light_url']),
         logoDarkUrl: @js($branding['logo_dark_url']),
@@ -371,7 +371,7 @@
                 });
                 const json = await res.json();
                 if (!res.ok || json.success === false) {
-                    alert(json.message || 'Erro ao atualizar usuário.');
+                    alertModal(json.message || 'Erro ao atualizar usuário.');
                     return;
                 }
                 await this.loadUsers();
@@ -392,7 +392,7 @@
                 });
                 const json = await res.json();
                 if (!res.ok || json.success === false) {
-                    alert(json.message || 'Erro ao excluir usuário.');
+                    alertModal(json.message || 'Erro ao excluir usuário.');
                     return;
                 }
                 await this.loadUsers();
@@ -876,6 +876,16 @@
         </div>
     </div>
 
+    <!-- MODAL DE ALERTA GLOBAL (substitui o alert() nativo do navegador) -->
+    <div x-show="$store.alertDialog.visible" x-cloak x-transition class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200 dark:border-gray-700">
+            <p class="text-sm text-gray-800 dark:text-gray-100 mb-5" x-text="$store.alertDialog.message"></p>
+            <div class="flex justify-end">
+                <button type="button" @click="$store.alertDialog.close()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.store('toast', {
@@ -909,6 +919,21 @@
                 },
             });
 
+            Alpine.store('alertDialog', {
+                visible: false,
+                message: '',
+                resolvePromise: null,
+                ask(message) {
+                    this.message = message;
+                    this.visible = true;
+                    return new Promise(resolve => { this.resolvePromise = resolve; });
+                },
+                close() {
+                    this.visible = false;
+                    if (this.resolvePromise) this.resolvePromise(true);
+                },
+            });
+
             @if(session('success'))
                 Alpine.store('toast').show(@js(session('success')), 'success');
             @endif
@@ -920,6 +945,7 @@
         // Atalho global: funciona tanto de dentro de componentes Alpine (await confirmModal(...))
         // quanto direto num onsubmit/onclick simples, sem precisar escrever Alpine.store(...) toda vez.
         window.confirmModal = (message) => Alpine.store('confirmDialog').ask(message);
+        window.alertModal = (message) => Alpine.store('alertDialog').ask(message);
     </script>
 
     @stack('scripts')

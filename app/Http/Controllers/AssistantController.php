@@ -1711,6 +1711,10 @@ class AssistantController extends Controller
 
         $assistant->forceFill($data)->save();
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Configurações atualizadas!']);
+        }
+
         return redirect('/?configure=' . $assistant->id)->with('success', 'Configurações atualizadas!');
     }
 

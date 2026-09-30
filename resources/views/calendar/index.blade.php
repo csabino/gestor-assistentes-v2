@@ -271,7 +271,7 @@
 
                 select: function(info) {
                     if (agentId === 'all') {
-                        alert('Selecione um agente específico no filtro acima para poder criar um bloqueio.');
+                        alertModal('Selecione um agente específico no filtro acima para poder criar um bloqueio.');
                         calendar.unselect();
                         return;
                     }
@@ -289,7 +289,7 @@
                             })
                         }).then(r => r.json()).then(data => {
                             if(data.success) calendar.refetchEvents();
-                            else alert(data.message || 'Erro ao criar bloqueio.');
+                            else alertModal(data.message || 'Erro ao criar bloqueio.');
                         });
                     });
                 },
@@ -351,7 +351,7 @@
                             if (eventObj) eventObj.remove();
                             Alpine.$data(document.getElementById('calendarRoot')).showModal = false;
                         } else {
-                            alert('Erro ao excluir evento.');
+                            alertModal('Erro ao excluir evento.');
                         }
                     });
                 });
