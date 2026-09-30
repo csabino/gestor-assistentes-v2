@@ -1118,14 +1118,14 @@
                             <table class="w-full text-xs text-left">
                                 <thead>
                                     <tr class="border-b border-gray-200 text-gray-500 uppercase text-[10px] tracking-wide">
-                                        <th class="py-2 pr-3 w-8"></th>
+                                        <th class="sticky top-0 z-10 bg-white py-2 pr-3 w-8"></th>
                                         <template x-for="col in [{ key: 'name', label: 'Nome' }, { key: 'type', label: 'Tipo' }, { key: 'size', label: 'Tamanho' }, { key: 'crawled_at', label: 'Data/Hora' }]" :key="col.key">
-                                            <th class="py-2 pr-3 cursor-pointer select-none hover:text-indigo-600 transition" @click="toggleKbSort(col.key)">
+                                            <th class="sticky top-0 z-10 bg-white py-2 pr-3 cursor-pointer select-none hover:text-indigo-600 transition" @click="toggleKbSort(col.key)">
                                                 <span x-text="col.label"></span>
                                                 <span x-show="kbSortField === col.key" x-text="kbSortDir === 'asc' ? '▲' : '▼'" class="ml-0.5"></span>
                                             </th>
                                         </template>
-                                        <th class="py-2 pr-3 w-8"></th>
+                                        <th class="sticky top-0 z-10 bg-white py-2 pr-3 w-8"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1155,12 +1155,11 @@
                             </table>
                         </div>
 
-                        <div class="flex justify-between items-center p-4 border-t border-gray-100 shrink-0">
+                        <div class="flex items-center p-4 border-t border-gray-100 shrink-0">
                             <a href="/?action=export_knowledge_base&assistant_id={{ $configuring->id ?? '' }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                                 Exportar CSV
                             </a>
-                            <button type="button" @click="kbModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Fechar</button>
                         </div>
                     </div>
                 </div>
