@@ -870,8 +870,8 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200 dark:border-gray-700">
             <p class="text-sm text-gray-800 dark:text-gray-100 mb-5" x-text="$store.confirmDialog.message"></p>
             <div class="flex justify-end gap-2">
-                <button type="button" @click="$store.confirmDialog.cancel()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-lg transition">Cancelar</button>
-                <button type="button" @click="$store.confirmDialog.confirm()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition">Confirmar</button>
+                <button type="button" @click.stop="$store.confirmDialog.cancel()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold rounded-lg transition">Cancelar</button>
+                <button type="button" @click.stop="$store.confirmDialog.confirm()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition">Confirmar</button>
             </div>
         </div>
     </div>
@@ -881,7 +881,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200 dark:border-gray-700">
             <p class="text-sm text-gray-800 dark:text-gray-100 mb-5" x-text="$store.alertDialog.message"></p>
             <div class="flex justify-end">
-                <button type="button" @click="$store.alertDialog.close()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">OK</button>
+                <button type="button" @click.stop="$store.alertDialog.close()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">OK</button>
             </div>
         </div>
     </div>

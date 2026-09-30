@@ -675,7 +675,7 @@
 
                     <!-- MODAL PERSONALIDADE E PROMPT -->
                     <div x-show="personalidadeModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                        <div @click.away="if (!showLeadModal) personalidadeModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                        <div @click.away="if (!showLeadModal && !$store.alertDialog.visible && !$store.confirmDialog.visible) personalidadeModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
@@ -685,7 +685,7 @@
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
-                            <div class="flex-1 min-h-0 overflow-auto p-5">
+                            <div class="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-5">
                                 <div class="flex items-center justify-end mb-2">
                                     <button type="button" x-on:click="showLeadModal = true" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-200 flex items-center gap-1.5 transition">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
@@ -693,10 +693,10 @@
                                     </button>
                                 </div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-1">Instruções do Sistema</label>
-                                <div class="grid">
+                                <div class="grid w-full min-w-0">
                                     <textarea form="configForm" name="system_prompt" x-model="systemPromptText"
-                                        class="[grid-area:1/1] w-full min-h-[160px] border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none overflow-hidden" placeholder="Ex: Você é um vendedor especializado na loja X..."></textarea>
-                                    <div class="[grid-area:1/1] invisible min-h-[160px] whitespace-pre-wrap break-words border border-transparent p-3 text-sm" x-text="systemPromptText + ' '"></div>
+                                        class="[grid-area:1/1] w-full min-w-0 min-h-[160px] border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none overflow-hidden" placeholder="Ex: Você é um vendedor especializado na loja X..."></textarea>
+                                    <div class="[grid-area:1/1] invisible min-w-0 min-h-[160px] whitespace-pre-wrap break-all border border-transparent p-3 text-sm" x-text="systemPromptText + ' '"></div>
                                 </div>
                                 <div class="h-4"></div>
                             </div>
@@ -712,7 +712,7 @@
 
                     <!-- MODAL CONEXAO IA -->
                     <div x-show="conexaoModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                        <div @click.away="conexaoModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                        <div @click.away="if (!$store.alertDialog.visible && !$store.confirmDialog.visible) conexaoModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" /></svg>
@@ -797,7 +797,7 @@
 
                     <!-- MODAL CANAL WHATSAPP -->
                     <div x-show="canalWhatsappModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                        <div @click.away="if (!showWebhookModal && !showWaModal) canalWhatsappModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                        <div @click.away="if (!showWebhookModal && !showWaModal && !$store.alertDialog.visible && !$store.confirmDialog.visible) canalWhatsappModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-emerald-500"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
@@ -916,7 +916,7 @@
                                         <p class="text-xs text-slate-500 font-medium mt-0.5">Defina os dados que a IA deve capturar para abrir chamados (InSoft Omni).</p>
                                     </div>
                                 </div>
-                                <button type="button" x-on:click="showLeadModal = false" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-100 transition">
+                                <button type="button" x-on:click.stop="showLeadModal = false" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-100 transition">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -955,7 +955,7 @@
 
                             <div class="flex justify-between items-center p-5 border-t border-slate-100 bg-white rounded-b-xl shrink-0">
                                 <p class="text-[10px] text-slate-400 font-medium w-2/3 leading-tight">Dica: O campo "Variável Interna" deve ser o mesmo nome esperado pela API do InSoft Omni (sem espaços, ex: cpf_cliente).</p>
-                                <button type="button" x-on:click="showLeadModal = false" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-lg text-xs transition shadow-sm">
+                                <button type="button" x-on:click.stop="showLeadModal = false" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-lg text-xs transition shadow-sm">
                                     Concluído
                                 </button>
                             </div>
@@ -973,7 +973,7 @@
                                     </span>
                                     <h3 class="text-sm font-bold text-slate-800">Webhook & Diagnóstico do Sistema</h3>
                                 </div>
-                                <button type="button" x-on:click="closeWebhookModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
+                                <button type="button" x-on:click.stop="closeWebhookModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -1048,7 +1048,7 @@
                             </div>
 
                             <div class="flex justify-end pt-2 border-t border-slate-100">
-                                <button type="button" x-on:click="closeWebhookModal()" class="dark-btn-fix-neutral bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-xs transition">
+                                <button type="button" x-on:click.stop="closeWebhookModal()" class="dark-btn-fix-neutral bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2 rounded-lg text-xs transition">
                                     Fechar
                                 </button>
                             </div>
@@ -1059,7 +1059,7 @@
                     <div x-show="showWaModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4" x-transition>
                         <div x-on:click.away="showWaModal = false" class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center relative border border-gray-100">
                             
-                            <button type="button" x-on:click="showWaModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition p-1 rounded-lg">
+                            <button type="button" x-on:click.stop="showWaModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition p-1 rounded-lg">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
 
@@ -1122,7 +1122,7 @@
                                 <button type="button" x-on:click="runWaPoll()" :disabled="waLoading" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg text-xs transition">
                                     Atualizar / Tentar Novamente
                                 </button>
-                                <button type="button" x-on:click="showWaModal = false" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2 rounded-lg text-xs transition">
+                                <button type="button" x-on:click.stop="showWaModal = false" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2 rounded-lg text-xs transition">
                                     Fechar
                                 </button>
                             </div>
@@ -1164,7 +1164,7 @@
 
                 <!-- MODAL VER BASE DE CONHECIMENTO (unica forma de consultar/gerenciar a base agora - grid ordenavel, exclusao individual/lote, export CSV) -->
                 <div x-show="kbModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div @click.away="if (!$store.confirmDialog.visible) kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[88vh] flex flex-col relative border border-slate-200">
+                    <div @click.away="if (!$store.confirmDialog.visible && !$store.alertDialog.visible) kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[88vh] flex flex-col relative border border-slate-200">
                         <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                             <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" /></svg>
@@ -1191,7 +1191,7 @@
                                         </button>
                                         <input type="file" x-ref="docsInput" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="hidden" @change="docsCount = $event.target.files.length">
                                         <span class="flex-1 min-w-0 flex items-center text-sm text-gray-500 border border-gray-200 rounded-lg px-3 bg-white truncate" x-text="docsCount + (docsCount === 1 ? ' arquivo' : ' arquivos')"></span>
-                                        <button type="submit" form="configForm" onclick="saveScrollPosition()" title="Anexar arquivos selecionados" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
+                                        <button type="button" @click="if (docsCount === 0) { alertModal('Selecione ao menos um arquivo antes de anexar.'); } else { saveScrollPosition(); document.getElementById('configForm').submit(); }" title="Anexar arquivos selecionados" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
                                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                         </button>
                                     </div>
@@ -1236,7 +1236,13 @@
                                         <input type="url" x-model="siteMenuUrl" placeholder="https://www.site.com" class="block w-full min-w-0 text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
 
                                         <button type="button" @click="startMenuCrawler()" :disabled="menuCrawling" :class="menuCrawling ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'" title="Varrer estrutura de menu do site" class="text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
-                                            <svg x-show="!menuCrawling" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.159.69.159 1.006 0z" /></svg>
+                                            <svg x-show="!menuCrawling" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                                                <line x1="19" y1="5" x2="10" y2="14" />
+                                                <path d="M10 14l-6 2 1.5 5 6-2z" />
+                                                <line x1="6" y1="20" x2="4.5" y2="22.5" />
+                                                <line x1="8" y1="19.5" x2="7" y2="22.5" />
+                                                <line x1="10" y1="19" x2="9.5" y2="22" />
+                                            </svg>
                                             <span x-show="menuCrawling" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                                         </button>
                                     </div>
