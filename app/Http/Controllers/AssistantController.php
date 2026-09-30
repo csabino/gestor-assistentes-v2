@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Assistant;
 use App\Models\Holiday;
 use App\Models\AutomationFollowup;
+use App\Models\WaContactName;
 use App\Models\Setting;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
@@ -747,6 +748,7 @@ class AssistantController extends Controller
         $conversationThreads = [];
         $activeThreadMessages = [];
         $activePhone = $request->input('phone');
+        $activeContactName = null;
         $assistantTz = 'America/Sao_Paulo';
 
         if ($request->has('conversations_id')) {
@@ -760,6 +762,11 @@ class AssistantController extends Controller
                     ->orderBy('last_activity', 'desc')
                     ->get();
 
+                $contactNames = WaContactName::where('assistant_id', $conversationsAssistant->id)->pluck('name', 'phone_number');
+                foreach ($conversationThreads as $thread) {
+                    $thread->contact_name = $contactNames[$thread->phone_number] ?? null;
+                }
+
                 if (!$activePhone && count($conversationThreads) > 0) {
                     $activePhone = $conversationThreads[0]->phone_number;
                 }
@@ -770,6 +777,7 @@ class AssistantController extends Controller
                         ->where('phone_number', $activePhone)
                         ->orderBy('id', 'asc')
                         ->get();
+                    $activeContactName = $contactNames[$activePhone] ?? null;
                 }
             }
         }
@@ -797,7 +805,7 @@ class AssistantController extends Controller
 
         return view('assistants.index', compact(
             'assistants', 'configuring', 'lastWebhook',
-            'conversationsAssistant', 'conversationThreads', 'activeThreadMessages', 'activePhone', 'currentView',
+            'conversationsAssistant', 'conversationThreads', 'activeThreadMessages', 'activePhone', 'activeContactName', 'currentView',
             'departments', 'agents', 'assistantTz'
         ));
     }
@@ -2386,6 +2394,15 @@ class AssistantController extends Controller
 
             if (!empty($omniUserName) && !preg_match('/^[0-9]+$/', trim($omniUserName))) {
                 $displayName = trim($omniUserName);
+            }
+
+            // Guarda/atualiza o nome conhecido desse número (pushName do WhatsApp, ou o nome
+            // resolvido pelo Omni acima, se houver) - usado só pra exibir na tela de Conversas.
+            if ($displayName !== 'Cliente') {
+                WaContactName::updateOrCreate(
+                    ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender],
+                    ['name' => $displayName]
+                );
             }
 
             // ==============================================================
