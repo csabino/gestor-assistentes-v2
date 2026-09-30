@@ -433,6 +433,28 @@
                         }
                     },
 
+                    persistOpenModal(name, isOpen) {
+                        const key = 'openmodal_config_' + {{ $configuring->id }};
+                        if (isOpen) {
+                            sessionStorage.setItem(key, name);
+                        } else if (sessionStorage.getItem(key) === name) {
+                            sessionStorage.removeItem(key);
+                        }
+                    },
+
+                    restoreOpenModal() {
+                        const key = 'openmodal_config_' + {{ $configuring->id }};
+                        const saved = sessionStorage.getItem(key);
+                        if (saved === 'personalidade') this.personalidadeModalOpen = true;
+                        if (saved === 'conexao') this.conexaoModalOpen = true;
+                        if (saved === 'canal') this.canalWhatsappModalOpen = true;
+                        if (saved === 'kb') { this.kbModalOpen = true; this.loadKbRows(); }
+                        this.$watch('personalidadeModalOpen', v => this.persistOpenModal('personalidade', v));
+                        this.$watch('conexaoModalOpen', v => this.persistOpenModal('conexao', v));
+                        this.$watch('canalWhatsappModalOpen', v => this.persistOpenModal('canal', v));
+                        this.$watch('kbModalOpen', v => this.persistOpenModal('kb', v));
+                    },
+
                     async disconnectWa() {
                         if(!(await confirmModal('Tem certeza que deseja desconectar a sessão do WhatsApp?'))) return;
                         this.waStatus = 'checking';
@@ -502,7 +524,7 @@
                         this.showWebhookModal = false;
                         window.history.replaceState(null, '', '/?configure={{ $configuring->id }}');
                     }
-                }" x-init="checkWaStatusSilent()">
+                }" x-init="checkWaStatusSilent(); restoreOpenModal()">
                 <div class="sticky top-0 z-10 bg-gray-50 py-4 mb-4 border-b border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
                         <a href="/" class="dark-btn-fix text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 text-sm transition bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100">
@@ -526,22 +548,6 @@
                     </div>
 
                     <div class="flex items-center gap-3 w-full md:w-auto">
-                        <a href="/?view=settings&assistant_id={{ $configuring->id }}" class="text-slate-700 bg-white hover:bg-indigo-50 hover:text-indigo-600 border border-gray-300 text-xs px-3.5 py-2 rounded-lg font-semibold transition shadow-sm flex justify-center items-center gap-2 shrink-0" title="Configurações Avançadas (Fuso Horário & Webhook)">
-                            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span class="hidden sm:inline">Configurações Avançadas</span>
-                        </a>
-
-                        <a href="/?view=automation&assistant_id={{ $configuring->id }}" class="text-slate-700 bg-white hover:bg-indigo-50 hover:text-indigo-600 border border-gray-300 text-xs px-3.5 py-2 rounded-lg font-semibold transition shadow-sm flex justify-center items-center gap-2 shrink-0" title="Automação (Retomada de Atendimento)">
-                            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span class="hidden sm:inline">Automação</span>
-                        </a>
-
                         <form action="/" method="POST" class="flex-1 md:flex-none">
                             @csrf @method('PATCH')
                             <input type="hidden" name="assistant_id" value="{{ $configuring->id }}">
@@ -602,6 +608,30 @@
                                 <span x-show="wa_provider !== '' && waStatus === 'disconnected'" class="text-red-500 font-bold">Desconectado</span>
                             </span>
                         </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <a href="/?view=settings&assistant_id={{ $configuring->id }}" class="lg:col-start-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                            <span class="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </span>
+                            <span class="font-bold text-gray-800 text-sm">Configurações Avançadas</span>
+                            <span class="text-[11px] text-gray-400">Fuso horário e webhook</span>
+                        </a>
+
+                        <a href="/?view=automation&assistant_id={{ $configuring->id }}" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                            <span class="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </span>
+                            <span class="font-bold text-gray-800 text-sm">Automação</span>
+                            <span class="text-[11px] text-gray-400">Retomada de atendimento</span>
+                        </a>
                     </div>
 
                     <!-- MODAL PERSONALIDADE E PROMPT -->
@@ -1074,7 +1104,7 @@
 
                 <!-- MODAL VER BASE DE CONHECIMENTO (unica forma de consultar/gerenciar a base agora - grid ordenavel, exclusao individual/lote, export CSV) -->
                 <div x-show="kbModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                    <div @click.away="kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col relative border border-slate-200">
+                    <div @click.away="kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[88vh] flex flex-col relative border border-slate-200">
                         <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                             <h3 class="text-base font-bold text-gray-800">Base de Conhecimento — {{ $configuring->name ?? '' }}</h3>
                             <button type="button" @click="kbModalOpen = false" class="text-gray-400 hover:text-gray-600">
@@ -1086,7 +1116,7 @@
                             <div>
                                 <label class="block text-[11px] font-semibold text-gray-700 mb-1">Anexar Arquivos (PDF, Word, TXT)</label>
                                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                    <input type="file" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="block w-full text-sm text-gray-500 border border-gray-200 rounded-lg p-1">
+                                    <input type="file" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="block w-full text-sm text-gray-500 border border-gray-200 rounded-lg p-1">
                                     <button type="submit" form="configForm" onclick="saveScrollPosition(); this.innerHTML='Salvando...'" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Anexar
                                     </button>
@@ -1095,7 +1125,10 @@
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">🌐 Importar Site (Extração de Conteúdo)</label>
+                                    <label class="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                                        🌐 Importar Site (Extração de Conteúdo)
+                                        <svg class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" title="O sistema irá varrer a URL, identificar as páginas internas e extrair o texto útil automaticamente."><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                                    </label>
                                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                         <input type="url" x-model="websiteToCrawl" placeholder="https://www.site.com" class="block w-full text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
 
@@ -1115,11 +1148,13 @@
                                         </div>
                                     </div>
 
-                                    <p x-show="!crawling" class="text-[10px] text-slate-400 mt-1.5 leading-tight">O sistema irá varrer a URL, identificar as páginas internas e extrair o texto útil automaticamente.</p>
                                 </div>
 
                                 <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">🗂️ Varrer Site (Estrutura de Menu)</label>
+                                    <label class="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                                        🗂️ Varrer Site (Estrutura de Menu)
+                                        <svg class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" title="Entende a estrutura de menu do site (home, itens e submenus) e salva cada página como um documento organizado nessa mesma hierarquia."><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                                    </label>
                                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                         <input type="url" x-model="siteMenuUrl" placeholder="https://www.site.com" class="block w-full text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
 
@@ -1140,8 +1175,6 @@
                                             </div>
                                         </template>
                                     </div>
-
-                                    <p x-show="!menuCrawling" class="text-[10px] text-slate-400 mt-1.5 leading-tight">Entende a estrutura de menu do site (home, itens e submenus) e salva cada página como um documento organizado nessa mesma hierarquia.</p>
                                 </div>
                             </div>
                         </div>
@@ -1158,30 +1191,30 @@
                         </div>
 
                         <div class="flex-1 min-h-0 overflow-auto p-5">
-                            <table class="w-full text-xs text-left">
+                            <table class="w-full text-sm text-left">
                                 <thead>
-                                    <tr class="border-b border-gray-200 text-gray-500 uppercase text-[10px] tracking-wide">
-                                        <th class="sticky top-0 z-10 bg-white py-2 pr-3 w-8"></th>
+                                    <tr class="border-b border-gray-200 text-gray-500 uppercase text-[11px] tracking-wide">
+                                        <th class="sticky top-0 z-10 bg-white py-2.5 pr-3 w-8"></th>
                                         <template x-for="col in [{ key: 'name', label: 'Nome' }, { key: 'type', label: 'Tipo' }, { key: 'size', label: 'Tamanho' }, { key: 'crawled_at', label: 'Data/Hora' }]" :key="col.key">
-                                            <th class="sticky top-0 z-10 bg-white py-2 pr-3 cursor-pointer select-none hover:text-indigo-600 transition" @click="toggleKbSort(col.key)">
+                                            <th class="sticky top-0 z-10 bg-white py-2.5 pr-3 cursor-pointer select-none hover:text-indigo-600 transition" @click="toggleKbSort(col.key)">
                                                 <span x-text="col.label"></span>
                                                 <span x-show="kbSortField === col.key" x-text="kbSortDir === 'asc' ? '▲' : '▼'" class="ml-0.5"></span>
                                             </th>
                                         </template>
-                                        <th class="sticky top-0 z-10 bg-white py-2 pr-3 w-8"></th>
+                                        <th class="sticky top-0 z-10 bg-white py-2.5 pr-3 w-8"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <template x-for="row in kbSortedRows()" :key="row.index">
                                         <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                            <td class="py-2 pr-3">
+                                            <td class="py-2.5 pr-3">
                                                 <input type="checkbox" :value="String(row.index)" x-model="selectedFiles" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
                                             </td>
-                                            <td class="py-2 pr-3 font-medium text-gray-800 max-w-[280px] truncate" x-text="row.name"></td>
-                                            <td class="py-2 pr-3 text-gray-500" x-text="row.type"></td>
-                                            <td class="py-2 pr-3 text-gray-500" x-text="row.size ? (row.size > 1024 ? Math.round(row.size / 1024) + ' KB' : row.size + ' B') : '—'"></td>
-                                            <td class="py-2 pr-3 text-gray-500" x-text="row.crawled_at || '—'"></td>
-                                            <td class="py-2 pr-3">
+                                            <td class="py-2.5 pr-3 font-medium text-gray-800 max-w-[440px] truncate" x-text="row.name"></td>
+                                            <td class="py-2.5 pr-3 text-gray-500" x-text="row.type"></td>
+                                            <td class="py-2.5 pr-3 text-gray-500" x-text="row.size ? (row.size > 1024 ? Math.round(row.size / 1024) + ' KB' : row.size + ' B') : '—'"></td>
+                                            <td class="py-2.5 pr-3 text-gray-500" x-text="row.crawled_at || '—'"></td>
+                                            <td class="py-2.5 pr-3">
                                                 <button type="button" @click="confirmModal('Remover esta fonte de conhecimento?').then(ok => { if (ok) { saveScrollPosition(); document.getElementById('deleteFileForm_' + row.index).submit(); } })" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition">
                                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                                 </button>
@@ -1291,7 +1324,7 @@
 
                             <div class="flex items-center justify-between border-t border-gray-100 pt-4 mt-2">
                                 <div class="flex items-center gap-0.5">
-                                    <a href="/?configure={{ $assistant->id }}" title="Configurar" onclick="sessionStorage.removeItem('scrollpos_config_{{ $assistant->id }}');" class="text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition flex items-center justify-center">
+                                    <a href="/?configure={{ $assistant->id }}" title="Configurar" onclick="sessionStorage.removeItem('scrollpos_config_{{ $assistant->id }}'); sessionStorage.removeItem('openmodal_config_{{ $assistant->id }}');" class="text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition flex items-center justify-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>
                                     </a>
 
@@ -1348,7 +1381,7 @@
                                         <div class="flex items-center gap-1.5">
                                             <span class="font-bold text-gray-800 text-base">{{ $assistant->name }}</span>
                                             
-                                            <a href="/?configure={{ $assistant->id }}" title="Configurar" onclick="sessionStorage.removeItem('scrollpos_config_{{ $assistant->id }}');" class="text-gray-500 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 p-1.5 rounded-full transition border border-gray-200 hover:border-indigo-200 flex items-center justify-center shrink-0">
+                                            <a href="/?configure={{ $assistant->id }}" title="Configurar" onclick="sessionStorage.removeItem('scrollpos_config_{{ $assistant->id }}'); sessionStorage.removeItem('openmodal_config_{{ $assistant->id }}');" class="text-gray-500 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 p-1.5 rounded-full transition border border-gray-200 hover:border-indigo-200 flex items-center justify-center shrink-0">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>
                                             </a>
 
