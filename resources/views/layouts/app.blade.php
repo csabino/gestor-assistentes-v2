@@ -554,7 +554,7 @@
         </div>
     </header>
 
-    <main id="mainContent" class="flex-1 min-w-0 overflow-y-auto">
+    <main id="mainContent" class="flex-1 min-w-0 min-h-0 overflow-y-auto">
         @yield('content')
     </main>
 
