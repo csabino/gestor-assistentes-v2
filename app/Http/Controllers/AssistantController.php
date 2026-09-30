@@ -71,6 +71,15 @@ class AssistantController extends Controller
                     $table->longText('lead_fields')->nullable()->after('context_limit');
                 });
             }
+
+            if (!Schema::hasColumn('assistants', 'status')) {
+                Schema::table('assistants', function (Blueprint $table) {
+                    $table->string('status', 20)->default('active')->after('is_active');
+                });
+                // Assistentes ja marcados como inativos antes dessa coluna existir devem
+                // continuar inativos (e nao "ativos" so por causa do default da coluna nova).
+                DB::table('assistants')->where('is_active', 0)->update(['status' => 'inactive']);
+            }
         }
     }
 
@@ -1721,8 +1730,17 @@ class AssistantController extends Controller
     private function toggleActive(Request $request)
     {
         $assistant = Assistant::findOrFail($request->assistant_id);
-        $assistant->is_active = !$assistant->is_active;
+
+        $status = $request->input('status');
+        if (!in_array($status, ['active', 'inactive', 'maintenance'], true)) {
+            // Compatibilidade com o botao antigo (sem seletor de status): simples alterna ativo/inativo.
+            $status = $assistant->is_active ? 'inactive' : 'active';
+        }
+
+        $assistant->status = $status;
+        $assistant->is_active = ($status === 'active');
         $assistant->save();
+
         return redirect()->back()->with('success', 'Status alterado!');
     }
 
@@ -2275,7 +2293,8 @@ class AssistantController extends Controller
 
         try {
             $assistant = Assistant::find($id);
-            if (!$assistant || !$assistant->is_active) {
+            $assistantStatus = $assistant ? ($assistant->status ?? ($assistant->is_active ? 'active' : 'inactive')) : null;
+            if (!$assistant || $assistantStatus === 'inactive') {
                 return response()->json(['status' => 'ignored']);
             }
 
@@ -2326,6 +2345,25 @@ class AssistantController extends Controller
                     Log::info("Webhook duplicado ignorado (mensagem já processada): {$messageId}");
                     return response()->json(['status' => 'duplicate_ignored']);
                 }
+            }
+
+            // Assistente em manutencao: nao processa IA, so responde com a mensagem fixa.
+            if ($assistantStatus === 'maintenance') {
+                $maintenanceMessage = 'Este assistente está em manutenção no momento. Pedimos desculpas pelo transtorno, tente novamente mais tarde.';
+                $this->sendWhatsappMessage($assistant, $sendTarget, $maintenanceMessage);
+
+                $nowFormatted = now()->format('Y-m-d H:i:s');
+                DB::table('chat_messages')->insert([
+                    'assistant_id' => $assistant->id,
+                    'phone_number' => $cleanSender,
+                    'protocol' => null,
+                    'role' => 'assistant',
+                    'content' => $maintenanceMessage,
+                    'created_at' => $nowFormatted,
+                    'updated_at' => $nowFormatted,
+                ]);
+
+                return response()->json(['status' => 'maintenance_reply_sent']);
             }
 
             // Automação de retomada: o cliente acabou de falar, então zera o relógio de silêncio

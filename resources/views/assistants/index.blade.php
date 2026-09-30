@@ -555,18 +555,37 @@
                     </div>
 
                     <div class="flex items-center gap-3 w-full md:w-auto">
-                        <form action="/" method="POST" class="flex-1 md:flex-none">
-                            @csrf @method('PATCH')
-                            <input type="hidden" name="assistant_id" value="{{ $configuring->id }}">
-                            <input type="hidden" name="from_config" value="1">
-                            <button type="submit" onclick="saveScrollPosition()" class="w-full md:w-auto text-sm px-4 py-2 rounded-lg font-semibold transition border flex justify-center items-center gap-2 {{ $configuring->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200' }}">
-                                @if($configuring->is_active)
-                                    <svg class="w-2.5 h-2.5 fill-emerald-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Ativo
-                                @else
-                                    <svg class="w-2.5 h-2.5 fill-gray-400" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Inativo
-                                @endif
+                        @php
+                            $currentStatus = $configuring->status ?? ($configuring->is_active ? 'active' : 'inactive');
+                            $statusMeta = [
+                                'active' => ['label' => 'Ativo', 'classes' => 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100', 'dot' => 'fill-emerald-500'],
+                                'inactive' => ['label' => 'Inativo', 'classes' => 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200', 'dot' => 'fill-gray-400'],
+                                'maintenance' => ['label' => 'Manutenção', 'classes' => 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100', 'dot' => 'fill-amber-500'],
+                            ];
+                        @endphp
+                        <div x-data="{ statusMenuOpen: false }" class="relative flex-1 md:flex-none">
+                            <button type="button" @click="statusMenuOpen = !statusMenuOpen" class="w-full md:w-auto text-sm px-4 py-2 rounded-lg font-semibold transition border flex justify-center items-center gap-2 {{ $statusMeta[$currentStatus]['classes'] }}">
+                                <svg class="w-2.5 h-2.5 {{ $statusMeta[$currentStatus]['dot'] }}" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                {{ $statusMeta[$currentStatus]['label'] }}
+                                <svg class="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                             </button>
-                        </form>
+                            <div x-show="statusMenuOpen" x-cloak x-transition @click.away="statusMenuOpen = false" class="absolute right-0 md:left-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 z-20 overflow-hidden">
+                                @foreach($statusMeta as $statusKey => $meta)
+                                    @if($statusKey !== $currentStatus)
+                                        <form action="/" method="POST">
+                                            @csrf @method('PATCH')
+                                            <input type="hidden" name="assistant_id" value="{{ $configuring->id }}">
+                                            <input type="hidden" name="from_config" value="1">
+                                            <input type="hidden" name="status" value="{{ $statusKey }}">
+                                            <button type="submit" onclick="saveScrollPosition()" class="w-full text-left text-sm px-4 py-2 hover:bg-gray-50 transition flex items-center gap-2 text-gray-700">
+                                                <svg class="w-2.5 h-2.5 {{ $meta['dot'] }}" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                                {{ $meta['label'] }}
+                                            </button>
+                                        </form>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1350,8 +1369,8 @@
                                 <form action="/" method="POST" class="shrink-0">
                                     @csrf @method('PATCH')
                                     <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                                    <button type="submit" class="text-xs px-3 py-1 rounded-full font-semibold transition border flex items-center gap-1.5 shrink-0 {{ $assistant->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-300' }}">
-                                        @if($assistant->is_active) <svg class="w-2 h-2 fill-emerald-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Ativo @else <svg class="w-2 h-2 fill-gray-400" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Inativo @endif
+                                    <button type="submit" class="text-xs px-3 py-1 rounded-full font-semibold transition border flex items-center gap-1.5 shrink-0 {{ ($assistant->status ?? null) === 'maintenance' ? 'bg-amber-50 text-amber-700 border-amber-200' : ($assistant->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-300') }}">
+                                        @if(($assistant->status ?? null) === 'maintenance') <svg class="w-2 h-2 fill-amber-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Manutenção @elseif($assistant->is_active) <svg class="w-2 h-2 fill-emerald-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Ativo @else <svg class="w-2 h-2 fill-gray-400" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Inativo @endif
                                     </button>
                                 </form>
                             </div>
@@ -1433,8 +1452,8 @@
                                         <form action="/" method="POST">
                                             @csrf @method('PATCH')
                                             <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                                            <button type="submit" class="text-xs px-3 py-1 rounded-full font-semibold transition border flex items-center gap-1.5 w-max {{ $assistant->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-300' }}">
-                                                @if($assistant->is_active) <svg class="w-1.5 h-1.5 fill-emerald-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Ativo @else <svg class="w-1.5 h-1.5 fill-gray-400" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Inativo @endif
+                                            <button type="submit" class="text-xs px-3 py-1 rounded-full font-semibold transition border flex items-center gap-1.5 w-max {{ ($assistant->status ?? null) === 'maintenance' ? 'bg-amber-50 text-amber-700 border-amber-200' : ($assistant->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-300') }}">
+                                                @if(($assistant->status ?? null) === 'maintenance') <svg class="w-1.5 h-1.5 fill-amber-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Manutenção @elseif($assistant->is_active) <svg class="w-1.5 h-1.5 fill-emerald-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Ativo @else <svg class="w-1.5 h-1.5 fill-gray-400" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Inativo @endif
                                             </button>
                                         </form>
                                     </td>
