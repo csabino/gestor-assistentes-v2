@@ -1287,9 +1287,14 @@
                                     <p class="text-xs text-slate-500 font-medium">Veja os atendimentos e interações capturados pelo WhatsApp.</p>
                                 </div>
                             </div>
-                            <a href="{{ ($configuring ?? null) ? '/?configure=' . $configuring->id : '/' }}" class="dark-btn-fix-neutral text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-200 transition">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </a>
+                            <div class="flex items-center gap-1">
+                                <button type="button" onclick="window.location.reload()" title="Atualizar" class="dark-btn-fix-neutral text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-200 transition">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                                </button>
+                                <a href="{{ ($configuring ?? null) ? '/?configure=' . $configuring->id : '/' }}" title="Fechar" class="dark-btn-fix-neutral text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-200 transition">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </a>
+                            </div>
                         </div>
 
                         <div class="flex flex-1 overflow-hidden">
@@ -1385,7 +1390,7 @@
 
                                             @if($currentDate !== $lastDate)
                                                 <div class="flex justify-center my-5">
-                                                    <span class="bg-slate-200 text-slate-600 text-[10px] font-bold tracking-wide px-3 py-1 rounded-lg border border-slate-300 shadow-sm">
+                                                    <span class="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-100 text-[10px] font-bold tracking-wide px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 shadow-sm">
                                                         {{ $displayDate }}
                                                     </span>
                                                 </div>
