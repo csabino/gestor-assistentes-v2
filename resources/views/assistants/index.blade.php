@@ -1296,7 +1296,39 @@
             </div>
 
             @if(isset($conversationsAssistant) && $conversationsAssistant)
-                <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+                <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4"
+                     x-data="{
+                        clearContextModalOpen: false,
+                        clearContextPhone: '',
+                        clearContextSaving: false,
+                        clearContextError: null,
+                        clearContextResult: null,
+                        async clearContext() {
+                            this.clearContextSaving = true;
+                            this.clearContextError = null;
+                            try {
+                                const res = await fetch('/assistants/{{ $conversationsAssistant->id }}/clear-context', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                    },
+                                    body: JSON.stringify({ phone: this.clearContextPhone }),
+                                });
+                                const json = await res.json();
+                                if (!res.ok) {
+                                    this.clearContextError = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message || 'Erro ao limpar.');
+                                    return;
+                                }
+                                this.clearContextResult = json;
+                            } catch (e) {
+                                this.clearContextError = 'Erro de conexão. Tente novamente.';
+                            } finally {
+                                this.clearContextSaving = false;
+                            }
+                        }
+                     }">
                     <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full flex flex-col relative border border-slate-200 h-[85vh] overflow-hidden">
                         
                         <div class="flex justify-between items-center border-b border-slate-100 p-4 px-6 bg-slate-50 shrink-0">
@@ -1347,7 +1379,15 @@
                                 @if(isset($activePhone) && $activePhone && isset($activeThreadMessages) && count($activeThreadMessages) > 0)
                                     <div class="p-3 bg-white border-b border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-700 shrink-0 shadow-sm z-10 relative">
                                         <span>Conversa com <strong>+{{ $activePhone }}</strong></span>
-                                        <span class="text-slate-400 text-[11px]">{{ count($activeThreadMessages) }} interações</span>
+                                        <div class="flex items-center gap-3">
+                                            <button type="button" @click="clearContextModalOpen = true; clearContextPhone = @js($activePhone); clearContextError = null; clearContextResult = null"
+                                                    class="text-slate-400 hover:text-amber-600 transition flex items-center gap-1" title="Limpar contexto deste número">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l6.75 6.75M3 20.25l3.5-1 11.05-11.05a1.5 1.5 0 000-2.12l-1.13-1.13a1.5 1.5 0 00-2.12 0L3.25 16.02l-1 3.5a.75.75 0 00.92.92l.58-.19z" />
+                                                </svg>
+                                            </button>
+                                            <span class="text-slate-400 text-[11px]">{{ count($activeThreadMessages) }} interações</span>
+                                        </div>
                                     </div>
 
                                     <div x-data x-ref="chatBox" x-init="$nextTick(() => { $refs.chatBox.scrollTop = $refs.chatBox.scrollHeight; })" class="p-4 overflow-y-auto space-y-3 flex-1 scroll-smooth">
@@ -1403,6 +1443,43 @@
                             <a href="/" class="dark-btn-fix-neutral bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-5 py-2 rounded-lg text-xs transition">
                                 Fechar
                             </a>
+                        </div>
+                    </div>
+
+                    <!-- MODAL LIMPAR CONTEXTO (a partir da tela de Conversas) -->
+                    <div x-show="clearContextModalOpen" x-cloak x-transition class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                        <div @click.away="clearContextModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 relative border border-slate-200">
+                            <h3 class="text-base font-bold text-gray-800 mb-1">Limpar Contexto de Conversa</h3>
+                            <p class="text-xs text-gray-500 mb-4">Apaga o histórico de chat, pesquisa pendente, automação de retomada e logs deste número, só para este assistente.</p>
+
+                            <div x-show="clearContextError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-3" x-text="clearContextError"></div>
+
+                            <template x-if="!clearContextResult">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-gray-700 uppercase mb-1">Número</label>
+                                    <input type="text" x-model="clearContextPhone" @keydown.enter="clearContext()" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-5 outline-none focus:border-indigo-500">
+                                    <div class="flex justify-end gap-2">
+                                        <button type="button" @click="clearContextModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Cancelar</button>
+                                        <button type="button" @click="clearContext()" :disabled="clearContextSaving || !clearContextPhone" :class="(clearContextSaving || !clearContextPhone) ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition">
+                                            <span x-text="clearContextSaving ? 'Limpando...' : 'Limpar'"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="clearContextResult">
+                                <div>
+                                    <ul class="text-xs text-gray-700 space-y-1.5 mb-5 bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                        <li>📨 <span x-text="clearContextResult.chat_messages" class="font-bold"></span> mensagens de chat removidas</li>
+                                        <li>🤖 <span x-text="clearContextResult.automation_followups" class="font-bold"></span> registros de automação removidos</li>
+                                        <li>📋 <span x-text="clearContextResult.survey_responses" class="font-bold"></span> respostas de pesquisa pendentes removidas</li>
+                                        <li>🧾 <span x-text="clearContextResult.webhook_logs" class="font-bold"></span> logs removidos</li>
+                                    </ul>
+                                    <div class="flex justify-end gap-2">
+                                        <a href="/?conversations_id={{ $conversationsAssistant->id }}" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">Fechar e atualizar</a>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
                 </div>
