@@ -653,8 +653,10 @@
                                 </div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-1">Instruções do Sistema</label>
                                 <textarea form="configForm" name="system_prompt" rows="6"
-                                    x-on:input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"
-                                    x-effect="if (personalidadeModalOpen) { $nextTick(() => { $el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'; }); }"
+                                    x-data="{ resize() { $el.style.height = 'auto'; $el.style.height = ($el.scrollHeight + 4) + 'px'; } }"
+                                    x-init="resize(); setTimeout(() => resize(), 50); setTimeout(() => resize(), 250)"
+                                    x-effect="personalidadeModalOpen; $nextTick(() => resize()); setTimeout(() => resize(), 50); setTimeout(() => resize(), 250)"
+                                    x-on:input="resize()"
                                     class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none overflow-hidden" placeholder="Ex: Você é um vendedor especializado na loja X...">{{ $configuring->system_prompt }}</textarea>
                             </div>
                         </div>
