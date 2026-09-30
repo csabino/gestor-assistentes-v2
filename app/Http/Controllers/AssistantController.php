@@ -743,6 +743,7 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'discover_site_menu') return $this->discoverSiteMenu($request);
         if ($request->isMethod('post') && $request->input('action') === 'crawl_menu_page') return $this->crawlMenuPage($request);
         if ($request->isMethod('get') && $request->input('action') === 'export_knowledge_base') return $this->exportKnowledgeBaseCsv($request);
+        if ($request->isMethod('get') && $request->input('action') === 'knowledge_base_rows') return response()->json($this->buildKnowledgeBaseRows(Assistant::findOrFail($request->query('assistant_id'))));
 
         if ($request->isMethod('post')) return $this->store($request);
         if ($request->isMethod('put')) return $this->update($request);
@@ -793,8 +794,6 @@ class AssistantController extends Controller
             }
         }
 
-        $knowledgeBaseRows = [];
-
         if ($request->has('configure')) {
             $configuring = Assistant::find($request->configure);
             if ($configuring) {
@@ -813,29 +812,39 @@ class AssistantController extends Controller
                         $lastWebhook['wa_send_result'] = json_decode($lastWebhook['wa_send_result'], true);
                     }
                 }
-
-                // Dados pra tela "Ver Base de Conhecimento" (grid ordenável + export CSV) - não mexe
-                // em nada da lista/checkbox/bulk-delete que já existe, é só uma segunda forma de consulta.
-                $crawledByPath = CrawledPage::where('assistant_id', $configuring->id)->get()->keyBy('file_path');
-                foreach ((is_array($configuring->knowledge_files) ? $configuring->knowledge_files : []) as $f) {
-                    $path = $f['path'] ?? null;
-                    $crawled = $path ? $crawledByPath->get($path) : null;
-                    $knowledgeBaseRows[] = [
-                        'name' => $f['name'] ?? '',
-                        'type' => $crawled ? 'Varredura de site' : (str_starts_with($f['name'] ?? '', '🌐') ? 'Extração simples' : 'Upload'),
-                        'size' => $crawled ? $crawled->content_size : (isset($f['content']) ? strlen($f['content']) : null),
-                        'crawled_at' => $crawled ? $crawled->crawled_at->format('d/m/Y H:i') : null,
-                        'crawled_at_sort' => $crawled ? $crawled->crawled_at->timestamp : 0,
-                    ];
-                }
             }
         }
 
         return view('assistants.index', compact(
             'assistants', 'configuring', 'lastWebhook',
             'conversationsAssistant', 'conversationThreads', 'activeThreadMessages', 'activePhone', 'activeContactName', 'currentView',
-            'departments', 'agents', 'assistantTz', 'knowledgeBaseRows'
+            'departments', 'agents', 'assistantTz'
         ));
+    }
+
+    /**
+     * Dados pra tela "Ver Base de Conhecimento" (grid ordenável + export CSV) - não mexe em nada da
+     * lista/checkbox/bulk-delete que já existe, é só uma segunda forma de consulta. Carregado via
+     * chamada separada (action=knowledge_base_rows) em vez de embutido na página principal - uma
+     * base de conhecimento grande (nomes de página com caracteres variados, emojis, etc.) quebrava o
+     * parse do bloco x-data gigante quando embutida inline com @js().
+     */
+    private function buildKnowledgeBaseRows(Assistant $assistant): array
+    {
+        $rows = [];
+        $crawledByPath = CrawledPage::where('assistant_id', $assistant->id)->get()->keyBy('file_path');
+        foreach ((is_array($assistant->knowledge_files) ? $assistant->knowledge_files : []) as $f) {
+            $path = $f['path'] ?? null;
+            $crawled = $path ? $crawledByPath->get($path) : null;
+            $rows[] = [
+                'name' => $f['name'] ?? '',
+                'type' => $crawled ? 'Varredura de site' : (str_starts_with($f['name'] ?? '', '🌐') ? 'Extração simples' : 'Upload'),
+                'size' => $crawled ? $crawled->content_size : (isset($f['content']) ? strlen($f['content']) : null),
+                'crawled_at' => $crawled ? $crawled->crawled_at->format('d/m/Y H:i') : null,
+                'crawled_at_sort' => $crawled ? $crawled->crawled_at->timestamp : 0,
+            ];
+        }
+        return $rows;
     }
 
     public function servePublicFileRoute(string $path)
@@ -1543,20 +1552,14 @@ class AssistantController extends Controller
     private function exportKnowledgeBaseCsv(Request $request)
     {
         $assistant = Assistant::findOrFail($request->query('assistant_id'));
-        $files = is_array($assistant->knowledge_files) ? $assistant->knowledge_files : [];
-        $crawledByPath = CrawledPage::where('assistant_id', $assistant->id)->get()->keyBy('file_path');
+        $rows = $this->buildKnowledgeBaseRows($assistant);
 
-        return response()->streamDownload(function () use ($files, $crawledByPath) {
+        return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['Nome', 'Tipo', 'Tamanho (bytes)', 'Data/Hora'], ';');
-            foreach ($files as $f) {
-                $path = $f['path'] ?? null;
-                $crawled = $path ? $crawledByPath->get($path) : null;
-                $tipo = $crawled ? 'Varredura de site' : (str_starts_with($f['name'] ?? '', '🌐') ? 'Extração simples' : 'Upload');
-                $tamanho = $crawled ? $crawled->content_size : (isset($f['content']) ? strlen($f['content']) : '');
-                $data = $crawled ? $crawled->crawled_at->format('d/m/Y H:i') : '';
-                fputcsv($out, [$f['name'] ?? '', $tipo, $tamanho, $data], ';');
+            foreach ($rows as $row) {
+                fputcsv($out, [$row['name'], $row['type'], $row['size'] ?? '', $row['crawled_at'] ?? ''], ';');
             }
             fclose($out);
         }, 'base_conhecimento_' . $assistant->id . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);

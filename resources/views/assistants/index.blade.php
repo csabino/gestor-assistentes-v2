@@ -392,7 +392,19 @@
                             }
                         },
 
-                        kbRows: @js($knowledgeBaseRows ?? []),
+                        kbRows: [],
+                        kbLoading: false,
+                        async loadKbRows() {
+                            this.kbLoading = true;
+                            try {
+                                const res = await fetch('/?action=knowledge_base_rows&assistant_id={{ $configuring->id ?? '' }}');
+                                this.kbRows = await res.json();
+                            } catch (e) {
+                                this.kbRows = [];
+                            } finally {
+                                this.kbLoading = false;
+                            }
+                        },
                         kbSortedRows() {
                             const dir = this.kbSortDir === 'asc' ? 1 : -1;
                             const field = this.kbSortField;
@@ -657,7 +669,7 @@
                                             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Fontes ({{ count($configuring->knowledge_files) }})</h4>
                                             
                                             <div class="flex items-center gap-3">
-                                                <button type="button" @click="kbModalOpen = true" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition">
+                                                <button type="button" @click="kbModalOpen = true; loadKbRows()" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition">
                                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.573 16.49 16.638 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                                     Ver Base de Conhecimento
                                                 </button>
@@ -1157,7 +1169,10 @@
                                             <td class="py-2 pr-3 text-gray-500" x-text="row.crawled_at || '—'"></td>
                                         </tr>
                                     </template>
-                                    <tr x-show="kbRows.length === 0">
+                                    <tr x-show="kbLoading">
+                                        <td colspan="4" class="py-8 text-center text-gray-400">Carregando...</td>
+                                    </tr>
+                                    <tr x-show="!kbLoading && kbRows.length === 0">
                                         <td colspan="4" class="py-8 text-center text-gray-400">Nenhum documento na base de conhecimento.</td>
                                     </tr>
                                 </tbody>
