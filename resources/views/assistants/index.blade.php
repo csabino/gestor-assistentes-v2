@@ -246,6 +246,7 @@
                     personalidadeModalOpen: false,
                     conexaoModalOpen: false,
                     canalWhatsappModalOpen: false,
+                    savedFlash: null,
 
                     provider: '{{ $configuring->provider ?? 'openai' }}',
                     wa_provider: '{{ $configuring->whatsapp_provider ?? '' }}',
@@ -442,12 +443,18 @@
                         }
                     },
 
+                    flashSaved(name) {
+                        this.savedFlash = name;
+                        setTimeout(() => { if (this.savedFlash === name) this.savedFlash = null; }, 4000);
+                    },
+
                     restoreOpenModal() {
                         const key = 'openmodal_config_' + {{ $configuring->id }};
                         const saved = sessionStorage.getItem(key);
-                        if (saved === 'personalidade') this.personalidadeModalOpen = true;
-                        if (saved === 'conexao') this.conexaoModalOpen = true;
-                        if (saved === 'canal') this.canalWhatsappModalOpen = true;
+                        const hasSuccess = {{ session('success') ? 'true' : 'false' }};
+                        if (saved === 'personalidade') { this.personalidadeModalOpen = true; if (hasSuccess) this.flashSaved('personalidade'); }
+                        if (saved === 'conexao') { this.conexaoModalOpen = true; if (hasSuccess) this.flashSaved('conexao'); }
+                        if (saved === 'canal') { this.canalWhatsappModalOpen = true; if (hasSuccess) this.flashSaved('canal'); }
                         if (saved === 'kb') { this.kbModalOpen = true; this.loadKbRows(); }
                         this.$watch('personalidadeModalOpen', v => this.persistOpenModal('personalidade', v));
                         this.$watch('conexaoModalOpen', v => this.persistOpenModal('conexao', v));
@@ -560,9 +567,6 @@
                                 @endif
                             </button>
                         </form>
-                        <button type="submit" form="configForm" onclick="saveScrollPosition()" class="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex justify-center items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Salvar
-                        </button>
                     </div>
                 </div>
 
@@ -597,8 +601,8 @@
                         </button>
 
                         <button type="button" @click="canalWhatsappModalOpen = true" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                            <span class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" /></svg>
+                            <span class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Canal WhatsApp</span>
                             <span class="text-[11px] flex items-center justify-center gap-1">
@@ -645,6 +649,10 @@
                                 </button>
                             </div>
                             <div class="flex-1 min-h-0 overflow-auto p-5">
+                                <div x-show="savedFlash === 'personalidade'" x-transition class="mb-3 p-3 rounded-lg text-xs border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center gap-2">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Configurações salvas com sucesso!
+                                </div>
                                 <div class="flex items-center justify-end mb-2">
                                     <button type="button" x-on:click="showLeadModal = true" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-200 flex items-center gap-1.5 transition">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
@@ -658,6 +666,11 @@
                                     x-effect="personalidadeModalOpen; $nextTick(() => resize()); setTimeout(() => resize(), 50); setTimeout(() => resize(), 250)"
                                     x-on:input="resize()"
                                     class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none overflow-hidden" placeholder="Ex: Você é um vendedor especializado na loja X...">{{ $configuring->system_prompt }}</textarea>
+                            </div>
+                            <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
+                                <button type="submit" form="configForm" onclick="saveScrollPosition()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Salvar
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -675,6 +688,10 @@
                                 </button>
                             </div>
                             <div class="flex-1 min-h-0 overflow-auto p-5">
+                                <div x-show="savedFlash === 'conexao'" x-transition class="mb-3 p-3 rounded-lg text-xs border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center gap-2">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Configurações salvas com sucesso!
+                                </div>
                                 <div class="flex justify-end mb-3">
                                     <button type="button" x-on:click="testConnection()" :disabled="testing" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-200 flex items-center shrink-0">
                                         <span x-text="testing ? '⌛ Testando...' : '⚡ Testar'"></span>
@@ -742,6 +759,11 @@
                                     <input form="configForm" type="password" name="grok_api_key" value="{{ $configuring->grok_api_key }}" placeholder="xai-..." class="w-full border border-gray-300 rounded-lg p-2.5 text-xs">
                                 </div>
                             </div>
+                            <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
+                                <button type="submit" form="configForm" onclick="saveScrollPosition()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Salvar
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -761,6 +783,10 @@
                                 </button>
                             </div>
                             <div class="flex-1 min-h-0 overflow-auto p-5">
+                                <div x-show="savedFlash === 'canal'" x-transition class="mb-3 p-3 rounded-lg text-xs border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center gap-2">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Configurações salvas com sucesso!
+                                </div>
                                 <div class="flex items-center gap-1.5 mb-3" x-show="wa_provider !== ''" x-cloak>
                                     <span x-show="waStatus === 'checking'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 animate-pulse border border-gray-200">Verificando...</span>
                                     <span x-show="waStatus === 'connected'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 flex items-center gap-1 border border-emerald-200 shadow-sm">
@@ -841,6 +867,11 @@
                                         Conectar / QR Code
                                     </button>
                                 </div>
+                            </div>
+                            <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
+                                <button type="submit" form="configForm" onclick="saveScrollPosition()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Salvar
+                                </button>
                             </div>
                         </div>
                     </div>
