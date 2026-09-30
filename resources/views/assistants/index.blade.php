@@ -612,10 +612,9 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <a href="/?view=settings&assistant_id={{ $configuring->id }}" class="lg:col-start-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                            <span class="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
+                            <span class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
                                 </svg>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Configurações Avançadas</span>
@@ -623,10 +622,9 @@
                         </a>
 
                         <a href="/?view=automation&assistant_id={{ $configuring->id }}" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                            <span class="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
+                            <span class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
                                 </svg>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Automação</span>
@@ -654,7 +652,10 @@
                                     </button>
                                 </div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-1">Instruções do Sistema</label>
-                                <textarea form="configForm" name="system_prompt" rows="16" class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="Ex: Você é um vendedor especializado na loja X...">{{ $configuring->system_prompt }}</textarea>
+                                <textarea form="configForm" name="system_prompt" rows="6"
+                                    x-on:input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"
+                                    x-effect="if (personalidadeModalOpen) { $nextTick(() => { $el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'; }); }"
+                                    class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none overflow-hidden" placeholder="Ex: Você é um vendedor especializado na loja X...">{{ $configuring->system_prompt }}</textarea>
                             </div>
                         </div>
                     </div>
@@ -1179,7 +1180,7 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between px-5 pt-4 shrink-0">
+                        <div class="flex items-center justify-between px-5 py-3 shrink-0 bg-white border-b border-gray-100 relative z-20">
                             <label class="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition">
                                 <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" :checked="allSelected" @click="toggleAll()">
                                 <span class="font-bold">Selecionar Todos</span>
@@ -1190,7 +1191,7 @@
                             </button>
                         </div>
 
-                        <div class="flex-1 min-h-0 overflow-auto p-5">
+                        <div class="flex-1 min-h-0 overflow-auto px-5 pb-5">
                             <table class="w-full text-sm text-left">
                                 <thead>
                                     <tr class="border-b border-gray-200 text-gray-500 uppercase text-[11px] tracking-wide">
