@@ -42,6 +42,18 @@
         .dark .bg-slate-50 { background-color: #111827; }
         .dark .bg-indigo-50 { background-color: rgba(99, 102, 241, .15); }
 
+        /* Mesma lógica acima, mas para o estado :hover - sem isso, um elemento com hover:bg-white
+           (ou outro tom claro) fica branco ao passar o mouse mesmo no tema escuro, e como o texto
+           dele já ficou claro pela regra de texto acima, o conteúdo literalmente some. */
+        .dark .hover\:bg-white:hover { background-color: #1f2937; }
+        .dark .hover\:bg-gray-50:hover { background-color: #111827; }
+        .dark .hover\:bg-gray-100:hover { background-color: #374151; }
+        .dark .hover\:bg-gray-200:hover { background-color: #4b5563; }
+        .dark .hover\:bg-slate-50:hover { background-color: #111827; }
+        .dark .hover\:bg-slate-100:hover { background-color: #374151; }
+        .dark .hover\:bg-slate-200:hover { background-color: #4b5563; }
+        .dark .hover\:bg-indigo-50:hover { background-color: rgba(99, 102, 241, .15); }
+
         .dark .text-gray-800 { color: #f3f4f6; }
         .dark .text-gray-700 { color: #e5e7eb; }
         .dark .text-gray-600 { color: #d1d5db; }

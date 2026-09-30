@@ -1287,17 +1287,24 @@
                                             $threadDisplayDate = $threadDateObj->format('d/m/Y H:i');
                                         @endphp
                                         <a href="{{ ($configuring ?? null) ? '/?configure=' . $configuring->id . '&' : '/?' }}conversations_id={{ $conversationsAssistant->id }}&phone={{ $thread->phone_number }}"
-                                            class="p-4 flex items-center justify-between gap-2 transition hover:bg-white {{ ($activePhone ?? '') === $thread->phone_number ? 'bg-white border-l-4 border-indigo-600 shadow-sm' : '' }}">
-                                            <div class="min-w-0">
-                                                @if($thread->contact_name)
-                                                    <p class="font-bold text-slate-800 text-sm truncate">{{ $thread->contact_name }}</p>
-                                                    <span class="text-[11px] text-slate-500 font-medium">+{{ $thread->phone_number }}</span>
-                                                @else
-                                                    <p class="font-bold text-slate-800 text-sm truncate">+{{ $thread->phone_number }}</p>
-                                                @endif
-                                                <span class="text-[10px] text-slate-400 font-medium block mt-0.5">Última fala: {{ $threadDisplayDate }}</span>
+                                            class="p-4 flex items-center gap-3 transition hover:bg-white {{ ($activePhone ?? '') === $thread->phone_number ? 'bg-white border-l-4 border-indigo-600 shadow-sm' : '' }}">
+                                            @if($thread->contact_name)
+                                                <span class="w-9 h-9 shrink-0 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center">
+                                                    {{ mb_strtoupper(mb_substr($thread->contact_name, 0, 1)) }}
+                                                </span>
+                                            @endif
+                                            <div class="min-w-0 flex-1 flex items-center justify-between gap-2">
+                                                <div class="min-w-0">
+                                                    @if($thread->contact_name)
+                                                        <p class="font-bold text-slate-800 text-sm truncate">{{ $thread->contact_name }}</p>
+                                                        <span class="text-[11px] text-slate-500 font-medium">+{{ $thread->phone_number }}</span>
+                                                    @else
+                                                        <p class="font-bold text-slate-800 text-sm truncate">+{{ $thread->phone_number }}</p>
+                                                    @endif
+                                                    <span class="text-[10px] text-slate-400 font-medium block mt-0.5">Última fala: {{ $threadDisplayDate }}</span>
+                                                </div>
+                                                <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-bold border border-slate-200 shrink-0">{{ $thread->total_messages }} msgs</span>
                                             </div>
-                                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-bold border border-slate-200 shrink-0">{{ $thread->total_messages }} msgs</span>
                                         </a>
                                     @empty
                                         <div class="p-8 text-center text-xs text-slate-400">Nenhuma conversa gravada no banco.</div>
@@ -1308,13 +1315,20 @@
                             <div class="w-2/3 bg-slate-100 flex flex-col justify-between overflow-hidden">
                                 @if(isset($activePhone) && $activePhone && isset($activeThreadMessages) && count($activeThreadMessages) > 0)
                                     <div class="p-3 bg-white border-b border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-700 shrink-0 shadow-sm z-10 relative">
-                                        <div>
+                                        <div class="flex items-center gap-2.5">
                                             @if($activeContactName ?? null)
-                                                <p class="font-bold text-slate-800 leading-tight">{{ $activeContactName }}</p>
-                                                <span class="text-slate-400 font-medium text-[11px]">+{{ $activePhone }}</span>
-                                            @else
-                                                <p class="font-bold text-slate-800 leading-tight">+{{ $activePhone }}</p>
+                                                <span class="w-8 h-8 shrink-0 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center">
+                                                    {{ mb_strtoupper(mb_substr($activeContactName, 0, 1)) }}
+                                                </span>
                                             @endif
+                                            <div>
+                                                @if($activeContactName ?? null)
+                                                    <p class="font-bold text-slate-800 leading-tight">{{ $activeContactName }}</p>
+                                                    <span class="text-slate-400 font-medium text-[11px]">+{{ $activePhone }}</span>
+                                                @else
+                                                    <p class="font-bold text-slate-800 leading-tight">+{{ $activePhone }}</p>
+                                                @endif
+                                            </div>
                                         </div>
                                         <div class="flex items-center gap-3">
                                             <button type="button" @click="clearContextModalOpen = true; clearContextPhone = @js($activePhone); clearContextError = null; clearContextResult = null"
