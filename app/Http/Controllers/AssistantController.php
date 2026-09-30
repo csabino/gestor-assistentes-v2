@@ -6,6 +6,7 @@ use App\Models\Assistant;
 use App\Models\Holiday;
 use App\Models\AutomationFollowup;
 use App\Models\WaContactName;
+use App\Models\CrawledPage;
 use App\Models\PendingMessageBuffer;
 use Illuminate\Support\Str;
 use App\Models\Setting;
@@ -739,6 +740,9 @@ class AssistantController extends Controller
         
         if ($request->isMethod('post') && $request->input('action') === 'map_site') return $this->mapSite($request);
         if ($request->isMethod('post') && $request->input('action') === 'scrape_single_url') return $this->scrapeSingleUrl($request);
+        if ($request->isMethod('post') && $request->input('action') === 'discover_site_menu') return $this->discoverSiteMenu($request);
+        if ($request->isMethod('post') && $request->input('action') === 'crawl_menu_page') return $this->crawlMenuPage($request);
+        if ($request->isMethod('get') && $request->input('action') === 'export_knowledge_base') return $this->exportKnowledgeBaseCsv($request);
 
         if ($request->isMethod('post')) return $this->store($request);
         if ($request->isMethod('put')) return $this->update($request);
@@ -789,6 +793,8 @@ class AssistantController extends Controller
             }
         }
 
+        $knowledgeBaseRows = [];
+
         if ($request->has('configure')) {
             $configuring = Assistant::find($request->configure);
             if ($configuring) {
@@ -807,13 +813,28 @@ class AssistantController extends Controller
                         $lastWebhook['wa_send_result'] = json_decode($lastWebhook['wa_send_result'], true);
                     }
                 }
+
+                // Dados pra tela "Ver Base de Conhecimento" (grid ordenável + export CSV) - não mexe
+                // em nada da lista/checkbox/bulk-delete que já existe, é só uma segunda forma de consulta.
+                $crawledByPath = CrawledPage::where('assistant_id', $configuring->id)->get()->keyBy('file_path');
+                foreach ((is_array($configuring->knowledge_files) ? $configuring->knowledge_files : []) as $f) {
+                    $path = $f['path'] ?? null;
+                    $crawled = $path ? $crawledByPath->get($path) : null;
+                    $knowledgeBaseRows[] = [
+                        'name' => $f['name'] ?? '',
+                        'type' => $crawled ? 'Varredura de site' : (str_starts_with($f['name'] ?? '', '🌐') ? 'Extração simples' : 'Upload'),
+                        'size' => $crawled ? $crawled->content_size : (isset($f['content']) ? strlen($f['content']) : null),
+                        'crawled_at' => $crawled ? $crawled->crawled_at->format('d/m/Y H:i') : null,
+                        'crawled_at_sort' => $crawled ? $crawled->crawled_at->timestamp : 0,
+                    ];
+                }
             }
         }
 
         return view('assistants.index', compact(
             'assistants', 'configuring', 'lastWebhook',
             'conversationsAssistant', 'conversationThreads', 'activeThreadMessages', 'activePhone', 'activeContactName', 'currentView',
-            'departments', 'agents', 'assistantTz'
+            'departments', 'agents', 'assistantTz', 'knowledgeBaseRows'
         ));
     }
 
@@ -1306,6 +1327,239 @@ class AssistantController extends Controller
         }
 
         return response()->json(['success' => false, 'message' => 'Sem conteúdo na página.']);
+    }
+
+    /**
+     * "Varrer Site" (módulo novo, separado do "Extrair Site" acima): descobre a ESTRUTURA de menu
+     * da home (item de topo -> submenu), pra depois cada página virar um arquivo em disco
+     * organizado nessa mesma hierarquia (ver crawlMenuPage()). Baixa o HTML cru (não o texto já
+     * limpo do fetchContentFromUrl) porque aqui precisamos da árvore DOM do menu, não só do texto.
+     */
+    private function discoverSiteMenu(Request $request)
+    {
+        $url = trim($request->input('website_url'));
+        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+            $url = 'https://' . $url;
+        }
+
+        $domain = parse_url($url, PHP_URL_HOST);
+        if (!$domain) return response()->json(['success' => false, 'message' => 'URL inválida.']);
+        $domainStr = str_replace('www.', '', $domain);
+
+        try {
+            $response = Http::timeout(15)->get($url);
+            if (!$response->successful()) {
+                return response()->json(['success' => false, 'message' => 'Falha ao acessar o site.']);
+            }
+            $html = $response->body();
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Falha ao acessar o site.']);
+        }
+
+        $tree = $this->parseMenuTree($html, $url, $domainStr);
+
+        if (empty($tree)) {
+            // Nenhuma estrutura de menu reconhecível (site sem <nav> semântico, mega-menu via JS,
+            // etc.) - cai pro mesmo link-scan simples do "Extrair Site", sem hierarquia.
+            $content = $this->fetchContentFromUrl($url);
+            $flatLinks = $content ? $this->extractLinksFromText($content) : [];
+            $cleanLinks = [];
+            foreach ($flatLinks as $link) {
+                $link = rtrim(explode('#', explode('?', $link)[0])[0], '/');
+                $linkDomain = parse_url($link, PHP_URL_HOST);
+                if ($linkDomain && str_ends_with(str_replace('www.', '', $linkDomain), $domainStr)
+                    && !preg_match('/\.(jpg|jpeg|png|gif|pdf|zip|rar|mp4|mp3|css|js|svg|webp|doc|docx|xml)$/i', $link)
+                    && !in_array($link, $cleanLinks)) {
+                    $cleanLinks[] = $link;
+                }
+            }
+            $cleanLinks = array_slice($cleanLinks, 0, 150);
+            $tree = [];
+            foreach ($cleanLinks as $link) {
+                $label = trim(parse_url($link, PHP_URL_PATH) ?: '', '/');
+                $label = $label !== '' ? ucwords(str_replace(['-', '_', '/'], ' ', $label)) : 'Home';
+                $tree[] = ['label' => $label, 'url' => $link, 'children' => []];
+            }
+        }
+
+        return response()->json(['success' => true, 'domain' => $domainStr, 'tree' => $tree]);
+    }
+
+    /**
+     * Extrai a árvore de menu (topo -> submenu, 2 níveis) de um HTML cru via DOMDocument/DOMXPath.
+     * Procura um <nav> primeiro; se não achar, tenta um elemento cujo id/class contenha "menu".
+     * Retorna [] se não conseguir identificar nada reconhecível (deixa o chamador cair no fallback).
+     */
+    private function parseMenuTree(string $html, string $homeUrl, string $domainStr): array
+    {
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument();
+        $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        $navNodes = $xpath->query('//nav');
+        if ($navNodes === false || $navNodes->length === 0) {
+            $navNodes = $xpath->query('//*[contains(translate(@class, "MENU", "menu"), "menu") or contains(translate(@id, "MENU", "menu"), "menu")]');
+        }
+        if ($navNodes === false || $navNodes->length === 0) return [];
+
+        $nav = $navNodes->item(0);
+        $topItems = $xpath->query('.//li[parent::ul[1]]', $nav);
+        if ($topItems === false || $topItems->length === 0) {
+            $topItems = $xpath->query('.//a', $nav);
+        }
+
+        $tree = [];
+        $seenUrls = [];
+        $totalCount = 0;
+
+        foreach ($topItems as $node) {
+            if ($totalCount >= 150) break;
+
+            $isAnchor = $node->nodeName === 'a';
+            $anchorNode = $isAnchor ? $node : $xpath->query('.//a', $node)->item(0);
+            if (!$anchorNode) continue;
+
+            $absoluteUrl = $this->resolveMenuUrl($anchorNode->getAttribute('href'), $homeUrl);
+            $label = trim($anchorNode->textContent);
+            if (!$absoluteUrl || $label === '' || in_array($absoluteUrl, $seenUrls)) continue;
+
+            $linkDomain = parse_url($absoluteUrl, PHP_URL_HOST);
+            if (!$linkDomain || !str_ends_with(str_replace('www.', '', $linkDomain), $domainStr)) continue;
+
+            $seenUrls[] = $absoluteUrl;
+            $children = [];
+
+            if (!$isAnchor) {
+                $subItems = $xpath->query('.//ul//a', $node);
+                foreach ($subItems as $subAnchor) {
+                    if ($totalCount >= 150) break;
+                    $subUrl = $this->resolveMenuUrl($subAnchor->getAttribute('href'), $homeUrl);
+                    $subLabel = trim($subAnchor->textContent);
+                    if (!$subUrl || $subLabel === '' || in_array($subUrl, $seenUrls)) continue;
+                    $subDomain = parse_url($subUrl, PHP_URL_HOST);
+                    if (!$subDomain || !str_ends_with(str_replace('www.', '', $subDomain), $domainStr)) continue;
+                    $seenUrls[] = $subUrl;
+                    $children[] = ['label' => $subLabel, 'url' => $subUrl, 'children' => []];
+                    $totalCount++;
+                }
+            }
+
+            $tree[] = ['label' => $label, 'url' => $absoluteUrl, 'children' => $children];
+            $totalCount++;
+        }
+
+        return $tree;
+    }
+
+    private function resolveMenuUrl(string $href, string $baseUrl): ?string
+    {
+        $href = trim($href);
+        if ($href === '' || str_starts_with($href, '#') || str_starts_with($href, 'javascript:')
+            || str_starts_with($href, 'mailto:') || str_starts_with($href, 'tel:')) {
+            return null;
+        }
+
+        if (str_starts_with($href, 'http://') || str_starts_with($href, 'https://')) {
+            return rtrim(explode('#', explode('?', $href)[0])[0], '/');
+        }
+
+        $base = parse_url($baseUrl);
+        $scheme = $base['scheme'] ?? 'https';
+        $host = $base['host'] ?? '';
+
+        if (str_starts_with($href, '//')) {
+            return rtrim(explode('#', explode('?', $scheme . ':' . $href)[0])[0], '/');
+        }
+        if (str_starts_with($href, '/')) {
+            return rtrim(explode('#', explode('?', $scheme . '://' . $host . $href)[0])[0], '/');
+        }
+
+        $basePath = rtrim(dirname($base['path'] ?? '/'), '/');
+        return rtrim(explode('#', explode('?', $scheme . '://' . $host . $basePath . '/' . $href)[0])[0], '/');
+    }
+
+    /**
+     * Busca o conteúdo de UMA página do "Varrer Site" e salva num arquivo real em disco,
+     * organizado pela hierarquia de menu (menu_path) - ex: site_crawls/5/inhouse.com.br/
+     * produtos/insoft-omni.txt. Registra os metadados em crawled_pages e adiciona/atualiza a
+     * entrada correspondente em knowledge_files, pra entrar no prompt da IA como qualquer outro
+     * documento (buildSystemPromptWithKnowledge não precisa saber que isso existe).
+     */
+    private function crawlMenuPage(Request $request)
+    {
+        $assistant = Assistant::findOrFail($request->assistant_id);
+        $url = trim($request->input('website_url'));
+        $menuPath = $request->input('menu_path', []);
+        if (!is_array($menuPath)) $menuPath = [];
+
+        $content = $this->fetchContentFromUrl($url);
+        if (!$content) {
+            return response()->json(['success' => false, 'message' => 'Sem conteúdo na página.', 'url' => $url]);
+        }
+
+        $domain = parse_url($url, PHP_URL_HOST) ?: 'site';
+        $domainStr = str_replace('www.', '', $domain);
+
+        $slugs = array_map(fn($seg) => Str::slug((string) $seg) ?: 'pagina', $menuPath);
+        if (empty($slugs)) $slugs = ['home'];
+        $fileName = array_pop($slugs) . '.txt';
+        $relativeDir = 'site_crawls/' . $assistant->id . '/' . $domainStr . (count($slugs) ? '/' . implode('/', $slugs) : '');
+        $relativePath = $relativeDir . '/' . $fileName;
+
+        Storage::makeDirectory($relativeDir);
+        Storage::put($relativePath, $content);
+
+        $now = now();
+        CrawledPage::updateOrCreate(
+            ['assistant_id' => $assistant->id, 'file_path' => $relativePath],
+            ['url' => $url, 'menu_path' => $menuPath, 'content_size' => strlen($content), 'crawled_at' => $now]
+        );
+
+        $displayName = $menuPath ? implode(' › ', $menuPath) : $domainStr;
+        $files = is_array($assistant->knowledge_files) ? $assistant->knowledge_files : [];
+        $exists = false;
+        foreach ($files as &$f) {
+            if (($f['path'] ?? null) === $relativePath) {
+                $f['content'] = $content;
+                $f['name'] = $displayName;
+                $exists = true;
+                break;
+            }
+        }
+        unset($f);
+        if (!$exists) {
+            $files[] = ['name' => $displayName, 'path' => $relativePath, 'content' => $content];
+        }
+        $assistant->forceFill(['knowledge_files' => array_values($files)])->save();
+
+        return response()->json(['success' => true, 'url' => $url, 'name' => $displayName]);
+    }
+
+    /**
+     * CSV da tela "Ver Base de Conhecimento" - mesmo padrão de SurveyController::exportResponsesCsv().
+     */
+    private function exportKnowledgeBaseCsv(Request $request)
+    {
+        $assistant = Assistant::findOrFail($request->query('assistant_id'));
+        $files = is_array($assistant->knowledge_files) ? $assistant->knowledge_files : [];
+        $crawledByPath = CrawledPage::where('assistant_id', $assistant->id)->get()->keyBy('file_path');
+
+        return response()->streamDownload(function () use ($files, $crawledByPath) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['Nome', 'Tipo', 'Tamanho (bytes)', 'Data/Hora'], ';');
+            foreach ($files as $f) {
+                $path = $f['path'] ?? null;
+                $crawled = $path ? $crawledByPath->get($path) : null;
+                $tipo = $crawled ? 'Varredura de site' : (str_starts_with($f['name'] ?? '', '🌐') ? 'Extração simples' : 'Upload');
+                $tamanho = $crawled ? $crawled->content_size : (isset($f['content']) ? strlen($f['content']) : '');
+                $data = $crawled ? $crawled->crawled_at->format('d/m/Y H:i') : '';
+                fputcsv($out, [$f['name'] ?? '', $tipo, $tamanho, $data], ';');
+            }
+            fclose($out);
+        }, 'base_conhecimento_' . $assistant->id . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     private function storeDepartment(Request $request)

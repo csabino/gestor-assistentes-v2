@@ -257,6 +257,13 @@
                         crawlProgressText: '',
                         crawlPercent: 0,
 
+                        siteMenuUrl: '',
+                        menuCrawling: false,
+                        menuCrawlLog: [],
+                        kbModalOpen: false,
+                        kbSortField: 'name',
+                        kbSortDir: 'asc',
+
                         getApiKey() {
                             if (this.provider === 'openai') return document.querySelector('input[name=\'openai_api_key\']').value;
                             if (this.provider === 'gemini') return document.querySelector('input[name=\'gemini_api_key\']').value;
@@ -322,6 +329,89 @@
                             } catch (e) {
                                 alert('Erro de conexão durante a extração.');
                                 this.crawling = false;
+                            }
+                        },
+
+                        // "Varrer Site": modulo novo e separado do "Extrair Site" acima - descobre a
+                        // estrutura de menu (home -> item -> submenu) e salva cada pagina num
+                        // arquivo em disco organizado nessa hierarquia (ver crawlMenuPage() no
+                        // controller). Nao mexe em nada do startCrawler()/"Extrair Site" de cima.
+                        async startMenuCrawler() {
+                            if (!this.siteMenuUrl) return alert('Por favor, digite a URL do site para varrer.');
+
+                            this.menuCrawling = true;
+                            this.menuCrawlLog = [];
+
+                            try {
+                                const discoverRes = await fetch('/', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                    body: JSON.stringify({ action: 'discover_site_menu', website_url: this.siteMenuUrl })
+                                });
+                                const discoverData = await discoverRes.json();
+
+                                if (!discoverData.success) {
+                                    alert(discoverData.message || 'Não foi possível acessar o site.');
+                                    this.menuCrawling = false;
+                                    return;
+                                }
+
+                                const pages = [{ url: this.siteMenuUrl, menuPath: ['Home'] }];
+                                for (const item of (discoverData.tree || [])) {
+                                    pages.push({ url: item.url, menuPath: ['Home', item.label] });
+                                    for (const child of (item.children || [])) {
+                                        pages.push({ url: child.url, menuPath: ['Home', item.label, child.label] });
+                                    }
+                                }
+
+                                for (const page of pages) {
+                                    this.menuCrawlLog.push({ label: page.menuPath.join(' › '), status: 'pending' });
+                                    this.$nextTick(() => {
+                                        if (this.$refs.menuCrawlLogBox) this.$refs.menuCrawlLogBox.scrollTop = this.$refs.menuCrawlLogBox.scrollHeight;
+                                    });
+
+                                    try {
+                                        const pageRes = await fetch('/', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                            body: JSON.stringify({ action: 'crawl_menu_page', assistant_id: '{{ $configuring->id ?? '' }}', website_url: page.url, menu_path: page.menuPath })
+                                        });
+                                        const pageData = await pageRes.json();
+                                        this.menuCrawlLog[this.menuCrawlLog.length - 1].status = pageData.success ? 'ok' : 'fail';
+                                    } catch (e) {
+                                        this.menuCrawlLog[this.menuCrawlLog.length - 1].status = 'fail';
+                                    }
+                                }
+
+                                this.menuCrawlLog.push({ label: 'Concluído! Recarregando...', status: 'done' });
+                                saveScrollPosition();
+                                setTimeout(() => window.location.reload(), 1200);
+                            } catch (e) {
+                                alert('Erro de conexão durante a varredura.');
+                                this.menuCrawling = false;
+                            }
+                        },
+
+                        kbRows: @js($knowledgeBaseRows ?? []),
+                        kbSortedRows() {
+                            const dir = this.kbSortDir === 'asc' ? 1 : -1;
+                            const field = this.kbSortField;
+                            return [...this.kbRows].sort((a, b) => {
+                                let av, bv;
+                                if (field === 'size') { av = a.size ?? -1; bv = b.size ?? -1; }
+                                else if (field === 'crawled_at') { av = a.crawled_at_sort; bv = b.crawled_at_sort; }
+                                else { av = (a[field] || '').toString().toLowerCase(); bv = (b[field] || '').toString().toLowerCase(); }
+                                if (av < bv) return -1 * dir;
+                                if (av > bv) return 1 * dir;
+                                return 0;
+                            });
+                        },
+                        toggleKbSort(field) {
+                            if (this.kbSortField === field) {
+                                this.kbSortDir = this.kbSortDir === 'asc' ? 'desc' : 'asc';
+                            } else {
+                                this.kbSortField = field;
+                                this.kbSortDir = 'asc';
                             }
                         },
 
@@ -567,8 +657,13 @@
                                             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Fontes ({{ count($configuring->knowledge_files) }})</h4>
                                             
                                             <div class="flex items-center gap-3">
+                                                <button type="button" @click="kbModalOpen = true" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.573 16.49 16.638 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                    Ver Base de Conhecimento
+                                                </button>
+
                                                 <label class="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition">
-                                                    <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" 
+                                                    <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                                                            :checked="allSelected" @click="toggleAll()">
                                                     <span class="font-bold">Selecionar Todos</span>
                                                 </label>
@@ -643,6 +738,32 @@
                                     </div>
                                     
                                     <p x-show="!crawling" class="text-[10px] text-slate-400 mt-1.5 leading-tight">O sistema irá varrer a URL, identificar as páginas internas e extrair o texto útil automaticamente.</p>
+                                </div>
+
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">🗂️ Varrer Site (Estrutura de Menu)</label>
+                                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                        <input type="url" x-model="siteMenuUrl" placeholder="https://www.site.com" class="block w-full text-sm border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
+
+                                        <button type="button" @click="startMenuCrawler()" :disabled="menuCrawling" :class="menuCrawling ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'" class="text-white text-xs font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 shrink-0 transition shadow-sm whitespace-nowrap">
+                                            <span x-show="!menuCrawling" class="flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg> Varrer Site</span>
+                                            <span x-show="menuCrawling" class="flex items-center gap-1.5"><span class="inline-block animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span> Varrendo...</span>
+                                        </button>
+                                    </div>
+
+                                    <div x-show="menuCrawling" x-cloak x-ref="menuCrawlLogBox" class="mt-3 max-h-32 overflow-y-auto custom-scroll bg-white border border-slate-200 rounded-lg p-2 space-y-1">
+                                        <template x-for="(item, i) in menuCrawlLog" :key="i">
+                                            <div class="text-[10px] flex items-center gap-1.5">
+                                                <span x-show="item.status === 'pending'" class="inline-block animate-spin rounded-full h-2.5 w-2.5 border-2 border-indigo-400 border-t-transparent shrink-0"></span>
+                                                <span x-show="item.status === 'ok'" class="text-emerald-500 shrink-0">✓</span>
+                                                <span x-show="item.status === 'fail'" class="text-red-500 shrink-0">✗</span>
+                                                <span x-show="item.status === 'done'" class="text-indigo-500 shrink-0">✓</span>
+                                                <span class="truncate text-slate-600" x-text="item.label"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <p x-show="!menuCrawling" class="text-[10px] text-slate-400 mt-1.5 leading-tight">Entende a estrutura de menu do site (home, itens e submenus) e salva cada página como um documento organizado nessa mesma hierarquia.</p>
                                 </div>
 
                             </div>
@@ -1001,6 +1122,54 @@
                             <button type="button" @click="saveRename()" :disabled="renameSaving" :class="renameSaving ? 'opacity-50 cursor-not-allowed' : ''" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition">
                                 <span x-text="renameSaving ? 'Salvando...' : 'Salvar'"></span>
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODAL VER BASE DE CONHECIMENTO (grid ordenavel + export CSV, novo/adicional) -->
+                <div x-show="kbModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div @click.away="kbModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col relative border border-slate-200">
+                        <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                            <h3 class="text-base font-bold text-gray-800">Base de Conhecimento — {{ $configuring->name }}</h3>
+                            <button type="button" @click="kbModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div class="flex-1 min-h-0 overflow-auto p-5">
+                            <table class="w-full text-xs text-left">
+                                <thead>
+                                    <tr class="border-b border-gray-200 text-gray-500 uppercase text-[10px] tracking-wide">
+                                        <template x-for="col in [{ key: 'name', label: 'Nome' }, { key: 'type', label: 'Tipo' }, { key: 'size', label: 'Tamanho' }, { key: 'crawled_at', label: 'Data/Hora' }]" :key="col.key">
+                                            <th class="py-2 pr-3 cursor-pointer select-none hover:text-indigo-600 transition" @click="toggleKbSort(col.key)">
+                                                <span x-text="col.label"></span>
+                                                <span x-show="kbSortField === col.key" x-text="kbSortDir === 'asc' ? '▲' : '▼'" class="ml-0.5"></span>
+                                            </th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(row, i) in kbSortedRows()" :key="i">
+                                        <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                            <td class="py-2 pr-3 font-medium text-gray-800 max-w-[280px] truncate" x-text="row.name"></td>
+                                            <td class="py-2 pr-3 text-gray-500" x-text="row.type"></td>
+                                            <td class="py-2 pr-3 text-gray-500" x-text="row.size ? (row.size > 1024 ? Math.round(row.size / 1024) + ' KB' : row.size + ' B') : '—'"></td>
+                                            <td class="py-2 pr-3 text-gray-500" x-text="row.crawled_at || '—'"></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="kbRows.length === 0">
+                                        <td colspan="4" class="py-8 text-center text-gray-400">Nenhum documento na base de conhecimento.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="flex justify-between items-center p-4 border-t border-gray-100 shrink-0">
+                            <a href="/?action=export_knowledge_base&assistant_id={{ $configuring->id }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                                Exportar CSV
+                            </a>
+                            <button type="button" @click="kbModalOpen = false" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition">Fechar</button>
                         </div>
                     </div>
                 </div>
