@@ -832,31 +832,51 @@ class AssistantController extends Controller
     }
 
     /**
-     * Apaga o histórico de conversa (chat_messages), estado de pesquisa/automação pendente e logs
-     * de um número específico, só para este assistente - usado pra reiniciar um teste do zero sem
-     * a IA "lembrar" de conversas anteriores.
+     * Apaga o histórico de conversa (chat_messages), estado de pesquisa/automação pendente, nome
+     * salvo e logs de um ou mais números, só para este assistente - usado tanto pra reiniciar um
+     * teste do zero (um número) quanto pra limpeza em lote (vários números selecionados na tela de
+     * Conversas) sem a IA "lembrar" de conversas anteriores.
      */
     public function clearContext(Request $request, $id)
     {
-        $request->validate(['phone' => 'required|string|max:50']);
+        $request->validate([
+            'phone' => 'nullable|string|max:50',
+            'phones' => 'nullable|array',
+            'phones.*' => 'string|max:50',
+        ]);
 
         $assistant = Assistant::findOrFail($id);
-        $phone = preg_replace('/[^0-9]/', '', $request->input('phone'));
 
-        if (empty($phone)) {
-            return response()->json(['message' => 'Número inválido.'], 422);
+        $rawPhones = $request->input('phones', []);
+        if (empty($rawPhones) && $request->filled('phone')) {
+            $rawPhones = [$request->input('phone')];
+        }
+        $phones = array_values(array_unique(array_filter(array_map(
+            fn ($p) => preg_replace('/[^0-9]/', '', (string) $p),
+            $rawPhones
+        ))));
+
+        if (empty($phones)) {
+            return response()->json(['message' => 'Nenhum número válido informado.'], 422);
         }
 
-        $chatMessages = DB::table('chat_messages')->where('assistant_id', $assistant->id)->where('phone_number', $phone)->delete();
-        $automationFollowups = AutomationFollowup::where('assistant_id', $assistant->id)->where('phone_number', $phone)->delete();
-        $surveyResponses = SurveyResponse::where('assistant_id', $assistant->id)->where('phone_number', $phone)->delete();
-        $webhookLogs = DB::table('webhook_logs')->where('assistant_id', $assistant->id)->where('sender', 'like', '%' . $phone . '%')->delete();
+        $chatMessages = DB::table('chat_messages')->where('assistant_id', $assistant->id)->whereIn('phone_number', $phones)->delete();
+        $automationFollowups = AutomationFollowup::where('assistant_id', $assistant->id)->whereIn('phone_number', $phones)->delete();
+        $surveyResponses = SurveyResponse::where('assistant_id', $assistant->id)->whereIn('phone_number', $phones)->delete();
+        $contactNames = WaContactName::where('assistant_id', $assistant->id)->whereIn('phone_number', $phones)->delete();
+        $webhookLogs = DB::table('webhook_logs')->where('assistant_id', $assistant->id)
+            ->where(function ($q) use ($phones) {
+                foreach ($phones as $phone) {
+                    $q->orWhere('sender', 'like', '%' . $phone . '%');
+                }
+            })->delete();
 
         return response()->json([
             'success' => true,
             'chat_messages' => $chatMessages,
             'automation_followups' => $automationFollowups,
             'survey_responses' => $surveyResponses,
+            'contact_names' => $contactNames,
             'webhook_logs' => $webhookLogs,
         ]);
     }

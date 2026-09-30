@@ -1255,6 +1255,38 @@
                             } finally {
                                 this.clearContextSaving = false;
                             }
+                        },
+                        selectedPhones: [],
+                        allPhones: @js(collect($conversationThreads ?? [])->pluck('phone_number')->values()),
+                        bulkDeleting: false,
+                        toggleSelectAll() {
+                            this.selectedPhones = this.selectedPhones.length === this.allPhones.length ? [] : [...this.allPhones];
+                        },
+                        async bulkDelete() {
+                            if (this.selectedPhones.length === 0) return;
+                            if (!confirm('Excluir o histórico de ' + this.selectedPhones.length + ' conversa(s) selecionada(s)? Essa ação não pode ser desfeita.')) return;
+                            this.bulkDeleting = true;
+                            try {
+                                const res = await fetch('/assistants/{{ $conversationsAssistant->id }}/clear-context', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                    },
+                                    body: JSON.stringify({ phones: this.selectedPhones }),
+                                });
+                                if (!res.ok) {
+                                    const json = await res.json();
+                                    alert(json.message || 'Erro ao excluir.');
+                                    return;
+                                }
+                                window.location.href = '{{ ($configuring ?? null) ? "/?configure=" . $configuring->id . "&conversations_id=" . $conversationsAssistant->id : "/?conversations_id=" . $conversationsAssistant->id }}';
+                            } catch (e) {
+                                alert('Erro de conexão. Tente novamente.');
+                            } finally {
+                                this.bulkDeleting = false;
+                            }
                         }
                      }">
                     <div class="bg-white rounded-2xl shadow-2xl max-w-6xl w-full flex flex-col relative border border-slate-200 h-[90vh] overflow-hidden">
@@ -1277,8 +1309,18 @@
                         <div class="flex flex-1 overflow-hidden">
 
                             <div class="conv-sidebar w-1/3 border-r border-slate-200 bg-slate-50/50 overflow-y-auto">
-                                <div class="p-3 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                    Atendimentos ({{ count($conversationThreads ?? []) }})
+                                <div class="p-3 border-b border-slate-200 flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <input type="checkbox" :checked="allPhones.length > 0 && selectedPhones.length === allPhones.length" @click="toggleSelectAll()" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" title="Selecionar todas">
+                                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Atendimentos ({{ count($conversationThreads ?? []) }})</span>
+                                    </div>
+                                    <button type="button" x-show="selectedPhones.length > 0" x-cloak @click="bulkDelete()" :disabled="bulkDeleting"
+                                            class="text-[11px] font-bold text-red-600 hover:text-red-800 transition flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                        </svg>
+                                        <span x-text="'Excluir (' + selectedPhones.length + ')'"></span>
+                                    </button>
                                 </div>
                                 <div class="divide-y divide-slate-100">
                                     @forelse($conversationThreads ?? [] as $thread)
@@ -1288,6 +1330,8 @@
                                         @endphp
                                         <a href="{{ ($configuring ?? null) ? '/?configure=' . $configuring->id . '&' : '/?' }}conversations_id={{ $conversationsAssistant->id }}&phone={{ $thread->phone_number }}"
                                             class="p-4 flex items-center gap-3 transition hover:bg-white {{ ($activePhone ?? '') === $thread->phone_number ? 'bg-white border-l-4 border-indigo-600 shadow-sm' : '' }}">
+                                            <input type="checkbox" value="{{ $thread->phone_number }}" x-model="selectedPhones" @click.stop
+                                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 shrink-0">
                                             @if($thread->contact_name)
                                                 <span class="w-9 h-9 shrink-0 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center">
                                                     {{ mb_strtoupper(mb_substr($thread->contact_name, 0, 1)) }}
@@ -1424,6 +1468,7 @@
                                         <li>📨 <span x-text="clearContextResult.chat_messages" class="font-bold"></span> mensagens de chat removidas</li>
                                         <li>🤖 <span x-text="clearContextResult.automation_followups" class="font-bold"></span> registros de automação removidos</li>
                                         <li>📋 <span x-text="clearContextResult.survey_responses" class="font-bold"></span> respostas de pesquisa pendentes removidas</li>
+                                        <li>🙍 <span x-text="clearContextResult.contact_names" class="font-bold"></span> nomes salvos removidos</li>
                                         <li>🧾 <span x-text="clearContextResult.webhook_logs" class="font-bold"></span> logs removidos</li>
                                     </ul>
                                     <div class="flex justify-end gap-2">
