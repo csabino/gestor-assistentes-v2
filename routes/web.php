@@ -22,6 +22,12 @@ Route::match(['get', 'post', 'patch', 'put', 'delete'], '/webhook/whatsapp/{id}/
     ->where('path', '.*')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
+// Webhook único da API oficial da Meta: diferente da UazAPI, a Meta manda TODOS os números de
+// TODOS os clientes do App numa única URL (configurada uma vez no painel da Meta) - o assistente
+// certo é resolvido dentro do controller via phone_number_id do próprio payload, não pela URL.
+Route::match(['get', 'post'], '/webhook/whatsapp-meta', [AssistantController::class, 'webhookMeta'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
 // Disparo da automação de retomada de atendimento: como esta implantação (EasyPanel/Nixpacks) não
 // roda nenhum cron/scheduler, essa rota é chamada de fora por um serviço gratuito de agendamento de
 // URL (ex: cron-job.org) a cada 5 minutos. Protegida por um segredo na própria URL (não por sessão de

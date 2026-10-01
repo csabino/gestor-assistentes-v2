@@ -80,6 +80,12 @@ class AssistantController extends Controller
                 // continuar inativos (e nao "ativos" so por causa do default da coluna nova).
                 DB::table('assistants')->where('is_active', 0)->update(['status' => 'inactive']);
             }
+
+            if (!Schema::hasColumn('assistants', 'whatsapp_waba_id')) {
+                Schema::table('assistants', function (Blueprint $table) {
+                    $table->string('whatsapp_waba_id')->nullable()->after('whatsapp_instance');
+                });
+            }
         }
     }
 
@@ -746,6 +752,7 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'status_whatsapp') return $this->checkWhatsappStatus($request, false);
         if ($request->isMethod('post') && $request->input('action') === 'test_whatsapp') return $this->checkWhatsappStatus($request, true);
         if ($request->isMethod('post') && $request->input('action') === 'disconnect_whatsapp') return $this->disconnectWhatsapp($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_connect') return $this->connectMeta($request);
         
         if ($request->isMethod('post') && $request->input('action') === 'map_site') return $this->mapSite($request);
         if ($request->isMethod('post') && $request->input('action') === 'scrape_single_url') return $this->scrapeSingleUrl($request);
@@ -1196,6 +1203,115 @@ class AssistantController extends Controller
         }
 
         return response()->json(['success' => true, 'connected' => false, 'message' => 'Sessão encerrada com sucesso.']);
+    }
+
+    /**
+     * Troca de credenciais apos o popup de Embedded Signup da Meta terminar no front-end:
+     * recebe o "code" de autorizacao + phone_number_id/waba_id (capturados via postMessage
+     * durante o popup) e faz o restante do trabalho no servidor - troca o code por um token,
+     * estende pra longa duracao, assina o webhook do App no WABA do cliente, e salva tudo
+     * no assistente. Nada disso acontece no front, igual ao fluxo do Google Calendar.
+     */
+    private function connectMeta(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'code' => 'required|string',
+            'phone_number_id' => 'required|string',
+            'waba_id' => 'required|string',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+
+        $appId = Setting::getGlobal('meta_app_id');
+        $appSecret = Setting::getGlobal('meta_app_secret');
+        if (empty($appId) || empty($appSecret)) {
+            return response()->json(['success' => false, 'message' => 'Configure o App ID e o App Secret da Meta em Ambiente antes de conectar.'], 422);
+        }
+
+        try {
+            // 1. Troca o "code" do popup por um token de usuario (curta duracao).
+            $tokenResponse = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', [
+                'client_id' => $appId,
+                'client_secret' => $appSecret,
+                'code' => $request->input('code'),
+            ]);
+
+            if (!$tokenResponse->successful() || !$tokenResponse->json('access_token')) {
+                Log::error('Erro ao trocar code por token (Meta): ' . $tokenResponse->body());
+                return response()->json(['success' => false, 'message' => 'Não foi possível validar a conexão com a Meta.'], 422);
+            }
+
+            $shortLivedToken = $tokenResponse->json('access_token');
+
+            // 2. Troca por um token de longa duracao (~60 dias). Nao e um token permanente de
+            // System User (isso exigiria configuracao adicional fora do fluxo de Embedded
+            // Signup) - um job de renovacao periodica fica como melhoria futura.
+            $longLivedResponse = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', [
+                'grant_type' => 'fb_exchange_token',
+                'client_id' => $appId,
+                'client_secret' => $appSecret,
+                'fb_exchange_token' => $shortLivedToken,
+            ]);
+
+            $accessToken = ($longLivedResponse->successful() && $longLivedResponse->json('access_token'))
+                ? $longLivedResponse->json('access_token')
+                : $shortLivedToken;
+
+            // 3. Assina o webhook do seu App nesse WABA especifico - sem isso, mensagens desse
+            // cliente nunca chegam no /webhook/whatsapp-meta.
+            $wabaId = $request->input('waba_id');
+            $subscribeResponse = Http::withToken($accessToken)->post("https://graph.facebook.com/v21.0/{$wabaId}/subscribed_apps");
+
+            if (!$subscribeResponse->successful()) {
+                Log::warning('Falha ao inscrever o App nos webhooks do WABA ' . $wabaId . ': ' . $subscribeResponse->body());
+            }
+
+            $assistant->whatsapp_provider = 'meta';
+            $assistant->whatsapp_instance = $request->input('phone_number_id');
+            $assistant->whatsapp_waba_id = $wabaId;
+            $assistant->whatsapp_token = $accessToken;
+            $assistant->save();
+
+            return response()->json(['success' => true, 'message' => 'WhatsApp conectado via Meta com sucesso!']);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao conectar WhatsApp via Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao conectar: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Webhook unico do App inteiro na Meta (nao tem um por assistente como a UazAPI) - GET e o
+     * handshake de verificacao (uma vez, quando voce configura/troca a URL no painel da Meta);
+     * POST e mensagem de verdade, roteada pro assistente certo via phone_number_id do payload
+     * e entao delegada pro webhook() ja existente (mesma pipeline de IA/resposta de sempre).
+     */
+    public function webhookMeta(Request $request)
+    {
+        if ($request->isMethod('get')) {
+            $mode = $request->query('hub_mode');
+            $verifyToken = $request->query('hub_verify_token');
+            $challenge = $request->query('hub_challenge');
+
+            if ($mode === 'subscribe' && $verifyToken && $verifyToken === Setting::getGlobal('meta_webhook_verify_token')) {
+                return response($challenge, 200)->header('Content-Type', 'text/plain');
+            }
+
+            return response('Forbidden', 403);
+        }
+
+        $phoneNumberId = $request->input('entry.0.changes.0.value.metadata.phone_number_id');
+        if (!$phoneNumberId) {
+            return response()->json(['status' => 'ignored_no_phone_number_id']);
+        }
+
+        $assistant = Assistant::where('whatsapp_provider', 'meta')->where('whatsapp_instance', $phoneNumberId)->first();
+        if (!$assistant) {
+            Log::warning("Webhook da Meta recebido pra phone_number_id desconhecido: {$phoneNumberId}");
+            return response()->json(['status' => 'ignored_unknown_number']);
+        }
+
+        return $this->webhook($request, $assistant->id);
     }
 
     private function mapSite(Request $request)
@@ -2308,6 +2424,29 @@ class AssistantController extends Controller
         return $this->extractMediaBytesFromResponse($response);
     }
 
+    /**
+     * A Meta só manda o ID da mídia no payload do webhook, nunca a URL - precisa de uma
+     * chamada extra à Graph API pra resolver o ID numa URL de download temporária (que
+     * ainda exige o mesmo Bearer token do App pra baixar o binário de fato).
+     */
+    private function resolveMetaMediaUrl(string $mediaId, ?string $token): ?string
+    {
+        if (empty($token)) {
+            return null;
+        }
+
+        try {
+            $response = Http::withToken(trim($token))->get('https://graph.facebook.com/v21.0/' . $mediaId);
+            if ($response->successful()) {
+                return $response->json('url');
+            }
+        } catch (\Throwable $e) {
+            Log::error('Erro ao resolver mídia da Meta (ID ' . $mediaId . '): ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
     private function sendToOmni(string $message, string $pushName, string $type, string $phone, $assistantId = null)
     {
         try {
@@ -2367,16 +2506,23 @@ class AssistantController extends Controller
                 return response()->json(['status' => 'ignored']);
             }
 
-            $rawSender = $request->input('message.sender_pn')
+            $rawSender = $request->input('entry.0.changes.0.value.messages.0.from')
+                ?? $request->input('message.sender_pn')
                 ?? $request->input('message.chatid')
                 ?? $request->input('chat.phone')
                 ?? $request->input('chat.wa_chatid')
-                ?? $request->input('data.key.remoteJid') 
-                ?? $request->input('key.remoteJid') 
+                ?? $request->input('data.key.remoteJid')
+                ?? $request->input('key.remoteJid')
                 ?? $request->input('phone')
                 ?? $request->input('from')
-                ?? $request->input('sender') 
+                ?? $request->input('sender')
                 ?? 'desconhecido';
+
+            // Webhook da Meta sem mensagem (ex: apenas confirmação de entrega/leitura em "statuses")
+            // não tem "messages" no payload - ignora silenciosamente, não é uma mensagem de cliente.
+            if ($assistant->whatsapp_provider === 'meta' && !$request->filled('entry.0.changes.0.value.messages.0.from')) {
+                return response()->json(['status' => 'ignored_no_message']);
+            }
 
             $sender = is_array($rawSender) ? ($rawSender['user'] ?? json_encode($rawSender)) : (string)$rawSender;
             if (str_contains($sender, '@')) {
@@ -2402,7 +2548,8 @@ class AssistantController extends Controller
 
             // Protege contra reentrega do mesmo webhook (retry do provedor por timeout/instabilidade):
             // sem isso, a mesma mensagem podia gerar duas respostas de IA e ate duplicar agendamento.
-            $messageId = $request->input('message.id')
+            $messageId = $request->input('entry.0.changes.0.value.messages.0.id')
+                ?? $request->input('message.id')
                 ?? $request->input('message.messageid')
                 ?? $request->input('data.key.id')
                 ?? $request->input('key.id')
@@ -2448,7 +2595,8 @@ class AssistantController extends Controller
             $audioService = new \App\Services\AudioService();
 
             $msgType = strtolower(
-                $request->input('message.mediaType')
+                $request->input('entry.0.changes.0.value.messages.0.type')
+                ?? $request->input('message.mediaType')
                 ?? $request->input('message.messageType')
                 ?? $request->input('message.type')
                 ?? $request->input('type')
@@ -2461,6 +2609,15 @@ class AssistantController extends Controller
                 ?? $request->input('message.url')
                 ?? null;
 
+            // A Meta não manda a URL da mídia direto no payload, só um ID que precisa ser
+            // resolvido via Graph API (e a URL resultante exige o Bearer token pra baixar).
+            if ($assistant->whatsapp_provider === 'meta' && empty($mediaUrl) && in_array($msgType, ['image', 'audio', 'video', 'document', 'sticker'])) {
+                $metaMediaId = $request->input('entry.0.changes.0.value.messages.0.' . $msgType . '.id');
+                if ($metaMediaId) {
+                    $mediaUrl = $this->resolveMetaMediaUrl($metaMediaId, $assistant->whatsapp_token);
+                }
+            }
+
             $isAudioMessage = in_array($msgType, ['ptt', 'audio', 'audiomessage', 'voice']) 
                 || (!empty($mediaUrl) && (str_contains($mediaUrl, '.og') || str_contains($mediaUrl, '.mp3') || str_contains($mediaUrl, 'audio')));
 
@@ -2468,7 +2625,11 @@ class AssistantController extends Controller
                 || in_array($msgType, ['image', 'video', 'document', 'sticker', 'imagemessage', 'videomessage', 'documentmessage', 'documentwithcaptionmessage']) 
                 || (!empty($mediaUrl) && str_contains($mediaUrl, 'http'));
 
-            $rawMessage = $request->input('message.content')
+            $rawMessage = $request->input('entry.0.changes.0.value.messages.0.text.body')
+                ?? $request->input('entry.0.changes.0.value.messages.0.button.text')
+                ?? $request->input('entry.0.changes.0.value.messages.0.interactive.button_reply.title')
+                ?? $request->input('entry.0.changes.0.value.messages.0.interactive.list_reply.title')
+                ?? $request->input('message.content')
                 ?? $request->input('message.text')
                 ?? $request->input('message.caption')
                 ?? $request->input('data.message.conversation')
@@ -2557,7 +2718,10 @@ class AssistantController extends Controller
 
                     if (!$mediaBytes && !empty($mediaUrl) && str_starts_with($mediaUrl, 'http')) {
                         try {
-                            $dl = Http::timeout(25)->get($mediaUrl);
+                            // URLs de mídia da Meta não são públicas - exigem o mesmo Bearer token do App pra baixar o binário.
+                            $dl = $assistant->whatsapp_provider === 'meta'
+                                ? Http::withToken(trim($assistant->whatsapp_token))->timeout(25)->get($mediaUrl)
+                                : Http::timeout(25)->get($mediaUrl);
                             if ($dl->successful() && strlen($dl->body()) > 100) {
                                 $mediaBytes = $dl->body();
                             }
@@ -3317,6 +3481,27 @@ class AssistantController extends Controller
 
     private function sendWhatsappMessage(Assistant $assistant, string $to, string $message): array
     {
+        if ($assistant->whatsapp_provider === 'meta') {
+            if (empty($assistant->whatsapp_instance) || empty($assistant->whatsapp_token)) {
+                return ['success' => false, 'error' => 'WhatsApp (Meta) não configurado.'];
+            }
+
+            try {
+                $cleanTo = $this->normalizeWaTarget($to);
+                $response = Http::withToken(trim($assistant->whatsapp_token))
+                    ->post('https://graph.facebook.com/v21.0/' . $assistant->whatsapp_instance . '/messages', [
+                        'messaging_product' => 'whatsapp',
+                        'to' => $cleanTo,
+                        'type' => 'text',
+                        'text' => ['body' => $message],
+                    ]);
+
+                return ['success' => $response->successful(), 'error' => $response->failed() ? $response->body() : null];
+            } catch (\Throwable $e) {
+                return ['success' => false, 'error' => $e->getMessage()];
+            }
+        }
+
         if (empty($assistant->whatsapp_url) || empty($assistant->whatsapp_token)) {
             return ['success' => false, 'error' => 'WhatsApp não configurado.'];
         }

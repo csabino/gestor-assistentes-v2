@@ -1,6 +1,11 @@
 @php
     $branding = \App\Models\Setting::branding();
     $effectiveTheme = request()->cookie('theme') ?? auth()->user()->theme ?? $branding['theme_default'];
+    $metaAppConfig = [
+        'meta_app_id' => \App\Models\Setting::getGlobal('meta_app_id', ''),
+        'meta_config_id' => \App\Models\Setting::getGlobal('meta_config_id', ''),
+        'meta_webhook_verify_token' => \App\Models\Setting::getGlobal('meta_webhook_verify_token', ''),
+    ];
 @endphp
 <!DOCTYPE html>
 <html lang="pt-BR" class="{{ $effectiveTheme === 'dark' ? 'dark' : '' }}">
@@ -418,6 +423,10 @@
             footer_version: @js($branding['footer_version']),
             footer_company: @js($branding['footer_company']),
             footer_year: @js($branding['footer_year']),
+            meta_app_id: @js($metaAppConfig['meta_app_id']),
+            meta_app_secret: '',
+            meta_config_id: @js($metaAppConfig['meta_config_id']),
+            meta_webhook_verify_token: @js($metaAppConfig['meta_webhook_verify_token']),
         },
         openEnvModal() {
             this.envModalOpen = true;
@@ -444,6 +453,10 @@
             fd.append('footer_version', this.envForm.footer_version);
             fd.append('footer_company', this.envForm.footer_company);
             fd.append('footer_year', this.envForm.footer_year);
+            fd.append('meta_app_id', this.envForm.meta_app_id);
+            if (this.envForm.meta_app_secret) fd.append('meta_app_secret', this.envForm.meta_app_secret);
+            fd.append('meta_config_id', this.envForm.meta_config_id);
+            fd.append('meta_webhook_verify_token', this.envForm.meta_webhook_verify_token);
             if (this.envLogoLightFile) fd.append('logo_light', this.envLogoLightFile);
             if (this.envLogoDarkFile) fd.append('logo_dark', this.envLogoDarkFile);
             if (this.envLoginBgFile) fd.append('login_bg', this.envLoginBgFile);
@@ -472,6 +485,7 @@
                 this.envLogoDarkPreview = null;
                 this.envLoginBgFile = null;
                 this.envLoginBgPreview = null;
+                this.envForm.meta_app_secret = '';
                 this.envModalOpen = false;
             } catch (e) {
                 this.envError = 'Erro de conexão. Tente novamente.';
@@ -838,6 +852,33 @@
 
                 <div class="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-[11px] text-gray-500 dark:text-gray-400 text-center">
                     Pré-visualização: <span x-text="envForm.footer_name"></span> <span x-text="envForm.footer_version"></span> &middot; &copy; <span x-text="envForm.footer_year"></span> <span x-text="envForm.footer_company"></span>
+                </div>
+
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h4 class="text-xs font-bold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" /></svg>
+                        Integração Meta (WhatsApp)
+                    </h4>
+                    <p class="text-[11px] text-gray-400 mb-2">Credenciais do seu App Tech Provider da Meta, usadas pelo botão "Conectar com WhatsApp" em todos os assistentes.</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">App ID</label>
+                            <input type="text" x-model="envForm.meta_app_id" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">App Secret</label>
+                            <input type="password" x-model="envForm.meta_app_secret" placeholder="•••••••• (deixe em branco pra manter o atual)" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Configuration ID (Embedded Signup)</label>
+                            <input type="text" x-model="envForm.meta_config_id" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Verify Token do Webhook</label>
+                            <input type="text" x-model="envForm.meta_webhook_verify_token" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1.5">Esse Verify Token precisa ser o mesmo configurado no painel da Meta pra URL <code class="text-[10px]">/webhook/whatsapp-meta</code>.</p>
                 </div>
             </div>
 

@@ -142,6 +142,10 @@
                 </div>
 
             @elseif($configuring)
+                @php
+                    $metaAppId = \App\Models\Setting::getGlobal('meta_app_id', '');
+                    $metaConfigId = \App\Models\Setting::getGlobal('meta_config_id', '');
+                @endphp
                 <div x-data="{
                     renameModalOpen: false,
                     renameValue: @js($configuring->name),
@@ -319,6 +323,10 @@
                     wa_url: '{{ $configuring->whatsapp_url ?? '' }}',
                     wa_instance: '{{ $configuring->whatsapp_instance ?? '' }}',
                     wa_token: '{{ $configuring->whatsapp_token ?? '' }}',
+                    wa_waba_id: '{{ $configuring->whatsapp_waba_id ?? '' }}',
+                    metaConnecting: false,
+                    metaAppId: @js($metaAppId),
+                    metaConfigId: @js($metaConfigId),
 
                     testing: false,
                     saving: false,
@@ -507,6 +515,10 @@
                     },
 
                     async checkWaStatusSilent() {
+                        if (this.wa_provider === 'meta') {
+                            this.waStatus = (this.wa_instance && this.wa_token) ? 'connected' : 'disconnected';
+                            return;
+                        }
                         if(!this.wa_provider || !this.wa_url || !this.wa_token) {
                             this.waStatus = 'disconnected';
                             return;
@@ -569,6 +581,88 @@
                         } catch(e) {
                             alertModal('Erro na requisição.');
                             this.checkWaStatusSilent();
+                        }
+                    },
+
+                    loadFacebookSdk() {
+                        if (window.FB) return Promise.resolve();
+                        if (window.__fbSdkPromise) return window.__fbSdkPromise;
+                        window.__fbSdkPromise = new Promise((resolve, reject) => {
+                            window.fbAsyncInit = function() {
+                                window.FB.init({ appId: window.__metaAppIdForSdk, cookie: true, xfbml: false, version: 'v21.0' });
+                                resolve();
+                            };
+                            const script = document.createElement('script');
+                            script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
+                            script.async = true;
+                            script.defer = true;
+                            script.onerror = () => reject(new Error('Falha ao carregar o SDK da Meta.'));
+                            document.body.appendChild(script);
+                        });
+                        return window.__fbSdkPromise;
+                    },
+
+                    async startMetaConnect() {
+                        if (!this.metaAppId || !this.metaConfigId) {
+                            alertModal('Configure o App ID e o Configuration ID da Meta em Ambiente antes de conectar.');
+                            return;
+                        }
+                        this.metaConnecting = true;
+                        let signupData = null;
+
+                        const onMessage = (event) => {
+                            if (!event.origin.endsWith('facebook.com')) return;
+                            try {
+                                const data = JSON.parse(event.data);
+                                if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
+                                    signupData = data.data;
+                                }
+                            } catch (e) { /* mensagens que não são JSON da Meta - ignora */ }
+                        };
+                        window.addEventListener('message', onMessage);
+
+                        try {
+                            window.__metaAppIdForSdk = this.metaAppId;
+                            await this.loadFacebookSdk();
+
+                            const authResponse = await new Promise((resolve) => {
+                                window.FB.login((response) => resolve(response), {
+                                    config_id: this.metaConfigId,
+                                    response_type: 'code',
+                                    override_default_response_type: true,
+                                });
+                            });
+
+                            const code = authResponse?.authResponse?.code;
+                            if (!code || !signupData?.phone_number_id || !signupData?.waba_id) {
+                                alertModal('Conexão cancelada ou incompleta. Tente novamente.');
+                                return;
+                            }
+
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({
+                                    action: 'meta_connect',
+                                    assistant_id: {{ $configuring->id }},
+                                    code: code,
+                                    phone_number_id: signupData.phone_number_id,
+                                    waba_id: signupData.waba_id,
+                                }),
+                            });
+                            const data = await res.json();
+                            if (res.ok && data.success) {
+                                this.wa_instance = signupData.phone_number_id;
+                                this.wa_waba_id = signupData.waba_id;
+                                this.wa_token = 'ok';
+                                this.waStatus = 'connected';
+                            }
+                            Alpine.store('toast').show(data.message || 'Erro ao conectar.', (res.ok && data.success) ? 'success' : 'error');
+                        } catch (e) {
+                            Alpine.store('toast').show('Erro ao conectar com a Meta.', 'error');
+                        } finally {
+                            window.removeEventListener('message', onMessage);
+                            this.metaConnecting = false;
                         }
                     },
 
@@ -881,7 +975,7 @@
                                     <span x-show="waStatus === 'disconnected'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 flex items-center gap-1 border border-red-200 shadow-sm">
                                         <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Desconectado
                                     </span>
-                                    <button type="button" title="Desconectar" x-show="waStatus === 'connected'" x-on:click="disconnectWa()" class="w-6 h-6 rounded-full bg-red-50 hover:bg-red-100 text-red-600 transition border border-red-200 flex items-center justify-center cursor-pointer shadow-sm shrink-0">
+                                    <button type="button" title="Desconectar" x-show="waStatus === 'connected' && wa_provider !== 'meta'" x-on:click="disconnectWa()" class="w-6 h-6 rounded-full bg-red-50 hover:bg-red-100 text-red-600 transition border border-red-200 flex items-center justify-center cursor-pointer shadow-sm shrink-0">
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.636 5.636a9 9 0 1012.728 0M12 3v9" /></svg>
                                     </button>
                                 </div>
@@ -890,10 +984,7 @@
                                 <select form="configForm" name="whatsapp_provider" x-model="wa_provider" x-on:change="checkWaStatusSilent()" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-3 focus:ring-2 focus:ring-indigo-500">
                                     <option value="">Desativado</option>
                                     <option value="uazapi">UaZapi</option>
-                                    <option value="evolution">Evolution API</option>
                                     <option value="meta">API Oficial (Meta)</option>
-                                    <option value="zapi">Z-API</option>
-                                    <option value="chatpro">ChatPro</option>
                                 </select>
 
                                 <div x-show="wa_provider !== ''" x-transition class="space-y-3">
@@ -907,47 +998,29 @@
                                             <input form="configForm" type="password" name="whatsapp_token" x-model="wa_token" x-on:change="checkWaStatusSilent()" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]" placeholder="Ex: T0K3N...">
                                         </div>
                                     </template>
-                                    <template x-if="wa_provider === 'evolution'">
-                                        <div>
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">URL (Evolution)</label>
-                                            <input form="configForm" type="url" name="whatsapp_url" x-model="wa_url" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2" placeholder="https://api...">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Nome da Instância</label>
-                                            <input form="configForm" type="text" name="whatsapp_instance" x-model="wa_instance" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Global API Key</label>
-                                            <input form="configForm" type="password" name="whatsapp_token" x-model="wa_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                        </div>
-                                    </template>
                                     <template x-if="wa_provider === 'meta'">
                                         <div>
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Phone Number ID</label>
-                                            <input form="configForm" type="text" name="whatsapp_instance" x-model="wa_instance" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Access Token</label>
-                                            <input form="configForm" type="password" name="whatsapp_token" x-model="wa_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Verify Token</label>
-                                            <input form="configForm" type="text" name="whatsapp_verify_token" value="{{ $configuring->whatsapp_verify_token }}" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                        </div>
-                                    </template>
-                                    <template x-if="wa_provider === 'zapi'">
-                                        <div>
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">ID da Instância</label>
-                                            <input form="configForm" type="text" name="whatsapp_instance" x-model="wa_instance" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Token da Instância</label>
-                                            <input form="configForm" type="password" name="whatsapp_token" x-model="wa_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Client-Token</label>
-                                            <input form="configForm" type="text" name="whatsapp_verify_token" value="{{ $configuring->whatsapp_verify_token }}" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                        </div>
-                                    </template>
-                                    <template x-if="wa_provider === 'chatpro'">
-                                        <div>
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Endpoint URL</label>
-                                            <input form="configForm" type="url" name="whatsapp_url" x-model="wa_url" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Token</label>
-                                            <input form="configForm" type="password" name="whatsapp_token" x-model="wa_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                            <!-- Phone Number ID/token/WABA ID da Meta NÃO vão pelo configForm/Salvar geral -
+                                                 connectMeta() já grava isso direto no banco; reenviar por aqui sobrescreveria
+                                                 o token de verdade com o estado local (que nunca tem o token real). -->
+                                            <template x-if="!wa_instance || !wa_token">
+                                                <button type="button" @click="startMetaConnect()" :disabled="metaConnecting" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
+                                                    <span x-text="metaConnecting ? 'Conectando...' : 'Conectar com WhatsApp'"></span>
+                                                </button>
+                                            </template>
+                                            <template x-if="wa_instance && wa_token">
+                                                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
+                                                    <p class="font-bold mb-0.5">✅ Conectado via Meta</p>
+                                                    <p>Phone Number ID: <span class="font-mono" x-text="wa_instance"></span></p>
+                                                </div>
+                                            </template>
+                                            <p class="text-[10px] text-gray-400 mt-2 leading-tight">Abre o login oficial da Meta pra você (ou seu cliente) escolher/criar o Portfólio de Negócios e conectar o número - inclusive o que já usa no WhatsApp Business do celular, sem perder o histórico.</p>
                                         </div>
                                     </template>
                                 </div>
 
-                                <div x-show="wa_provider !== ''" x-transition class="border-t border-gray-100 pt-3 mt-4">
+                                <div x-show="wa_provider === 'uazapi'" x-transition class="border-t border-gray-100 pt-3 mt-4">
                                     <button type="button" x-on:click="startWaConnection()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" /></svg>
                                         Conectar / QR Code

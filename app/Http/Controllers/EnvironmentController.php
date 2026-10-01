@@ -9,7 +9,7 @@ class EnvironmentController extends Controller
 {
     public function index()
     {
-        return response()->json(Setting::branding());
+        return response()->json(Setting::branding() + $this->metaConfig());
     }
 
     public function update(Request $request)
@@ -22,6 +22,10 @@ class EnvironmentController extends Controller
             'footer_version' => 'required|string|max:30',
             'footer_company' => 'required|string|max:150',
             'footer_year' => 'required|digits:4',
+            'meta_app_id' => 'nullable|string|max:100',
+            'meta_app_secret' => 'nullable|string|max:255',
+            'meta_config_id' => 'nullable|string|max:100',
+            'meta_webhook_verify_token' => 'nullable|string|max:255',
         ]);
 
         if ($request->hasFile('logo_light')) {
@@ -41,6 +45,27 @@ class EnvironmentController extends Controller
         Setting::setGlobal('app_footer_company', $data['footer_company']);
         Setting::setGlobal('app_footer_year', $data['footer_year']);
 
-        return response()->json(['success' => true, 'message' => 'Ambiente atualizado com sucesso!'] + Setting::branding());
+        Setting::setGlobal('meta_app_id', trim($data['meta_app_id'] ?? ''));
+        if ($request->filled('meta_app_secret')) {
+            Setting::setGlobal('meta_app_secret', trim($data['meta_app_secret']));
+        }
+        Setting::setGlobal('meta_config_id', trim($data['meta_config_id'] ?? ''));
+        Setting::setGlobal('meta_webhook_verify_token', trim($data['meta_webhook_verify_token'] ?? ''));
+
+        return response()->json(['success' => true, 'message' => 'Ambiente atualizado com sucesso!'] + Setting::branding() + $this->metaConfig());
+    }
+
+    /**
+     * meta_app_secret nunca volta pro front (so indica se ja foi preenchido) -
+     * e um segredo que so deve trafegar na hora de salvar, nunca na leitura.
+     */
+    private function metaConfig(): array
+    {
+        return [
+            'meta_app_id' => Setting::getGlobal('meta_app_id', ''),
+            'meta_app_secret_set' => Setting::getGlobal('meta_app_secret') ? true : false,
+            'meta_config_id' => Setting::getGlobal('meta_config_id', ''),
+            'meta_webhook_verify_token' => Setting::getGlobal('meta_webhook_verify_token', ''),
+        ];
     }
 }
