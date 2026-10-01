@@ -156,15 +156,17 @@
                     </button>
 
                     <button type="button" @click="webhookModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
+                            <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white {{ !empty($webhookUrl) ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
                         </span>
                         <span class="font-bold text-gray-800 text-sm">Webhook Multiagentes</span>
                     </button>
 
                     <button type="button" @click="schedulingModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008z" /></svg>
+                            <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white {{ ($schedulingEnabled ?? '1') == '1' ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
                         </span>
                         <span class="font-bold text-gray-800 text-sm">Regras & Diretrizes de Agendamento</span>
                     </button>
@@ -172,8 +174,9 @@
 
                 <div class="flex flex-wrap justify-center gap-3 mb-4">
                     <button type="button" @click="googleModalOpen = true" class="w-full sm:w-72 bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 9v9a2.25 2.25 0 002.25 2.25z" /></svg>
+                            <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white {{ !empty($googleRefreshToken) ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
                         </span>
                         <span class="font-bold text-gray-800 text-sm">Google Calendar & Meet</span>
                     </button>
