@@ -212,7 +212,7 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 Fuso Horário
                             </h3>
-                            <button type="button" @click="timezoneModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="timezoneModalOpen = false; persistOpenModal('timezone', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
@@ -268,7 +268,7 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
                                 Webhook Multiagentes
                             </h3>
-                            <button type="button" @click="webhookModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="webhookModalOpen = false; persistOpenModal('webhook', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
@@ -297,7 +297,7 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008z" /></svg>
                                 Regras & Diretrizes de Agendamento
                             </h3>
-                            <button type="button" @click="schedulingModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="schedulingModalOpen = false; persistOpenModal('scheduling', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
@@ -429,7 +429,7 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 9v9a2.25 2.25 0 002.25 2.25z" /></svg>
                                 Integração Google Calendar & Meet
                             </h3>
-                            <button type="button" @click="googleModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="googleModalOpen = false; persistOpenModal('google', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
@@ -489,7 +489,7 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
                                 Controle de Anexos
                             </h3>
-                            <button type="button" @click="attachmentsModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="attachmentsModalOpen = false; persistOpenModal('attachments', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>

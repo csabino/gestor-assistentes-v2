@@ -567,7 +567,7 @@
         <div @click.away="profileModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative border border-slate-200">
             <div class="flex items-center justify-between mb-5">
                 <h3 class="text-base font-bold text-gray-800">Meu Perfil</h3>
-                <button type="button" @click="profileModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                <button type="button" @click="profileModalOpen = false; window.location.reload()" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
@@ -632,7 +632,7 @@
                     <h3 class="text-base font-bold text-gray-800">Usuários</h3>
                     <p class="text-xs text-gray-500 mt-0.5">Gerencie os usuários que têm acesso ao painel administrativo.</p>
                 </div>
-                <button type="button" @click="usersModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                <button type="button" @click="usersModalOpen = false; window.location.reload()" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
@@ -759,7 +759,7 @@
                     <h3 class="text-base font-bold text-gray-800 dark:text-gray-100">Ambiente</h3>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Identidade visual e informações do sistema.</p>
                 </div>
-                <button type="button" @click="envModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <button type="button" @click="envModalOpen = false; window.location.reload()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>

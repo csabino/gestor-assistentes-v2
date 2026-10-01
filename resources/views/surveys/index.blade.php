@@ -184,7 +184,7 @@
                                             Exportar CSV
                                         </a>
                                     @endif
-                                    <button type="button" @click="showResponsesModal = false" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg transition">
+                                    <button type="button" @click="showResponsesModal = false; window.location.reload()" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg transition">
                                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                     </button>
                                 </div>
@@ -218,7 +218,7 @@
                         <div @click.away="showDashboardModal = false" class="dark-card-invert bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[88vh] flex flex-col border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800">Dashboard — {{ $editingSurvey->name }}</h3>
-                                <button type="button" @click="showDashboardModal = false" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg transition">
+                                <button type="button" @click="showDashboardModal = false; window.location.reload()" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg transition">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
