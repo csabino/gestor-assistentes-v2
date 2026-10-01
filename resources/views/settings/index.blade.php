@@ -49,6 +49,15 @@
                                 this.currentTz = formData.get('timezone');
                                 this.updateTzClock();
                             }
+                            if (res.ok) {
+                                // Depois de salvar, atualiza a foto do modal aberto - senao fechar logo em
+                                // seguida pelo X acharia que ainda ha algo nao salvo e perguntaria à toa.
+                                if (this.timezoneModalOpen) this.snapTimezone = this.snapshotForm(document.getElementById('timezoneModalBody'));
+                                if (this.webhookModalOpen) this.snapWebhook = this.snapshotForm(document.getElementById('webhookModalBody'));
+                                if (this.schedulingModalOpen) this.snapScheduling = this.snapshotForm(document.getElementById('schedulingModalBody'));
+                                if (this.googleModalOpen) this.snapGoogle = this.snapshotForm(document.getElementById('googleModalBody'));
+                                if (this.attachmentsModalOpen) this.snapAttachments = this.snapshotForm(document.getElementById('attachmentsModalBody'));
+                            }
                             Alpine.store('toast').show(data.message || 'Configurações atualizadas!', res.ok ? 'success' : 'error');
                         }
                     } catch (e) {
