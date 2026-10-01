@@ -16,6 +16,15 @@
                 newHolidayDate: '',
                 newHolidayRecurring: false,
                 holidaysList: @js($holidays->map(fn($h) => ['id' => $h->id, 'name' => $h->name, 'date_formatted' => $h->date->format('d/m/Y'), 'is_recurring' => $h->is_recurring])->values()),
+                currentTz: @js($currentTz),
+                tzClockText: '',
+                updateTzClock() {
+                    try {
+                        this.tzClockText = new Date().toLocaleTimeString('pt-BR', { timeZone: this.currentTz, hour: '2-digit', minute: '2-digit' });
+                    } catch (e) {
+                        this.tzClockText = '';
+                    }
+                },
 
                 async saveSettings() {
                     if (this.saving) return;
@@ -31,6 +40,10 @@
                         if (res.status === 422 && data.errors) {
                             alertModal(Object.values(data.errors).flat().join(' '));
                         } else {
+                            if (res.ok && formData.get('timezone')) {
+                                this.currentTz = formData.get('timezone');
+                                this.updateTzClock();
+                            }
                             Alpine.store('toast').show(data.message || 'Configurações atualizadas!', res.ok ? 'success' : 'error');
                         }
                     } catch (e) {
@@ -121,7 +134,7 @@
                     this.$watch('attachmentsModalOpen', v => this.persistOpenModal('attachments', v));
                 },
             }"
-            x-init="restoreOpenModal()">
+            x-init="restoreOpenModal(); updateTzClock(); setInterval(() => updateTzClock(), 30000)">
 
             <form id="settingsForm" action="/?view=settings" method="POST">
                 @csrf
@@ -149,8 +162,9 @@
                 <!-- PAINEL DE BOTÕES -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
                     <button type="button" @click="timezoneModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span x-show="tzClockText" x-text="tzClockText" x-cloak class="absolute -top-2 -right-4 bg-white border border-gray-200 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 shadow-sm whitespace-nowrap"></span>
                         </span>
                         <span class="font-bold text-gray-800 text-sm">Fuso Horário</span>
                     </button>
@@ -182,8 +196,9 @@
                     </button>
 
                     <button type="button" @click="attachmentsModalOpen = true" class="w-full sm:w-72 bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
+                            <span class="absolute -top-2 -right-4 bg-white border border-gray-200 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 shadow-sm whitespace-nowrap">{{ $maxFileSize ?? '4' }} MB</span>
                         </span>
                         <span class="font-bold text-gray-800 text-sm">Controle de Anexos</span>
                     </button>
