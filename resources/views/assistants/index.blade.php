@@ -158,6 +158,8 @@
                     kbSortDir: 'asc',
                     kbRows: [],
                     kbLoading: false,
+                    docsCount: 0,
+                    docsUploading: false,
                     selectedFiles: [],
                     get allSelected() { return this.selectedFiles.length === this.kbRows.length && this.kbRows.length > 0; },
                     async loadKbRows() {
@@ -202,13 +204,78 @@
                     async submitBulkDelete() {
                         if (this.selectedFiles.length === 0) return;
                         if (!(await confirmModal('Tem certeza que deseja apagar os ' + this.selectedFiles.length + ' itens selecionados?'))) return;
-                        saveScrollPosition();
-                        const form = document.getElementById('bulkDeleteForm');
-                        form.innerHTML = '<input type=\'hidden\' name=\'_token\' value=\'{{ csrf_token() }}\'><input type=\'hidden\' name=\'_method\' value=\'DELETE\'><input type=\'hidden\' name=\'assistant_id\' value=\'{{ $configuring->id ?? '' }}\'>';
-                        this.selectedFiles.forEach(idx => {
-                            form.innerHTML += '<input type=\'hidden\' name=\'file_indexes[]\' value=\'' + idx + '\'>';
-                        });
-                        form.submit();
+                        try {
+                            const res = await fetch('/', {
+                                method: 'DELETE',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                },
+                                body: JSON.stringify({ assistant_id: {{ $configuring->id ?? 'null' }}, file_indexes: this.selectedFiles }),
+                            });
+                            const data = await res.json();
+                            Alpine.store('toast').show(data.message || 'Fontes removidas.', res.ok ? 'success' : 'error');
+                            this.selectedFiles = [];
+                            await this.loadKbRows();
+                        } catch (e) {
+                            Alpine.store('toast').show('Erro ao remover as fontes selecionadas.', 'error');
+                        }
+                    },
+
+                    async uploadDocs() {
+                        const files = this.$refs.docsInput.files;
+                        if (!files || files.length === 0) {
+                            alertModal('Selecione ao menos um arquivo antes de anexar.');
+                            return;
+                        }
+                        this.docsUploading = true;
+                        try {
+                            const formData = new FormData();
+                            formData.append('_method', 'PUT');
+                            formData.append('assistant_id', '{{ $configuring->id ?? '' }}');
+                            for (const file of files) {
+                                formData.append('documents[]', file);
+                                formData.append('document_modified_at[]', file.lastModified);
+                            }
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                },
+                                body: formData,
+                            });
+                            const data = await res.json();
+                            Alpine.store('toast').show(data.message || 'Arquivos anexados.', res.ok ? 'success' : 'error');
+                            this.$refs.docsInput.value = '';
+                            this.docsCount = 0;
+                            if (this.kbModalOpen) await this.loadKbRows();
+                        } catch (e) {
+                            Alpine.store('toast').show('Erro ao anexar arquivos.', 'error');
+                        } finally {
+                            this.docsUploading = false;
+                        }
+                    },
+
+                    async deleteKbFile(index) {
+                        if (!(await confirmModal('Remover esta fonte de conhecimento?'))) return;
+                        try {
+                            const res = await fetch('/', {
+                                method: 'DELETE',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                },
+                                body: JSON.stringify({ assistant_id: {{ $configuring->id ?? 'null' }}, file_index: index }),
+                            });
+                            const data = await res.json();
+                            Alpine.store('toast').show(data.message || 'Arquivo removido.', res.ok ? 'success' : 'error');
+                            await this.loadKbRows();
+                        } catch (e) {
+                            Alpine.store('toast').show('Erro ao remover o arquivo.', 'error');
+                        }
                     },
 
                     async saveRename() {
@@ -696,7 +763,7 @@
                                 <div class="grid w-full min-w-0">
                                     <textarea form="configForm" name="system_prompt" x-model="systemPromptText"
                                         class="[grid-area:1/1] w-full min-w-0 min-h-[160px] border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none overflow-hidden" placeholder="Ex: Você é um vendedor especializado na loja X..."></textarea>
-                                    <div class="[grid-area:1/1] invisible min-w-0 min-h-[160px] whitespace-pre-wrap break-all border border-transparent p-3 text-sm" x-text="systemPromptText + ' '"></div>
+                                    <div class="[grid-area:1/1] invisible min-w-0 min-h-[160px] whitespace-pre-wrap break-words border border-transparent p-3 text-sm" x-text="systemPromptText + ' '"></div>
                                 </div>
                                 <div class="h-4"></div>
                             </div>
@@ -1131,17 +1198,6 @@
                     </div>
 
                 </form>
-
-                @if($configuring->knowledge_files && count($configuring->knowledge_files) > 0)
-                    @foreach($configuring->knowledge_files as $index => $file)
-                        <form id="deleteFileForm_{{ $index }}" action="/" method="POST" class="hidden">
-                            @csrf @method('DELETE')
-                            <input type="hidden" name="assistant_id" value="{{ $configuring->id }}">
-                            <input type="hidden" name="file_index" value="{{ $index }}">
-                        </form>
-                    @endforeach
-                    <form id="bulkDeleteForm" action="/" method="POST" class="hidden"></form>
-                @endif
                 </div>
 
                 <!-- MODAL EDITAR ASSISTENTE (NOME E EMPRESA) -->
@@ -1183,16 +1239,17 @@
 
                         <div class="px-5 pt-4 shrink-0 border-b border-gray-100 pb-4">
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200" x-data="{ docsCount: 0 }">
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
                                     <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Anexar Arquivos (PDF, Word, TXT)</label>
                                     <div class="flex items-stretch gap-2">
                                         <button type="button" @click="$refs.docsInput.click()" title="Escolher arquivos" class="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:text-indigo-600 hover:border-indigo-300 bg-white transition shrink-0">
                                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
                                         </button>
-                                        <input type="file" x-ref="docsInput" form="configForm" name="documents[]" multiple accept=".pdf,.doc,.docx,.txt" class="hidden" @change="docsCount = $event.target.files.length">
+                                        <input type="file" x-ref="docsInput" multiple accept=".pdf,.doc,.docx,.txt" class="hidden" @change="docsCount = $event.target.files.length">
                                         <span class="flex-1 min-w-0 flex items-center text-sm text-gray-500 border border-gray-200 rounded-lg px-3 bg-white truncate" x-text="docsCount + (docsCount === 1 ? ' arquivo' : ' arquivos')"></span>
-                                        <button type="button" @click="if (docsCount === 0) { alertModal('Selecione ao menos um arquivo antes de anexar.'); } else { saveScrollPosition(); document.getElementById('configForm').submit(); }" title="Anexar arquivos selecionados" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                                        <button type="button" @click="uploadDocs()" :disabled="docsUploading" title="Anexar arquivos selecionados" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-lg flex items-center justify-center shrink-0 transition shadow-sm">
+                                            <svg x-show="!docsUploading" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                                            <span x-show="docsUploading" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                                         </button>
                                     </div>
                                 </div>
@@ -1298,7 +1355,7 @@
                                             <td class="py-2.5 pr-3 text-gray-500" x-text="row.size ? (row.size > 1024 ? Math.round(row.size / 1024) + ' KB' : row.size + ' B') : '—'"></td>
                                             <td class="py-2.5 pr-3 text-gray-500" x-text="row.crawled_at || '—'"></td>
                                             <td class="py-2.5 pr-3">
-                                                <button type="button" @click="confirmModal('Remover esta fonte de conhecimento?').then(ok => { if (ok) { saveScrollPosition(); document.getElementById('deleteFileForm_' + row.index).submit(); } })" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition">
+                                                <button type="button" @click="deleteKbFile(row.index)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition">
                                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                                 </button>
                                             </td>

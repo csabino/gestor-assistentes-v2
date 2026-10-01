@@ -1676,31 +1676,77 @@ class AssistantController extends Controller
         }
         $hasKnowledgeChanges = false;
 
+        $uploadSkippedDuplicate = [];
+        $uploadSkippedOlder = [];
+        $uploadReplaced = [];
+        $uploadAdded = [];
+
         if ($request->hasFile('documents')) {
             $uploadedFiles = $request->file('documents');
             if (!is_array($uploadedFiles)) {
                 $uploadedFiles = [$uploadedFiles];
             }
+            $clientModifiedTimes = $request->input('document_modified_at', []);
 
-            foreach ($uploadedFiles as $file) {
-                if ($file && $file->isValid()) {
-                    try {
-                        $fileName = $file->getClientOriginalName();
-                        $path = $file->store('knowledge_base');
-                        $fullPath = Storage::path($path);
-                        
-                        $extractedText = $this->extractTextFromFile($fullPath, $fileName);
+            foreach ($uploadedFiles as $i => $file) {
+                if (!$file || !$file->isValid()) {
+                    continue;
+                }
 
-                        $existingFiles[] = [
-                            'name' => $fileName,
-                            'path' => $path,
-                            'content' => $extractedText,
-                            'added_at' => now()->toDateTimeString(),
-                        ];
-                        $hasKnowledgeChanges = true;
-                    } catch (\Throwable $e) {
-                        Log::error('Erro no anexo ' . $file->getClientOriginalName() . ': ' . $e->getMessage());
+                $fileName = $file->getClientOriginalName();
+                $fileSize = $file->getSize();
+                $clientModifiedAt = (int) ($clientModifiedTimes[$i] ?? 0);
+
+                $existingIndex = null;
+                foreach ($existingFiles as $idx => $existing) {
+                    if (($existing['name'] ?? null) === $fileName) {
+                        $existingIndex = $idx;
+                        break;
                     }
+                }
+
+                if ($existingIndex !== null) {
+                    $existing = $existingFiles[$existingIndex];
+                    $existingModifiedAt = $existing['file_modified_at'] ?? null;
+                    $existingSize = $existing['file_size'] ?? null;
+
+                    if ($existingModifiedAt !== null && $existingSize !== null) {
+                        if ($fileSize === $existingSize && $clientModifiedAt === $existingModifiedAt) {
+                            $uploadSkippedDuplicate[] = $fileName;
+                            continue;
+                        }
+                        if ($clientModifiedAt < $existingModifiedAt) {
+                            $uploadSkippedOlder[] = $fileName;
+                            continue;
+                        }
+                    }
+
+                    // Substitui: remove a versao anterior do storage e do array antes de gravar a nova.
+                    if (!empty($existing['path'])) {
+                        Storage::delete($existing['path']);
+                    }
+                    array_splice($existingFiles, $existingIndex, 1);
+                    $uploadReplaced[] = $fileName;
+                } else {
+                    $uploadAdded[] = $fileName;
+                }
+
+                try {
+                    $path = $file->store('knowledge_base');
+                    $fullPath = Storage::path($path);
+                    $extractedText = $this->extractTextFromFile($fullPath, $fileName);
+
+                    $existingFiles[] = [
+                        'name' => $fileName,
+                        'path' => $path,
+                        'content' => $extractedText,
+                        'added_at' => now()->toDateTimeString(),
+                        'file_size' => $fileSize,
+                        'file_modified_at' => $clientModifiedAt,
+                    ];
+                    $hasKnowledgeChanges = true;
+                } catch (\Throwable $e) {
+                    Log::error('Erro no anexo ' . $fileName . ': ' . $e->getMessage());
                 }
             }
         }
@@ -1712,7 +1758,16 @@ class AssistantController extends Controller
         $assistant->forceFill($data)->save();
 
         if ($request->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'Configurações atualizadas!']);
+            $messageParts = [];
+            if ($uploadAdded) $messageParts[] = count($uploadAdded) . ' arquivo(s) anexado(s)';
+            if ($uploadReplaced) $messageParts[] = count($uploadReplaced) . ' atualizado(s) para a versão mais recente';
+            if ($uploadSkippedDuplicate) $messageParts[] = count($uploadSkippedDuplicate) . ' ignorado(s) por já existir(em) sem alteração';
+            if ($uploadSkippedOlder) $messageParts[] = count($uploadSkippedOlder) . ' ignorado(s) por ser(em) mais antigo(s) que a versão já cadastrada';
+
+            return response()->json([
+                'success' => true,
+                'message' => $messageParts ? implode(', ', $messageParts) . '.' : 'Configurações atualizadas!',
+            ]);
         }
 
         return redirect('/?configure=' . $assistant->id)->with('success', 'Configurações atualizadas!');
@@ -1770,6 +1825,11 @@ class AssistantController extends Controller
             }
 
             $assistant->forceFill(['knowledge_files' => array_values($files)])->save();
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true, 'message' => 'Fontes de conhecimento removidas com sucesso.']);
+            }
+
             return redirect('/?configure=' . $assistant->id)->with('success', 'Fontes de conhecimento removidas com sucesso.');
         }
 
@@ -1785,6 +1845,11 @@ class AssistantController extends Controller
                 array_splice($files, $index, 1);
                 $assistant->forceFill(['knowledge_files' => array_values($files)])->save();
             }
+
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true, 'message' => 'Arquivo/URL removido.']);
+            }
+
             return redirect('/?configure=' . $assistant->id)->with('success', 'Arquivo/URL removido.');
         }
 
