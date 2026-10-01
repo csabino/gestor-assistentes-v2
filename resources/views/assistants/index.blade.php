@@ -326,6 +326,14 @@
                     wa_instance: '{{ $configuring->whatsapp_instance ?? '' }}',
                     wa_token: '{{ $configuring->whatsapp_token ?? '' }}',
                     wa_waba_id: '{{ $configuring->whatsapp_waba_id ?? '' }}',
+                    // Guarda o que está REALMENTE salvo no banco pra Meta, separado do wa_instance/wa_token
+                    // do formulário - esses dois últimos são compartilhados com a UazAPI, então se o
+                    // assistente já teve UazAPI configurada e o admin só troca o combo pra Meta sem
+                    // conectar de verdade, wa_instance/wa_token ainda carregam os valores antigos da
+                    // UazAPI e dariam falso positivo de Conectado via Meta.
+                    savedWaProvider: '{{ $configuring->whatsapp_provider ?? '' }}',
+                    savedWaInstance: '{{ $configuring->whatsapp_instance ?? '' }}',
+                    savedWaToken: '{{ $configuring->whatsapp_token ?? '' }}',
                     metaConnecting: false,
                     metaAppId: @js($metaAppId),
                     metaConfigId: @js($metaConfigId),
@@ -377,6 +385,7 @@
                     },
 
                     testing: false,
+                    aiStatus: 'checking',
                     saving: false,
                     showWaModal: false,
                     showWebhookModal: new URLSearchParams(window.location.search).get('modal') === 'webhook',
@@ -530,11 +539,28 @@
                                 body: JSON.stringify({ action: 'test_ai', provider: this.provider, api_key: this.getApiKey() })
                             });
                             const result = await response.json();
+                            this.aiStatus = result.success ? 'connected' : 'disconnected';
                             Alpine.store('toast').show(result.message, result.success ? 'success' : 'error');
                         } catch (e) {
+                            this.aiStatus = 'disconnected';
                             Alpine.store('toast').show('Erro ao processar requisição.', 'error');
                         } finally {
                             this.testing = false;
+                        }
+                    },
+
+                    async checkAiStatusSilent() {
+                        this.aiStatus = 'checking';
+                        try {
+                            const response = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({ action: 'test_ai', provider: this.provider, api_key: this.getApiKey() })
+                            });
+                            const result = await response.json();
+                            this.aiStatus = result.success ? 'connected' : 'disconnected';
+                        } catch (e) {
+                            this.aiStatus = 'disconnected';
                         }
                     },
 
@@ -564,7 +590,7 @@
 
                     async checkWaStatusSilent() {
                         if (this.wa_provider === 'meta') {
-                            this.waStatus = (this.wa_instance && this.wa_token) ? 'connected' : 'disconnected';
+                            this.waStatus = (this.savedWaProvider === 'meta' && this.savedWaInstance && this.savedWaToken) ? 'connected' : 'disconnected';
                             return;
                         }
                         if(!this.wa_provider || !this.wa_url || !this.wa_token) {
@@ -703,6 +729,9 @@
                                 this.wa_instance = signupData.phone_number_id;
                                 this.wa_waba_id = signupData.waba_id;
                                 this.wa_token = 'ok';
+                                this.savedWaProvider = 'meta';
+                                this.savedWaInstance = signupData.phone_number_id;
+                                this.savedWaToken = 'ok';
                                 this.waStatus = 'connected';
                             }
                             Alpine.store('toast').show(data.message || 'Erro ao conectar.', (res.ok && data.success) ? 'success' : 'error');
@@ -758,7 +787,7 @@
                         this.showWebhookModal = false;
                         window.history.replaceState(null, '', '/?configure={{ $configuring->id }}');
                     }
-                }" x-init="checkWaStatusSilent(); restoreOpenModal()">
+                }" x-init="checkWaStatusSilent(); checkAiStatusSilent(); restoreOpenModal()">
                 <div class="sticky top-0 z-10 bg-gray-50 py-2 mb-3 border-b border-gray-200 flex flex-col md:flex-row items-center justify-between gap-3">
                     <div class="flex items-center gap-4">
                         <a href="/" class="dark-btn-fix text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1.5 text-sm transition bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100">
@@ -834,6 +863,7 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" /></svg>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Base de Conhecimento</span>
+                            <span class="text-[11px] text-gray-400">{{ count($configuring->knowledge_files ?? []) }} {{ count($configuring->knowledge_files ?? []) === 1 ? 'arquivo' : 'arquivos' }}</span>
                         </button>
 
                         <button type="button" @click="conexaoModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
@@ -841,6 +871,11 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" /></svg>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Conexão IA</span>
+                            <span class="text-[11px] flex items-center justify-center gap-1">
+                                <span x-show="aiStatus === 'checking'" class="text-gray-400">Verificando...</span>
+                                <span x-show="aiStatus === 'connected'" class="text-emerald-600 font-bold">Ativo</span>
+                                <span x-show="aiStatus === 'disconnected'" class="text-red-500 font-bold">Inativo</span>
+                            </span>
                         </button>
 
                         <button type="button" @click="canalWhatsappModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
@@ -867,6 +902,11 @@
                             <span class="font-bold text-gray-800 text-sm">Configurações Avançadas</span>
                         </a>
 
+                        @php
+                            $automationActive = \App\Models\Setting::where('assistant_id', $configuring->id)
+                                ->where('key', 'automation_enabled')
+                                ->value('value') === '1';
+                        @endphp
                         <a href="/?view=automation&assistant_id={{ $configuring->id }}" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                             <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -874,6 +914,7 @@
                                 </svg>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Automação</span>
+                            <span class="text-[11px] font-bold {{ $automationActive ? 'text-emerald-600' : 'text-red-500' }}">{{ $automationActive ? 'Ativa' : 'Inativa' }}</span>
                         </a>
                     </div>
 
@@ -928,8 +969,9 @@
                             </div>
                             <div class="flex-1 min-h-0 overflow-auto p-5">
                                 <div class="flex justify-end mb-3">
-                                    <button type="button" x-on:click="testConnection()" :disabled="testing" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-200 flex items-center shrink-0">
-                                        <span x-text="testing ? '⌛ Testando...' : '⚡ Testar'"></span>
+                                    <button type="button" x-on:click="testConnection()" :disabled="testing" class="dark-btn-fix text-xs font-bold py-1.5 px-3 rounded-lg border flex items-center shrink-0 transition"
+                                        :class="testing || aiStatus === 'checking' ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200' : (aiStatus === 'connected' ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200')">
+                                        <span x-text="testing ? '⌛ Testando...' : (aiStatus === 'checking' ? '⌛ Verificando...' : (aiStatus === 'connected' ? '✅ Ativo' : '❌ Inativo - Testar'))"></span>
                                     </button>
                                 </div>
 
