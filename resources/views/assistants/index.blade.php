@@ -1001,7 +1001,7 @@
 
                     <!-- MODAL CANAL WHATSAPP -->
                     <div x-show="canalWhatsappModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                        <div @click.away="if (!showWebhookModal && !showWaModal && !$store.alertDialog.visible && !$store.confirmDialog.visible) canalWhatsappModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                        <div @click.away="if (!showWebhookModal && !showWaModal && !$store.alertDialog.visible && !$store.confirmDialog.visible) canalWhatsappModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-emerald-500"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
@@ -1055,21 +1055,23 @@
                                                 <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 mb-3">
                                                     <p class="text-[11px] font-bold text-gray-600">Credenciais do App Tech Provider (Meta)</p>
                                                     <p class="text-[10px] text-gray-400 leading-tight">Valem pra todos os assistentes conectados via Meta - só precisa configurar uma vez.</p>
-                                                    <div>
-                                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App ID</label>
-                                                        <input type="text" x-model="metaConfigForm.meta_app_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                                    </div>
-                                                    <div>
-                                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App Secret</label>
-                                                        <input type="password" x-model="metaConfigForm.meta_app_secret" :placeholder="metaAppSecretSet ? '•••••••• (deixe em branco pra manter o atual)' : ''" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                                    </div>
-                                                    <div>
-                                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Configuration ID (Embedded Signup)</label>
-                                                        <input type="text" x-model="metaConfigForm.meta_config_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                                    </div>
-                                                    <div>
-                                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Verify Token do Webhook</label>
-                                                        <input type="text" x-model="metaConfigForm.meta_webhook_verify_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                    <div class="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App ID</label>
+                                                            <input type="text" x-model="metaConfigForm.meta_app_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App Secret</label>
+                                                            <input type="password" x-model="metaConfigForm.meta_app_secret" :placeholder="metaAppSecretSet ? '•••••••• (deixe em branco pra manter o atual)' : ''" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Configuration ID (Embedded Signup)</label>
+                                                            <input type="text" x-model="metaConfigForm.meta_config_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Verify Token do Webhook</label>
+                                                            <input type="text" x-model="metaConfigForm.meta_webhook_verify_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                        </div>
                                                     </div>
                                                     <p class="text-[10px] text-gray-400 leading-tight">Esse Verify Token precisa ser o mesmo configurado no painel da Meta pra URL <code class="text-[10px]">/webhook/whatsapp-meta</code>.</p>
                                                     <p x-show="metaConfigError" x-text="metaConfigError" class="text-[11px] text-red-600"></p>
