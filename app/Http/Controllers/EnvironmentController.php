@@ -14,14 +14,18 @@ class EnvironmentController extends Controller
 
     public function update(Request $request)
     {
+        // Todos os campos de texto são "nullable" porque este endpoint é compartilhado por dois
+        // formulários diferentes (o modal Ambiente e, agora, a configuração da Meta dentro do
+        // modal Canal WhatsApp) - cada um manda só os campos que é dono, e um não pode apagar o
+        // que o outro já salvou. Por isso cada valor só é gravado se vier preenchido (filled()).
         $data = $request->validate([
             'logo_light' => 'nullable|image|max:2048',
             'logo_dark' => 'nullable|image|max:2048',
             'login_bg' => 'nullable|image|max:4096',
-            'footer_name' => 'required|string|max:100',
-            'footer_version' => 'required|string|max:30',
-            'footer_company' => 'required|string|max:150',
-            'footer_year' => 'required|digits:4',
+            'footer_name' => 'nullable|string|max:100',
+            'footer_version' => 'nullable|string|max:30',
+            'footer_company' => 'nullable|string|max:150',
+            'footer_year' => 'nullable|digits:4',
             'meta_app_id' => 'nullable|string|max:100',
             'meta_app_secret' => 'nullable|string|max:255',
             'meta_config_id' => 'nullable|string|max:100',
@@ -40,19 +44,19 @@ class EnvironmentController extends Controller
             Setting::setGlobal('app_login_bg_path', $request->file('login_bg')->store('branding', 'public'));
         }
 
-        Setting::setGlobal('app_footer_name', $data['footer_name']);
-        Setting::setGlobal('app_footer_version', $data['footer_version']);
-        Setting::setGlobal('app_footer_company', $data['footer_company']);
-        Setting::setGlobal('app_footer_year', $data['footer_year']);
-
-        Setting::setGlobal('meta_app_id', trim($data['meta_app_id'] ?? ''));
-        if ($request->filled('meta_app_secret')) {
-            Setting::setGlobal('meta_app_secret', trim($data['meta_app_secret']));
+        foreach (['footer_name', 'footer_version', 'footer_company', 'footer_year'] as $key) {
+            if ($request->filled($key)) {
+                Setting::setGlobal('app_' . $key, trim($data[$key]));
+            }
         }
-        Setting::setGlobal('meta_config_id', trim($data['meta_config_id'] ?? ''));
-        Setting::setGlobal('meta_webhook_verify_token', trim($data['meta_webhook_verify_token'] ?? ''));
 
-        return response()->json(['success' => true, 'message' => 'Ambiente atualizado com sucesso!'] + Setting::branding() + $this->metaConfig());
+        foreach (['meta_app_id', 'meta_app_secret', 'meta_config_id', 'meta_webhook_verify_token'] as $key) {
+            if ($request->filled($key)) {
+                Setting::setGlobal($key, trim($data[$key]));
+            }
+        }
+
+        return response()->json(['success' => true, 'message' => 'Configurações atualizadas!'] + Setting::branding() + $this->metaConfig());
     }
 
     /**

@@ -145,6 +145,8 @@
                 @php
                     $metaAppId = \App\Models\Setting::getGlobal('meta_app_id', '');
                     $metaConfigId = \App\Models\Setting::getGlobal('meta_config_id', '');
+                    $metaAppSecretSet = \App\Models\Setting::getGlobal('meta_app_secret') ? true : false;
+                    $metaWebhookVerifyToken = \App\Models\Setting::getGlobal('meta_webhook_verify_token', '');
                 @endphp
                 <div x-data="{
                     renameModalOpen: false,
@@ -327,6 +329,52 @@
                     metaConnecting: false,
                     metaAppId: @js($metaAppId),
                     metaConfigId: @js($metaConfigId),
+                    metaAppSecretSet: @js($metaAppSecretSet),
+                    metaWebhookVerifyToken: @js($metaWebhookVerifyToken),
+                    metaConfigEditing: !(@js($metaAppId) && @js($metaConfigId) && @js($metaAppSecretSet)),
+                    metaConfigSaving: false,
+                    metaConfigError: null,
+                    metaConfigForm: {
+                        meta_app_id: @js($metaAppId),
+                        meta_app_secret: '',
+                        meta_config_id: @js($metaConfigId),
+                        meta_webhook_verify_token: @js($metaWebhookVerifyToken),
+                    },
+                    async saveMetaConfig() {
+                        this.metaConfigSaving = true;
+                        this.metaConfigError = null;
+                        const fd = new FormData();
+                        fd.append('meta_app_id', this.metaConfigForm.meta_app_id);
+                        if (this.metaConfigForm.meta_app_secret) fd.append('meta_app_secret', this.metaConfigForm.meta_app_secret);
+                        fd.append('meta_config_id', this.metaConfigForm.meta_config_id);
+                        fd.append('meta_webhook_verify_token', this.metaConfigForm.meta_webhook_verify_token);
+                        try {
+                            const res = await fetch('/settings/environment', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                },
+                                body: fd,
+                            });
+                            const json = await res.json();
+                            if (!res.ok) {
+                                this.metaConfigError = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message || 'Erro ao salvar.');
+                                return;
+                            }
+                            this.metaAppId = json.meta_app_id;
+                            this.metaConfigId = json.meta_config_id;
+                            this.metaAppSecretSet = json.meta_app_secret_set;
+                            this.metaWebhookVerifyToken = json.meta_webhook_verify_token;
+                            this.metaConfigForm.meta_app_secret = '';
+                            this.metaConfigEditing = false;
+                            Alpine.store('toast').show('Configuração da Meta salva!', 'success');
+                        } catch (e) {
+                            this.metaConfigError = 'Erro de conexão. Tente novamente.';
+                        } finally {
+                            this.metaConfigSaving = false;
+                        }
+                    },
 
                     testing: false,
                     saving: false,
@@ -1003,19 +1051,54 @@
                                             <!-- Phone Number ID/token/WABA ID da Meta NÃO vão pelo configForm/Salvar geral -
                                                  connectMeta() já grava isso direto no banco; reenviar por aqui sobrescreveria
                                                  o token de verdade com o estado local (que nunca tem o token real). -->
-                                            <template x-if="!wa_instance || !wa_token">
-                                                <button type="button" @click="startMetaConnect()" :disabled="metaConnecting" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
-                                                    <span x-text="metaConnecting ? 'Conectando...' : 'Conectar com WhatsApp'"></span>
-                                                </button>
-                                            </template>
-                                            <template x-if="wa_instance && wa_token">
-                                                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
-                                                    <p class="font-bold mb-0.5">✅ Conectado via Meta</p>
-                                                    <p>Phone Number ID: <span class="font-mono" x-text="wa_instance"></span></p>
+                                            <template x-if="metaConfigEditing">
+                                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 mb-3">
+                                                    <p class="text-[11px] font-bold text-gray-600">Credenciais do App Tech Provider (Meta)</p>
+                                                    <p class="text-[10px] text-gray-400 leading-tight">Valem pra todos os assistentes conectados via Meta - só precisa configurar uma vez.</p>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App ID</label>
+                                                        <input type="text" x-model="metaConfigForm.meta_app_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App Secret</label>
+                                                        <input type="password" x-model="metaConfigForm.meta_app_secret" :placeholder="metaAppSecretSet ? '•••••••• (deixe em branco pra manter o atual)' : ''" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Configuration ID (Embedded Signup)</label>
+                                                        <input type="text" x-model="metaConfigForm.meta_config_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Verify Token do Webhook</label>
+                                                        <input type="text" x-model="metaConfigForm.meta_webhook_verify_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                                    </div>
+                                                    <p class="text-[10px] text-gray-400 leading-tight">Esse Verify Token precisa ser o mesmo configurado no painel da Meta pra URL <code class="text-[10px]">/webhook/whatsapp-meta</code>.</p>
+                                                    <p x-show="metaConfigError" x-text="metaConfigError" class="text-[11px] text-red-600"></p>
+                                                    <div class="flex items-center gap-2 pt-1">
+                                                        <button type="button" @click="saveMetaConfig()" :disabled="metaConfigSaving" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 rounded-lg text-[11px] transition">
+                                                            <span x-text="metaConfigSaving ? 'Salvando...' : 'Salvar Configuração da Meta'"></span>
+                                                        </button>
+                                                        <button type="button" x-show="metaAppId && metaConfigId && metaAppSecretSet" @click="metaConfigEditing = false" class="text-[11px] text-gray-500 hover:text-gray-700 px-2">Cancelar</button>
+                                                    </div>
                                                 </div>
                                             </template>
-                                            <p class="text-[10px] text-gray-400 mt-2 leading-tight">Abre o login oficial da Meta pra você (ou seu cliente) escolher/criar o Portfólio de Negócios e conectar o número - inclusive o que já usa no WhatsApp Business do celular, sem perder o histórico.</p>
+                                            <template x-if="!metaConfigEditing">
+                                                <div>
+                                                    <template x-if="!wa_instance || !wa_token">
+                                                        <button type="button" @click="startMetaConnect()" :disabled="metaConnecting" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
+                                                            <span x-text="metaConnecting ? 'Conectando...' : 'Conectar com WhatsApp'"></span>
+                                                        </button>
+                                                    </template>
+                                                    <template x-if="wa_instance && wa_token">
+                                                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
+                                                            <p class="font-bold mb-0.5">✅ Conectado via Meta</p>
+                                                            <p>Phone Number ID: <span class="font-mono" x-text="wa_instance"></span></p>
+                                                        </div>
+                                                    </template>
+                                                    <p class="text-[10px] text-gray-400 mt-2 leading-tight">Abre o login oficial da Meta pra você (ou seu cliente) escolher/criar o Portfólio de Negócios e conectar o número - inclusive o que já usa no WhatsApp Business do celular, sem perder o histórico.</p>
+                                                    <button type="button" @click="metaConfigEditing = true" class="text-[11px] text-indigo-600 hover:text-indigo-800 mt-2">Editar configuração da Meta</button>
+                                                </div>
+                                            </template>
                                         </div>
                                     </template>
                                 </div>
