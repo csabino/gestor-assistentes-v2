@@ -86,6 +86,12 @@ class AssistantController extends Controller
                     $table->string('whatsapp_waba_id')->nullable()->after('whatsapp_instance');
                 });
             }
+
+            if (!Schema::hasColumn('assistants', 'whatsapp_pin')) {
+                Schema::table('assistants', function (Blueprint $table) {
+                    $table->string('whatsapp_pin', 10)->nullable()->after('whatsapp_waba_id');
+                });
+            }
         }
     }
 
@@ -753,7 +759,11 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'test_whatsapp') return $this->checkWhatsappStatus($request, true);
         if ($request->isMethod('post') && $request->input('action') === 'disconnect_whatsapp') return $this->disconnectWhatsapp($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect') return $this->connectMeta($request);
-        
+        if ($request->isMethod('post') && $request->input('action') === 'meta_connect_waba') return $this->connectMetaWabaOnly($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_request_code') return $this->requestMetaVerificationCode($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_verify_code') return $this->verifyMetaCode($request);
+
         if ($request->isMethod('post') && $request->input('action') === 'map_site') return $this->mapSite($request);
         if ($request->isMethod('post') && $request->input('action') === 'scrape_single_url') return $this->scrapeSingleUrl($request);
         if ($request->isMethod('post') && $request->input('action') === 'discover_site_menu') return $this->discoverSiteMenu($request);
@@ -1230,42 +1240,13 @@ class AssistantController extends Controller
         }
 
         try {
-            // 1. Troca o "code" do popup por um token de usuario (curta duracao).
-            $tokenResponse = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', [
-                'client_id' => $appId,
-                'client_secret' => $appSecret,
-                'code' => $request->input('code'),
-            ]);
-
-            if (!$tokenResponse->successful() || !$tokenResponse->json('access_token')) {
-                Log::error('Erro ao trocar code por token (Meta): ' . $tokenResponse->body());
+            $accessToken = $this->exchangeMetaCodeForToken($request->input('code'), $appId, $appSecret);
+            if (!$accessToken) {
                 return response()->json(['success' => false, 'message' => 'Não foi possível validar a conexão com a Meta.'], 422);
             }
 
-            $shortLivedToken = $tokenResponse->json('access_token');
-
-            // 2. Troca por um token de longa duracao (~60 dias). Nao e um token permanente de
-            // System User (isso exigiria configuracao adicional fora do fluxo de Embedded
-            // Signup) - um job de renovacao periodica fica como melhoria futura.
-            $longLivedResponse = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', [
-                'grant_type' => 'fb_exchange_token',
-                'client_id' => $appId,
-                'client_secret' => $appSecret,
-                'fb_exchange_token' => $shortLivedToken,
-            ]);
-
-            $accessToken = ($longLivedResponse->successful() && $longLivedResponse->json('access_token'))
-                ? $longLivedResponse->json('access_token')
-                : $shortLivedToken;
-
-            // 3. Assina o webhook do seu App nesse WABA especifico - sem isso, mensagens desse
-            // cliente nunca chegam no /webhook/whatsapp-meta.
             $wabaId = $request->input('waba_id');
-            $subscribeResponse = Http::withToken($accessToken)->post("https://graph.facebook.com/v21.0/{$wabaId}/subscribed_apps");
-
-            if (!$subscribeResponse->successful()) {
-                Log::warning('Falha ao inscrever o App nos webhooks do WABA ' . $wabaId . ': ' . $subscribeResponse->body());
-            }
+            $this->subscribeMetaWebhook($wabaId, $accessToken);
 
             $assistant->whatsapp_provider = 'meta';
             $assistant->whatsapp_instance = $request->input('phone_number_id');
@@ -1277,6 +1258,219 @@ class AssistantController extends Controller
         } catch (\Throwable $e) {
             Log::error('Exceção ao conectar WhatsApp via Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao conectar: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Troca o "code" do popup por um access token de longa duracao (~60 dias) - usado tanto
+     * pelo fluxo antigo (connectMeta, popup entrega tudo de uma vez) quanto pelo fluxo novo
+     * (connectMetaWabaOnly, popup so entrega o WABA e a gente cadastra o telefone depois).
+     * Nao e um token permanente de System User (exigiria configuracao adicional fora do
+     * Embedded Signup) - um job de renovacao periodica fica como melhoria futura.
+     */
+    private function exchangeMetaCodeForToken(string $code, string $appId, string $appSecret): ?string
+    {
+        $tokenResponse = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', [
+            'client_id' => $appId,
+            'client_secret' => $appSecret,
+            'code' => $code,
+        ]);
+
+        if (!$tokenResponse->successful() || !$tokenResponse->json('access_token')) {
+            Log::error('Erro ao trocar code por token (Meta): ' . $tokenResponse->body());
+            return null;
+        }
+
+        $shortLivedToken = $tokenResponse->json('access_token');
+
+        $longLivedResponse = Http::get('https://graph.facebook.com/v21.0/oauth/access_token', [
+            'grant_type' => 'fb_exchange_token',
+            'client_id' => $appId,
+            'client_secret' => $appSecret,
+            'fb_exchange_token' => $shortLivedToken,
+        ]);
+
+        return ($longLivedResponse->successful() && $longLivedResponse->json('access_token'))
+            ? $longLivedResponse->json('access_token')
+            : $shortLivedToken;
+    }
+
+    /**
+     * Assina o webhook do seu App no WABA do cliente - sem isso, mensagens desse cliente nunca
+     * chegam no /webhook/whatsapp-meta. So loga aviso em caso de falha (nao interrompe o fluxo
+     * de conexao - o admin pode reassinar depois se precisar).
+     */
+    private function subscribeMetaWebhook(string $wabaId, string $accessToken): void
+    {
+        $response = Http::withToken($accessToken)->post("https://graph.facebook.com/v21.0/{$wabaId}/subscribed_apps");
+        if (!$response->successful()) {
+            Log::warning('Falha ao inscrever o App nos webhooks do WABA ' . $wabaId . ': ' . $response->body());
+        }
+    }
+
+    /**
+     * Variante de connectMeta() pro caso da Configuration do Embedded Signup estar no modo
+     * "sem selecao de numero": o popup devolve so o WABA (sem phone_number_id). Salva o WABA +
+     * token no assistente, mas NAO marca whatsapp_provider='meta' ainda - so depois que o
+     * numero for cadastrado e verificado de verdade (addMetaPhoneNumber -> requestMetaVerificationCode
+     * -> verifyMetaCode), senao o assistente apareceria "conectado" sem nenhum numero.
+     */
+    private function connectMetaWabaOnly(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'code' => 'required|string',
+            'waba_id' => 'required|string',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+
+        $appId = Setting::getGlobal('meta_app_id');
+        $appSecret = Setting::getGlobal('meta_app_secret');
+        if (empty($appId) || empty($appSecret)) {
+            return response()->json(['success' => false, 'message' => 'Configure o App ID e o App Secret da Meta em Ambiente antes de conectar.'], 422);
+        }
+
+        try {
+            $accessToken = $this->exchangeMetaCodeForToken($request->input('code'), $appId, $appSecret);
+            if (!$accessToken) {
+                return response()->json(['success' => false, 'message' => 'Não foi possível validar a conexão com a Meta.'], 422);
+            }
+
+            $wabaId = $request->input('waba_id');
+            $this->subscribeMetaWebhook($wabaId, $accessToken);
+
+            $assistant->whatsapp_waba_id = $wabaId;
+            $assistant->whatsapp_token = $accessToken;
+            $assistant->save();
+
+            return response()->json(['success' => true, 'message' => 'Conta da Meta conectada! Agora cadastre o número de WhatsApp.']);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao conectar WABA via Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao conectar: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Passo 1 do cadastro manual do numero (fora do popup, por causa do bug da Meta na tela
+     * SMS/Ligacao): cria o recurso do numero de telefone no WABA ja conectado. O numero so
+     * funciona de verdade depois dos proximos passos (request_code -> verify_code -> register).
+     */
+    private function addMetaPhoneNumber(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'cc' => 'required|string',
+            'phone_number' => 'required|string',
+            'verified_name' => 'required|string|max:100',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        if (empty($assistant->whatsapp_waba_id) || empty($assistant->whatsapp_token)) {
+            return response()->json(['success' => false, 'message' => 'Conecte a conta da Meta antes de cadastrar um número.'], 422);
+        }
+
+        try {
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->post("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/phone_numbers", [
+                    'cc' => $request->input('cc'),
+                    'phone_number' => $request->input('phone_number'),
+                    'verified_name' => $request->input('verified_name'),
+                ]);
+
+            if (!$response->successful() || !$response->json('id')) {
+                Log::error('Erro ao cadastrar número na Meta: ' . $response->body());
+                return response()->json(['success' => false, 'message' => $response->json('error.error_user_msg') ?? $response->json('error.message') ?? 'Não foi possível cadastrar esse número.'], 422);
+            }
+
+            return response()->json(['success' => true, 'phone_number_id' => $response->json('id')]);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao cadastrar número na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao cadastrar número: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Passo 2: pede o codigo de verificacao pro numero recem-cadastrado, por SMS ou por
+     * ligacao - a escolha de verdade (sem o bug da telinha do popup que some em menos de 1s).
+     */
+    private function requestMetaVerificationCode(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'phone_number_id' => 'required|string',
+            'code_method' => 'required|in:sms,voice',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+
+        try {
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->post("https://graph.facebook.com/v21.0/{$request->input('phone_number_id')}/request_code", [
+                    'code_method' => $request->input('code_method'),
+                    'language' => 'pt_BR',
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Erro ao pedir código de verificação (Meta): ' . $response->body());
+                return response()->json(['success' => false, 'message' => $response->json('error.error_user_msg') ?? $response->json('error.message') ?? 'Não foi possível enviar o código.'], 422);
+            }
+
+            return response()->json(['success' => true]);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao pedir código de verificação (Meta): ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao pedir código: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Passo 3 e 4: confirma o codigo recebido e, se valido, registra o numero de vez (exige um
+     * PIN de 2 fatores - gerado aqui, guardado no assistente pra eventual re-registro futuro).
+     * So agora, com o numero realmente ativo, o assistente passa a usar whatsapp_provider='meta'.
+     */
+    private function verifyMetaCode(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'phone_number_id' => 'required|string',
+            'code' => 'required|string',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        $phoneNumberId = $request->input('phone_number_id');
+
+        try {
+            $verifyResponse = Http::withToken($assistant->whatsapp_token)
+                ->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/verify_code", [
+                    'code' => $request->input('code'),
+                ]);
+
+            if (!$verifyResponse->successful()) {
+                Log::error('Erro ao verificar código (Meta): ' . $verifyResponse->body());
+                return response()->json(['success' => false, 'message' => $verifyResponse->json('error.error_user_msg') ?? $verifyResponse->json('error.message') ?? 'Código inválido ou expirado.'], 422);
+            }
+
+            $pin = (string) random_int(100000, 999999);
+            $registerResponse = Http::withToken($assistant->whatsapp_token)
+                ->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/register", [
+                    'messaging_product' => 'whatsapp',
+                    'pin' => $pin,
+                ]);
+
+            if (!$registerResponse->successful()) {
+                Log::error('Erro ao registrar número (Meta): ' . $registerResponse->body());
+                return response()->json(['success' => false, 'message' => $registerResponse->json('error.error_user_msg') ?? $registerResponse->json('error.message') ?? 'Não foi possível concluir o registro do número.'], 422);
+            }
+
+            $assistant->whatsapp_provider = 'meta';
+            $assistant->whatsapp_instance = $phoneNumberId;
+            $assistant->whatsapp_pin = $pin;
+            $assistant->save();
+
+            return response()->json(['success' => true, 'message' => 'Número de WhatsApp conectado e verificado com sucesso!']);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao verificar/registrar número (Meta): ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao verificar código: ' . $e->getMessage()], 500);
         }
     }
 

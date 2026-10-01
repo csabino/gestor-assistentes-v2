@@ -338,6 +338,18 @@
                     savedWaInstance: '{{ $configuring->whatsapp_instance ?? '' }}',
                     savedWaToken: '{{ $configuring->whatsapp_token ?? '' }}',
                     metaConnecting: false,
+                    // Passos do cadastro manual do numero (fora do popup, por causa do bug da Meta
+                    // na tela SMS/Ligacao): null = nao esta em cadastro; 'add_number' -> 'choose_method'
+                    // -> 'enter_code' -> null de novo quando termina.
+                    metaPhoneStep: null,
+                    metaPhoneSaving: false,
+                    metaPhoneError: null,
+                    metaNewPhoneNumberId: null,
+                    metaNewPhoneCc: '',
+                    metaNewPhoneNumber: '',
+                    metaVerifiedName: '',
+                    metaCodeMethod: null,
+                    metaVerificationCode: '',
                     metaAppId: @js($metaAppId),
                     metaConfigId: @js($metaConfigId),
                     metaAppSecretSet: @js($metaAppSecretSet),
@@ -745,8 +757,32 @@
                             });
 
                             const code = authResponse?.authResponse?.code;
-                            if (!code || !signupData?.phone_number_id || !signupData?.waba_id) {
+                            if (!code || !signupData?.waba_id) {
                                 alertModal('Conexão cancelada ou incompleta. Tente novamente.');
+                                return;
+                            }
+
+                            // Se a Configuration do Embedded Signup estiver no modo sem seleção de
+                            // número (necessário pra fugir do bug da Meta na telinha de SMS/Ligação,
+                            // que some rápido demais pra dar tempo de escolher), o popup devolve só o
+                            // waba_id - cadastramos o número por fora, com nossas próprias telas.
+                            if (!signupData.phone_number_id) {
+                                const res = await fetch('/', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                    body: JSON.stringify({
+                                        action: 'meta_connect_waba',
+                                        assistant_id: {{ $configuring->id }},
+                                        code: code,
+                                        waba_id: signupData.waba_id,
+                                    }),
+                                });
+                                const data = await res.json();
+                                if (res.ok && data.success) {
+                                    this.wa_waba_id = signupData.waba_id;
+                                    this.metaPhoneStep = 'add_number';
+                                }
+                                Alpine.store('toast').show(data.message || 'Erro ao conectar.', (res.ok && data.success) ? 'success' : 'error');
                                 return;
                             }
 
@@ -777,6 +813,109 @@
                         } finally {
                             window.removeEventListener('message', onMessage);
                             this.metaConnecting = false;
+                        }
+                    },
+
+                    // Passo 1: cadastra o numero novo no WABA ja conectado.
+                    async submitMetaPhoneNumber() {
+                        if (!this.metaNewPhoneCc || !this.metaNewPhoneNumber || !this.metaVerifiedName) {
+                            this.metaPhoneError = 'Preencha todos os campos.';
+                            return;
+                        }
+                        this.metaPhoneSaving = true;
+                        this.metaPhoneError = null;
+                        try {
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({
+                                    action: 'meta_add_phone_number',
+                                    assistant_id: {{ $configuring->id }},
+                                    cc: this.metaNewPhoneCc,
+                                    phone_number: this.metaNewPhoneNumber,
+                                    verified_name: this.metaVerifiedName,
+                                }),
+                            });
+                            const data = await res.json();
+                            if (!res.ok || !data.success) {
+                                this.metaPhoneError = data.message || 'Não foi possível cadastrar esse número.';
+                                return;
+                            }
+                            this.metaNewPhoneNumberId = data.phone_number_id;
+                            this.metaPhoneStep = 'choose_method';
+                        } catch (e) {
+                            this.metaPhoneError = 'Erro de conexão. Tente novamente.';
+                        } finally {
+                            this.metaPhoneSaving = false;
+                        }
+                    },
+
+                    // Passo 2: pede o codigo por SMS ou ligacao - sem pressa nenhuma de tempo,
+                    // diferente da telinha com bug do popup da Meta.
+                    async chooseMetaCodeMethod(method) {
+                        this.metaCodeMethod = method;
+                        this.metaPhoneSaving = true;
+                        this.metaPhoneError = null;
+                        try {
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({
+                                    action: 'meta_request_code',
+                                    assistant_id: {{ $configuring->id }},
+                                    phone_number_id: this.metaNewPhoneNumberId,
+                                    code_method: method,
+                                }),
+                            });
+                            const data = await res.json();
+                            if (!res.ok || !data.success) {
+                                this.metaPhoneError = data.message || 'Não foi possível enviar o código.';
+                                return;
+                            }
+                            this.metaPhoneStep = 'enter_code';
+                        } catch (e) {
+                            this.metaPhoneError = 'Erro de conexão. Tente novamente.';
+                        } finally {
+                            this.metaPhoneSaving = false;
+                        }
+                    },
+
+                    // Passo 3: confirma o codigo recebido - o backend ja faz o register() junto.
+                    async submitMetaVerificationCode() {
+                        if (!this.metaVerificationCode) {
+                            this.metaPhoneError = 'Digite o código recebido.';
+                            return;
+                        }
+                        this.metaPhoneSaving = true;
+                        this.metaPhoneError = null;
+                        try {
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({
+                                    action: 'meta_verify_code',
+                                    assistant_id: {{ $configuring->id }},
+                                    phone_number_id: this.metaNewPhoneNumberId,
+                                    code: this.metaVerificationCode,
+                                }),
+                            });
+                            const data = await res.json();
+                            if (!res.ok || !data.success) {
+                                this.metaPhoneError = data.message || 'Código inválido ou expirado.';
+                                return;
+                            }
+                            this.wa_instance = this.metaNewPhoneNumberId;
+                            this.wa_token = 'ok';
+                            this.savedWaProvider = 'meta';
+                            this.savedWaInstance = this.metaNewPhoneNumberId;
+                            this.savedWaToken = 'ok';
+                            this.waStatus = 'connected';
+                            this.metaPhoneStep = null;
+                            Alpine.store('toast').show(data.message || 'Número conectado!', 'success');
+                        } catch (e) {
+                            this.metaPhoneError = 'Erro de conexão. Tente novamente.';
+                        } finally {
+                            this.metaPhoneSaving = false;
                         }
                     },
 
@@ -1157,11 +1296,22 @@
                                             </template>
                                             <template x-if="!metaConfigEditing">
                                                 <div>
-                                                    <template x-if="!wa_instance || !wa_token">
+                                                    <template x-if="(!wa_instance || !wa_token) && !wa_waba_id">
                                                         <button type="button" @click="startMetaConnect()" :disabled="metaConnecting" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
                                                             <span x-text="metaConnecting ? 'Conectando...' : 'Conectar com WhatsApp'"></span>
                                                         </button>
+                                                    </template>
+                                                    <template x-if="!wa_instance && wa_waba_id">
+                                                        <div class="space-y-2">
+                                                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-700">
+                                                                <p class="font-bold mb-0.5">⚠️ Conta da Meta conectada, falta o número</p>
+                                                                <p>O WABA já está vinculado - cadastre o número de WhatsApp pra concluir.</p>
+                                                            </div>
+                                                            <button type="button" @click="metaPhoneStep = 'add_number'" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                                                                Cadastrar Número de WhatsApp
+                                                            </button>
+                                                        </div>
                                                     </template>
                                                     <template x-if="wa_instance && wa_token">
                                                         <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
@@ -1189,6 +1339,104 @@
                                     <svg x-show="!saving" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                                     <span x-show="saving" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                                     <span x-text="saving ? 'Salvando...' : 'Salvar'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL META: CADASTRAR NÚMERO (passo 1 do cadastro manual, fora do popup) -->
+                    <div x-show="metaPhoneStep === 'add_number'" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                        <div @click.away="metaPhoneStep = null; metaPhoneError = null" class="bg-white rounded-xl shadow-2xl max-w-sm w-full flex flex-col relative border border-slate-200">
+                            <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                                <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                                    Cadastrar Número
+                                </h3>
+                                <button type="button" @click="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                            <div class="p-5 space-y-3">
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">DDI</label>
+                                        <input type="text" x-model="metaNewPhoneCc" placeholder="55" class="w-full border border-gray-300 rounded-lg p-2.5 text-xs">
+                                    </div>
+                                    <div class="col-span-2">
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Número (DDD + número)</label>
+                                        <input type="text" x-model="metaNewPhoneNumber" placeholder="11999998888" class="w-full border border-gray-300 rounded-lg p-2.5 text-xs">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Nome de Exibição</label>
+                                    <input type="text" x-model="metaVerifiedName" placeholder="Ex: InHouse Suporte" class="w-full border border-gray-300 rounded-lg p-2.5 text-xs">
+                                    <p class="text-[10px] text-gray-400 mt-1 leading-tight">É o nome que aparece pro cliente no WhatsApp. A Meta pode levar um tempo pra aprovar, mas o número já funciona antes disso.</p>
+                                </div>
+                                <p x-show="metaPhoneError" x-text="metaPhoneError" class="text-[11px] text-red-600"></p>
+                            </div>
+                            <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
+                                <button type="button" @click="submitMetaPhoneNumber()" :disabled="metaPhoneSaving" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm">
+                                    <span x-text="metaPhoneSaving ? 'Cadastrando...' : 'Avançar'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL META: SMS OU LIGAÇÃO (passo 2) -->
+                    <div x-show="metaPhoneStep === 'choose_method'" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                        <div @click.away="metaPhoneStep = null; metaPhoneError = null" class="bg-white rounded-xl shadow-2xl max-w-sm w-full flex flex-col relative border border-slate-200">
+                            <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                                <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" /></svg>
+                                    Como quer receber o código?
+                                </h3>
+                                <button type="button" @click="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                            <div class="p-5">
+                                <p class="text-xs text-gray-500 mb-3">Sem pressa - escolha com calma. Números fixos e 0800 só recebem por ligação.</p>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button type="button" @click="chooseMetaCodeMethod('sms')" :disabled="metaPhoneSaving" class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition text-center">
+                                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                                        </span>
+                                        <span class="text-xs font-bold text-gray-700">SMS</span>
+                                    </button>
+                                    <button type="button" @click="chooseMetaCodeMethod('voice')" :disabled="metaPhoneSaving" class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition text-center">
+                                        <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" /></svg>
+                                        </span>
+                                        <span class="text-xs font-bold text-gray-700">Ligação</span>
+                                    </button>
+                                </div>
+                                <p x-show="metaPhoneError" x-text="metaPhoneError" class="text-[11px] text-red-600 mt-3"></p>
+                                <p x-show="metaPhoneSaving" class="text-[11px] text-gray-400 mt-3">Enviando...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL META: DIGITAR O CÓDIGO (passo 3, já registra o número no final) -->
+                    <div x-show="metaPhoneStep === 'enter_code'" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                        <div @click.away="metaPhoneStep = null; metaPhoneError = null" class="bg-white rounded-xl shadow-2xl max-w-sm w-full flex flex-col relative border border-slate-200">
+                            <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                                <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Digite o Código
+                                </h3>
+                                <button type="button" @click="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                            <div class="p-5 space-y-2">
+                                <p class="text-xs text-gray-500" x-text="metaCodeMethod === 'voice' ? 'Atenda a ligação e digite o código informado.' : 'Digite o código recebido por SMS.'"></p>
+                                <input type="text" x-model="metaVerificationCode" maxlength="8" placeholder="000000" class="w-full border border-gray-300 rounded-lg p-2.5 text-center text-lg font-mono tracking-widest" @keydown.enter="submitMetaVerificationCode()">
+                                <p x-show="metaPhoneError" x-text="metaPhoneError" class="text-[11px] text-red-600"></p>
+                                <button type="button" @click="metaPhoneStep = 'choose_method'; metaPhoneError = null" class="text-[11px] text-indigo-600 hover:text-indigo-800">Não recebi - pedir de novo</button>
+                            </div>
+                            <div class="flex justify-end p-4 border-t border-gray-100 shrink-0">
+                                <button type="button" @click="submitMetaVerificationCode()" :disabled="metaPhoneSaving" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition text-sm">
+                                    <span x-text="metaPhoneSaving ? 'Confirmando...' : 'Confirmar'"></span>
                                 </button>
                             </div>
                         </div>
