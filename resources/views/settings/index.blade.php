@@ -147,7 +147,7 @@
                 </div>
 
                 <!-- PAINEL DE BOTÕES -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                     <button type="button" @click="timezoneModalOpen = true" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                         <span class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -171,8 +171,10 @@
                         <span class="font-bold text-gray-800 text-sm">Regras & Diretrizes de Agendamento</span>
                         <span class="text-[11px] text-gray-400">{{ ($schedulingEnabled ?? '1') == '1' ? 'Habilitado' : 'Desabilitado' }}</span>
                     </button>
+                </div>
 
-                    <button type="button" @click="googleModalOpen = true" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                <div class="flex flex-wrap justify-center gap-4 mb-6">
+                    <button type="button" @click="googleModalOpen = true" class="w-full sm:w-72 bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                         <span class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                             <svg class="w-6 h-6" viewBox="0 0 24 24">
                                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -185,7 +187,7 @@
                         <span class="text-[11px] {{ !empty($googleRefreshToken) ? 'text-emerald-600 font-bold' : 'text-gray-400' }}">{{ !empty($googleRefreshToken) ? 'Conta conectada' : 'Não conectado' }}</span>
                     </button>
 
-                    <button type="button" @click="attachmentsModalOpen = true" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                    <button type="button" @click="attachmentsModalOpen = true" class="w-full sm:w-72 bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                         <span class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
                         </span>
