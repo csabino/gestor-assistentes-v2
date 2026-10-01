@@ -760,6 +760,7 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'disconnect_whatsapp') return $this->disconnectWhatsapp($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect') return $this->connectMeta($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect_waba') return $this->connectMetaWabaOnly($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_list_phone_numbers') return $this->listMetaPhoneNumbers($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_request_code') return $this->requestMetaVerificationCode($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_verify_code') return $this->verifyMetaCode($request);
@@ -1348,6 +1349,41 @@ class AssistantController extends Controller
         } catch (\Throwable $e) {
             Log::error('Exceção ao conectar WABA via Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao conectar: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * O popup da Meta pode ter deixado um numero ja ADICIONADO ao WABA mesmo sem a verificacao
+     * ter sido concluida (ex: o admin entrou com o numero, o SMS saiu disparado pelo bug da
+     * telinha, mas ele fechou o popup antes de confirmar o codigo) - adicionar e verificar sao
+     * passos separados na API da Meta. Lista os numeros existentes nesse WABA pra evitar tentar
+     * cadastrar de novo um numero que ja existe (a Meta rejeitaria como duplicado) e permitir
+     * retomar a verificacao de onde parou, por fora do popup.
+     */
+    private function listMetaPhoneNumbers(Request $request)
+    {
+        $request->validate(['assistant_id' => 'required|exists:assistants,id']);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        if (empty($assistant->whatsapp_waba_id) || empty($assistant->whatsapp_token)) {
+            return response()->json(['success' => false, 'message' => 'Conecte a conta da Meta antes de listar números.'], 422);
+        }
+
+        try {
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->get("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/phone_numbers", [
+                    'fields' => 'id,display_phone_number,verified_name,code_verification_status',
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Erro ao listar números do WABA na Meta: ' . $response->body());
+                return response()->json(['success' => false, 'message' => 'Não foi possível listar os números já cadastrados.'], 422);
+            }
+
+            return response()->json(['success' => true, 'numbers' => $response->json('data') ?? []]);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao listar números do WABA na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao listar números: ' . $e->getMessage()], 500);
         }
     }
 

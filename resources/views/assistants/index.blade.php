@@ -350,6 +350,8 @@
                     metaVerifiedName: '',
                     metaCodeMethod: null,
                     metaVerificationCode: '',
+                    metaExistingNumbers: [],
+                    metaLoadingNumbers: false,
                     metaAppId: @js($metaAppId),
                     metaConfigId: @js($metaConfigId),
                     metaAppSecretSet: @js($metaAppSecretSet),
@@ -733,12 +735,21 @@
                         this.metaConnecting = true;
                         let signupData = null;
 
+                        // Loga TODO evento do Embedded Signup (nao so o FINISH) no console - a Meta
+                        // mudou o comportamento do popup varias vezes (changelog deprecia
+                        // only_waba_sharing em 2025, junta tudo numa Configuration no v4...), entao
+                        // em vez de assumir qual evento/formato vem, a gente observa o que chega de
+                        // verdade e guarda qualquer dado parcial util (ex: so o waba_id, mesmo se o
+                        // usuario cancelar ou a etapa de telefone travar no bug do SMS/Ligacao).
                         const onMessage = (event) => {
                             if (!event.origin.endsWith('facebook.com')) return;
                             try {
                                 const data = JSON.parse(event.data);
-                                if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
-                                    signupData = data.data;
+                                if (data.type === 'WA_EMBEDDED_SIGNUP') {
+                                    console.log('[Meta Embedded Signup]', data.event, data.data);
+                                    if (data.data && (data.data.waba_id || data.data.phone_number_id)) {
+                                        signupData = { ...(signupData || {}), ...data.data };
+                                    }
                                 }
                             } catch (e) { /* mensagens que não são JSON da Meta - ignora */ }
                         };
@@ -756,9 +767,10 @@
                                 });
                             });
 
+                            console.log('[Meta FB.login authResponse]', authResponse);
                             const code = authResponse?.authResponse?.code;
                             if (!code || !signupData?.waba_id) {
-                                alertModal('Conexão cancelada ou incompleta. Tente novamente.');
+                                alertModal('Conexão cancelada ou incompleta. Veja o console (F12) pra detalhes do que a Meta retornou.');
                                 return;
                             }
 
@@ -780,7 +792,7 @@
                                 const data = await res.json();
                                 if (res.ok && data.success) {
                                     this.wa_waba_id = signupData.waba_id;
-                                    this.metaPhoneStep = 'add_number';
+                                    this.openMetaAddNumberStep();
                                 }
                                 Alpine.store('toast').show(data.message || 'Erro ao conectar.', (res.ok && data.success) ? 'success' : 'error');
                                 return;
@@ -814,6 +826,36 @@
                             window.removeEventListener('message', onMessage);
                             this.metaConnecting = false;
                         }
+                    },
+
+                    // Abre o passo de cadastro de numero ja carregando os numeros que porventura
+                    // existam no WABA (o popup da Meta pode ter adicionado um numero sem concluir a
+                    // verificacao, por causa do bug do SMS/Ligacao - adicionar e verificar sao passos
+                    // separados na API, entao o numero pode ja estar la, so pendente).
+                    async openMetaAddNumberStep() {
+                        this.metaPhoneStep = 'add_number';
+                        this.metaPhoneError = null;
+                        this.metaLoadingNumbers = true;
+                        try {
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({ action: 'meta_list_phone_numbers', assistant_id: {{ $configuring->id }} }),
+                            });
+                            const data = await res.json();
+                            this.metaExistingNumbers = (res.ok && data.success) ? (data.numbers || []) : [];
+                        } catch (e) {
+                            this.metaExistingNumbers = [];
+                        } finally {
+                            this.metaLoadingNumbers = false;
+                        }
+                    },
+
+                    // Retoma a verificacao de um numero que o popup ja deixou cadastrado (pendente),
+                    // sem precisar cadastrar de novo - vai direto pro passo de escolher SMS/Ligacao.
+                    useExistingMetaNumber(number) {
+                        this.metaNewPhoneNumberId = number.id;
+                        this.metaPhoneStep = 'choose_method';
                     },
 
                     // Passo 1: cadastra o numero novo no WABA ja conectado.
@@ -1308,7 +1350,7 @@
                                                                 <p class="font-bold mb-0.5">⚠️ Conta da Meta conectada, falta o número</p>
                                                                 <p>O WABA já está vinculado - cadastre o número de WhatsApp pra concluir.</p>
                                                             </div>
-                                                            <button type="button" @click="metaPhoneStep = 'add_number'" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                                                            <button type="button" @click="openMetaAddNumberStep()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
                                                                 Cadastrar Número de WhatsApp
                                                             </button>
                                                         </div>
@@ -1357,6 +1399,19 @@
                                 </button>
                             </div>
                             <div class="p-5 space-y-3">
+                                <p x-show="metaLoadingNumbers" class="text-[11px] text-gray-400">Verificando números já existentes nessa conta...</p>
+                                <template x-if="!metaLoadingNumbers && metaExistingNumbers.length > 0">
+                                    <div class="space-y-1.5">
+                                        <p class="text-[11px] font-bold text-gray-600">Já existe(m) número(s) nessa conta - continuar um deles?</p>
+                                        <template x-for="number in metaExistingNumbers" :key="number.id">
+                                            <button type="button" @click="useExistingMetaNumber(number)" class="w-full text-left bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg p-2.5 text-[11px] transition">
+                                                <span class="font-bold text-gray-700" x-text="number.display_phone_number || number.id"></span>
+                                                <span class="text-gray-500" x-text="' - ' + (number.code_verification_status || 'pendente')"></span>
+                                            </button>
+                                        </template>
+                                        <p class="text-[11px] text-gray-400 pt-1">Ou cadastre um número novo abaixo:</p>
+                                    </div>
+                                </template>
                                 <div class="grid grid-cols-3 gap-2">
                                     <div>
                                         <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">DDI</label>
