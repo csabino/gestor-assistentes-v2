@@ -236,6 +236,10 @@ class SettingController extends Controller
             ['value' => $request->boolean('business_block_weekends') ? '1' : '0']
         );
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Configurações atualizadas!']);
+        }
+
         return redirect()->to('/?view=settings&assistant_id=' . $assistantId)->with('success', 'Configurações atualizadas para este assistente!');
     }
 
@@ -247,12 +251,25 @@ class SettingController extends Controller
             'holiday_date' => 'required|date',
         ]);
 
-        Holiday::create([
+        $holiday = Holiday::create([
             'assistant_id' => $request->input('assistant_id'),
             'name' => trim($request->input('holiday_name')),
             'date' => $request->input('holiday_date'),
             'is_recurring' => $request->boolean('holiday_recurring'),
         ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Feriado cadastrado!',
+                'holiday' => [
+                    'id' => $holiday->id,
+                    'name' => $holiday->name,
+                    'date_formatted' => $holiday->date->format('d/m/Y'),
+                    'is_recurring' => $holiday->is_recurring,
+                ],
+            ]);
+        }
 
         return redirect()->to('/?view=settings&assistant_id=' . $request->input('assistant_id'))->with('success', 'Feriado cadastrado!');
     }
@@ -262,6 +279,10 @@ class SettingController extends Controller
         $assistantId = $request->input('assistant_id');
 
         Holiday::where('id', $request->input('holiday_id'))->where('assistant_id', $assistantId)->delete();
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Feriado removido!']);
+        }
 
         return redirect()->to('/?view=settings&assistant_id=' . $assistantId)->with('success', 'Feriado removido!');
     }
