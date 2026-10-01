@@ -867,28 +867,19 @@
                         </button>
 
                         <button type="button" @click="conexaoModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                            <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" /></svg>
+                                <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white" :class="aiStatus === 'connected' ? 'bg-emerald-500' : (aiStatus === 'disconnected' ? 'bg-red-500' : 'bg-gray-300 animate-pulse')"></span>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Conexão IA</span>
-                            <span class="text-[11px] flex items-center justify-center gap-1">
-                                <span x-show="aiStatus === 'checking'" class="text-gray-400">Verificando...</span>
-                                <span x-show="aiStatus === 'connected'" class="text-emerald-600 font-bold">Ativo</span>
-                                <span x-show="aiStatus === 'disconnected'" class="text-red-500 font-bold">Inativo</span>
-                            </span>
                         </button>
 
                         <button type="button" @click="canalWhatsappModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                            <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
+                                <span x-show="wa_provider !== ''" class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white" :class="waStatus === 'connected' ? 'bg-emerald-500' : (waStatus === 'disconnected' ? 'bg-red-500' : 'bg-gray-300 animate-pulse')"></span>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Canal WhatsApp</span>
-                            <span class="text-[11px] flex items-center justify-center gap-1">
-                                <span x-show="wa_provider === ''" class="text-gray-400">Desativado</span>
-                                <span x-show="wa_provider !== '' && waStatus === 'checking'" class="text-gray-400">Verificando...</span>
-                                <span x-show="wa_provider !== '' && waStatus === 'connected'" class="text-emerald-600 font-bold">Conectado</span>
-                                <span x-show="wa_provider !== '' && waStatus === 'disconnected'" class="text-red-500 font-bold">Desconectado</span>
-                            </span>
                         </button>
                     </div>
 
@@ -908,13 +899,13 @@
                                 ->value('value') === '1';
                         @endphp
                         <a href="/?view=automation&assistant_id={{ $configuring->id }}" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
-                            <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
                                 </svg>
+                                <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white {{ $automationActive ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
                             </span>
                             <span class="font-bold text-gray-800 text-sm">Automação</span>
-                            <span class="text-[11px] font-bold {{ $automationActive ? 'text-emerald-600' : 'text-red-500' }}">{{ $automationActive ? 'Ativa' : 'Inativa' }}</span>
                         </a>
                     </div>
 
@@ -1576,10 +1567,12 @@
                     filter: localStorage.getItem('assistant_filter') || 'active',
                     total: {{ $assistants->count() }},
                     activeCount: {{ $assistants->where('is_active', true)->count() }},
-                    inactiveCount: {{ $assistants->where('is_active', false)->count() }},
+                    inactiveCount: {{ $assistants->filter(fn($a) => !$a->is_active && ($a->status ?? null) !== 'maintenance')->count() }},
+                    maintenanceCount: {{ $assistants->where('status', 'maintenance')->count() }},
                     get currentCount() {
                         if (this.filter === 'active') return this.activeCount;
                         if (this.filter === 'inactive') return this.inactiveCount;
+                        if (this.filter === 'maintenance') return this.maintenanceCount;
                         return this.total;
                     }
                 }" x-init="
@@ -1621,6 +1614,7 @@
                             <select x-model="filter" class="text-xs font-bold text-gray-700 bg-transparent focus:outline-none cursor-pointer">
                                 <option value="active">🟢 Ativos</option>
                                 <option value="inactive">⚪ Inativos</option>
+                                <option value="maintenance">🔧 Manutenção</option>
                                 <option value="all">Todos</option>
                             </select>
                         </div>
@@ -1630,7 +1624,7 @@
                 <div class="border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/40 dark:bg-gray-900 p-4 flex-1 min-h-0 overflow-y-auto custom-scroll">
                 <div x-show="view === 'card'" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     @forelse($assistants as $assistant)
-                        <div x-show="(filter === 'all') || (filter === 'active' && {{ $assistant->is_active ? 'true' : 'false' }}) || (filter === 'inactive' && {{ !$assistant->is_active ? 'true' : 'false' }})"
+                        <div x-show="(filter === 'all') || (filter === 'active' && {{ $assistant->is_active ? 'true' : 'false' }}) || (filter === 'inactive' && {{ (!$assistant->is_active && ($assistant->status ?? null) !== 'maintenance') ? 'true' : 'false' }}) || (filter === 'maintenance' && {{ ($assistant->status ?? null) === 'maintenance' ? 'true' : 'false' }})"
                             class="light-surface bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition duration-200 flex flex-col justify-between gap-4">
 
                             <div class="flex justify-between items-start gap-2">
@@ -1641,13 +1635,35 @@
                                     @endif
                                 </div>
 
-                                <form action="/" method="POST" class="shrink-0">
-                                    @csrf @method('PATCH')
-                                    <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                                    <button type="submit" class="text-xs px-3 py-1 rounded-full font-semibold transition border flex items-center gap-1.5 shrink-0 {{ ($assistant->status ?? null) === 'maintenance' ? 'bg-amber-50 text-amber-700 border-amber-200' : ($assistant->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-300') }}">
-                                        @if(($assistant->status ?? null) === 'maintenance') <svg class="w-2 h-2 fill-amber-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Manutenção @elseif($assistant->is_active) <svg class="w-2 h-2 fill-emerald-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Ativo @else <svg class="w-2 h-2 fill-gray-400" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Inativo @endif
+                                @php
+                                    $cardCurrentStatus = $assistant->status ?? ($assistant->is_active ? 'active' : 'inactive');
+                                    $cardStatusMeta = [
+                                        'active' => ['label' => 'Ativo', 'classes' => 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100', 'dot' => 'fill-emerald-500'],
+                                        'inactive' => ['label' => 'Inativo', 'classes' => 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200', 'dot' => 'fill-gray-400'],
+                                        'maintenance' => ['label' => 'Manutenção', 'classes' => 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100', 'dot' => 'fill-amber-500'],
+                                    ];
+                                @endphp
+                                <div x-data="{ statusMenuOpen: false }" class="relative shrink-0">
+                                    <button type="button" @click="statusMenuOpen = !statusMenuOpen" class="text-xs px-3 py-1 rounded-full font-semibold transition border flex items-center gap-1.5 shrink-0 {{ $cardStatusMeta[$cardCurrentStatus]['classes'] }}">
+                                        <svg class="w-2 h-2 {{ $cardStatusMeta[$cardCurrentStatus]['dot'] }}" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                        {{ $cardStatusMeta[$cardCurrentStatus]['label'] }}
                                     </button>
-                                </form>
+                                    <div x-show="statusMenuOpen" x-cloak x-transition @click.away="statusMenuOpen = false" class="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-20 overflow-hidden">
+                                        @foreach($cardStatusMeta as $cardStatusKey => $cardMeta)
+                                            @if($cardStatusKey !== $cardCurrentStatus)
+                                                <form action="/" method="POST">
+                                                    @csrf @method('PATCH')
+                                                    <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
+                                                    <input type="hidden" name="status" value="{{ $cardStatusKey }}">
+                                                    <button type="submit" class="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 transition flex items-center gap-2 text-gray-700">
+                                                        <svg class="w-2 h-2 {{ $cardMeta['dot'] }}" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                                        {{ $cardMeta['label'] }}
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="flex items-center justify-between border-t border-gray-100 pt-4 mt-2">
@@ -1702,7 +1718,7 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @forelse($assistants as $assistant)
-                                <tr x-show="(filter === 'all') || (filter === 'active' && {{ $assistant->is_active ? 'true' : 'false' }}) || (filter === 'inactive' && {{ !$assistant->is_active ? 'true' : 'false' }})"
+                                <tr x-show="(filter === 'all') || (filter === 'active' && {{ $assistant->is_active ? 'true' : 'false' }}) || (filter === 'inactive' && {{ (!$assistant->is_active && ($assistant->status ?? null) !== 'maintenance') ? 'true' : 'false' }}) || (filter === 'maintenance' && {{ ($assistant->status ?? null) === 'maintenance' ? 'true' : 'false' }})"
                                     class="hover:bg-gray-50 transition duration-150 group">
                                     
                                     <td class="py-4 px-5">
@@ -1724,13 +1740,35 @@
                                     </td>
 
                                     <td class="py-4 px-5">
-                                        <form action="/" method="POST">
-                                            @csrf @method('PATCH')
-                                            <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
-                                            <button type="submit" class="text-xs px-3 py-1 rounded-full font-semibold transition border flex items-center gap-1.5 w-max {{ ($assistant->status ?? null) === 'maintenance' ? 'bg-amber-50 text-amber-700 border-amber-200' : ($assistant->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-300') }}">
-                                                @if(($assistant->status ?? null) === 'maintenance') <svg class="w-1.5 h-1.5 fill-amber-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Manutenção @elseif($assistant->is_active) <svg class="w-1.5 h-1.5 fill-emerald-500" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Ativo @else <svg class="w-1.5 h-1.5 fill-gray-400" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Inativo @endif
+                                        @php
+                                            $rowCurrentStatus = $assistant->status ?? ($assistant->is_active ? 'active' : 'inactive');
+                                            $rowStatusMeta = [
+                                                'active' => ['label' => 'Ativo', 'classes' => 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100', 'dot' => 'fill-emerald-500'],
+                                                'inactive' => ['label' => 'Inativo', 'classes' => 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200', 'dot' => 'fill-gray-400'],
+                                                'maintenance' => ['label' => 'Manutenção', 'classes' => 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100', 'dot' => 'fill-amber-500'],
+                                            ];
+                                        @endphp
+                                        <div x-data="{ statusMenuOpen: false }" class="relative w-max">
+                                            <button type="button" @click="statusMenuOpen = !statusMenuOpen" class="text-xs px-3 py-1 rounded-full font-semibold transition border flex items-center gap-1.5 w-max {{ $rowStatusMeta[$rowCurrentStatus]['classes'] }}">
+                                                <svg class="w-1.5 h-1.5 {{ $rowStatusMeta[$rowCurrentStatus]['dot'] }}" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                                {{ $rowStatusMeta[$rowCurrentStatus]['label'] }}
                                             </button>
-                                        </form>
+                                            <div x-show="statusMenuOpen" x-cloak x-transition @click.away="statusMenuOpen = false" class="absolute left-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-20 overflow-hidden">
+                                                @foreach($rowStatusMeta as $rowStatusKey => $rowMeta)
+                                                    @if($rowStatusKey !== $rowCurrentStatus)
+                                                        <form action="/" method="POST">
+                                                            @csrf @method('PATCH')
+                                                            <input type="hidden" name="assistant_id" value="{{ $assistant->id }}">
+                                                            <input type="hidden" name="status" value="{{ $rowStatusKey }}">
+                                                            <button type="submit" class="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 transition flex items-center gap-2 text-gray-700">
+                                                                <svg class="w-2 h-2 {{ $rowMeta['dot'] }}" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                                                {{ $rowMeta['label'] }}
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endforeach
+                                            </div>
+                                        </div>
                                     </td>
 
                                     <td class="py-4 px-5 text-right flex justify-end items-center gap-2 opacity-90 group-hover:opacity-100 transition">
