@@ -10,6 +10,11 @@
                 schedulingModalOpen: false,
                 googleModalOpen: false,
                 attachmentsModalOpen: false,
+                snapTimezone: '',
+                snapWebhook: '',
+                snapScheduling: '',
+                snapGoogle: '',
+                snapAttachments: '',
                 saving: false,
                 savingHoliday: false,
                 newHolidayName: '',
@@ -122,16 +127,40 @@
                 restoreOpenModal() {
                     const key = 'openmodal_settings_{{ $assistant->id }}';
                     const saved = sessionStorage.getItem(key);
-                    if (saved === 'timezone') this.timezoneModalOpen = true;
-                    if (saved === 'webhook') this.webhookModalOpen = true;
-                    if (saved === 'scheduling') this.schedulingModalOpen = true;
-                    if (saved === 'google') this.googleModalOpen = true;
-                    if (saved === 'attachments') this.attachmentsModalOpen = true;
+                    if (saved === 'timezone') this.openModal('timezoneModalOpen', 'timezoneModalBody', 'snapTimezone');
+                    if (saved === 'webhook') this.openModal('webhookModalOpen', 'webhookModalBody', 'snapWebhook');
+                    if (saved === 'scheduling') this.openModal('schedulingModalOpen', 'schedulingModalBody', 'snapScheduling');
+                    if (saved === 'google') this.openModal('googleModalOpen', 'googleModalBody', 'snapGoogle');
+                    if (saved === 'attachments') this.openModal('attachmentsModalOpen', 'attachmentsModalBody', 'snapAttachments');
                     this.$watch('timezoneModalOpen', v => this.persistOpenModal('timezone', v));
                     this.$watch('webhookModalOpen', v => this.persistOpenModal('webhook', v));
                     this.$watch('schedulingModalOpen', v => this.persistOpenModal('scheduling', v));
                     this.$watch('googleModalOpen', v => this.persistOpenModal('google', v));
                     this.$watch('attachmentsModalOpen', v => this.persistOpenModal('attachments', v));
+                },
+
+                snapshotForm(root) {
+                    if (!root) return '';
+                    return Array.from(root.querySelectorAll('input, select, textarea')).map(el => {
+                        if (el.type === 'checkbox' || el.type === 'radio') return el.name + '=' + el.checked;
+                        return (el.name || el.id) + '=' + el.value;
+                    }).join('&');
+                },
+
+                openModal(prop, rootId, snapKey) {
+                    this[prop] = true;
+                    this.$nextTick(() => { this[snapKey] = this.snapshotForm(document.getElementById(rootId)); });
+                },
+
+                async confirmCloseModal(prop, rootId, snapKey, persistName) {
+                    const current = this.snapshotForm(document.getElementById(rootId));
+                    if (current !== (this[snapKey] ?? '')) {
+                        const ok = await confirmModal('Você tem alterações não salvas aqui. Fechar mesmo assim e perder essas alterações?');
+                        if (!ok) return;
+                    }
+                    this[prop] = false;
+                    this.persistOpenModal(persistName, false);
+                    window.location.reload();
                 },
             }"
             x-init="restoreOpenModal(); updateTzClock(); setInterval(() => updateTzClock(), 30000)">
@@ -161,7 +190,7 @@
 
                 <!-- PAINEL DE BOTÕES -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-                    <button type="button" @click="timezoneModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                    <button type="button" @click="openModal('timezoneModalOpen', 'timezoneModalBody', 'snapTimezone')" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                         <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             <span x-show="tzClockText" x-text="tzClockText" x-cloak class="absolute -top-2 -right-4 bg-white border border-gray-200 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 shadow-sm whitespace-nowrap"></span>
@@ -169,7 +198,7 @@
                         <span class="font-bold text-gray-800 text-sm">Fuso Horário</span>
                     </button>
 
-                    <button type="button" @click="webhookModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                    <button type="button" @click="openModal('webhookModalOpen', 'webhookModalBody', 'snapWebhook')" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                         <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
                             <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white {{ !empty($webhookUrl) ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
@@ -177,7 +206,7 @@
                         <span class="font-bold text-gray-800 text-sm">Webhook Multiagentes</span>
                     </button>
 
-                    <button type="button" @click="schedulingModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                    <button type="button" @click="openModal('schedulingModalOpen', 'schedulingModalBody', 'snapScheduling')" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                         <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008z" /></svg>
                             <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white {{ ($schedulingEnabled ?? '1') == '1' ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
@@ -187,7 +216,7 @@
                 </div>
 
                 <div class="flex flex-wrap justify-center gap-3 mb-4">
-                    <button type="button" @click="googleModalOpen = true" class="w-full sm:w-72 bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                    <button type="button" @click="openModal('googleModalOpen', 'googleModalBody', 'snapGoogle')" class="w-full sm:w-72 bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                         <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 9v9a2.25 2.25 0 002.25 2.25z" /></svg>
                             <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white {{ !empty($googleRefreshToken) ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
@@ -195,7 +224,7 @@
                         <span class="font-bold text-gray-800 text-sm">Google Calendar & Meet</span>
                     </button>
 
-                    <button type="button" @click="attachmentsModalOpen = true" class="w-full sm:w-72 bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                    <button type="button" @click="openModal('attachmentsModalOpen', 'attachmentsModalBody', 'snapAttachments')" class="w-full sm:w-72 bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                         <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
                             <span class="absolute -top-2 -right-4 bg-white border border-gray-200 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 shadow-sm whitespace-nowrap">{{ $maxFileSize ?? '4' }} MB</span>
@@ -212,11 +241,11 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 Fuso Horário
                             </h3>
-                            <button type="button" @click="timezoneModalOpen = false; persistOpenModal('timezone', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="confirmCloseModal('timezoneModalOpen', 'timezoneModalBody', 'snapTimezone', 'timezone')" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-                        <div class="flex-1 min-h-0 overflow-auto p-5">
+                        <div id="timezoneModalBody" class="flex-1 min-h-0 overflow-auto p-5">
                             <div x-data="{
                                 open: false,
                                 search: '',
@@ -268,11 +297,11 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
                                 Webhook Multiagentes
                             </h3>
-                            <button type="button" @click="webhookModalOpen = false; persistOpenModal('webhook', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="confirmCloseModal('webhookModalOpen', 'webhookModalBody', 'snapWebhook', 'webhook')" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-                        <div class="flex-1 min-h-0 overflow-auto p-5 space-y-2">
+                        <div id="webhookModalBody" class="flex-1 min-h-0 overflow-auto p-5 space-y-2">
                             <label for="omni_webhook_url" class="block text-xs font-semibold text-gray-700">URL / Path do Webhook (`webhook_multiagents.php`)</label>
                             <input type="text" form="settingsForm" name="omni_webhook_url" id="omni_webhook_url" value="{{ $webhookUrl }}" placeholder="https://seu-dominio.com/caminho/" class="w-full border border-gray-300 rounded-lg p-2.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none">
                             <p class="text-xs text-gray-400 mt-2 leading-relaxed">
@@ -297,11 +326,11 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008z" /></svg>
                                 Regras & Diretrizes de Agendamento
                             </h3>
-                            <button type="button" @click="schedulingModalOpen = false; persistOpenModal('scheduling', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="confirmCloseModal('schedulingModalOpen', 'schedulingModalBody', 'snapScheduling', 'scheduling')" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-                        <div class="flex-1 min-h-0 overflow-auto p-5">
+                        <div id="schedulingModalBody" class="flex-1 min-h-0 overflow-auto p-5">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div class="md:col-span-1">
                                     <label for="scheduling_enabled" class="block text-xs font-semibold text-gray-700 mb-1">Módulo de Agendamento</label>
@@ -429,11 +458,11 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 9v9a2.25 2.25 0 002.25 2.25z" /></svg>
                                 Integração Google Calendar & Meet
                             </h3>
-                            <button type="button" @click="googleModalOpen = false; persistOpenModal('google', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="confirmCloseModal('googleModalOpen', 'googleModalBody', 'snapGoogle', 'google')" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-                        <div class="flex-1 min-h-0 overflow-auto p-5">
+                        <div id="googleModalBody" class="flex-1 min-h-0 overflow-auto p-5">
                             <a href="/?view=settings&action=google_redirect&assistant_id={{ $assistant->id }}" class="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg text-xs transition shadow-sm flex items-center justify-center gap-2 shrink-0 w-full mb-5">
                                 @if(!empty($googleRefreshToken))
                                     <span class="text-emerald-600 font-bold flex items-center gap-1">
@@ -489,11 +518,11 @@
                                 <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
                                 Controle de Anexos
                             </h3>
-                            <button type="button" @click="attachmentsModalOpen = false; persistOpenModal('attachments', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                            <button type="button" @click="confirmCloseModal('attachmentsModalOpen', 'attachmentsModalBody', 'snapAttachments', 'attachments')" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-                        <div class="flex-1 min-h-0 overflow-auto p-5">
+                        <div id="attachmentsModalBody" class="flex-1 min-h-0 overflow-auto p-5">
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                                 <div class="md:col-span-1 md:border-r border-gray-100 md:pr-4">
                                     <label class="block text-xs font-semibold text-gray-700 mb-2">Tamanho Máximo por Anexo</label>

@@ -269,11 +269,42 @@
                 this.profileSaving = false;
             }
         },
+        async confirmCloseProfileModal() {
+            if (this.profileChanged) {
+                const ok = await confirmModal('Você tem alterações não salvas no perfil. Fechar mesmo assim e perder essas alterações?');
+                if (!ok) return;
+            }
+            this.profileModalOpen = false;
+            window.location.reload();
+        },
+
+        snapshotForm(root) {
+            if (!root) return '';
+            return Array.from(root.querySelectorAll('input, select, textarea')).map(el => {
+                if (el.type === 'checkbox' || el.type === 'radio') return el.name + '=' + el.checked;
+                return (el.name || el.id) + '=' + el.value;
+            }).join('&');
+        },
+        openModal(prop, rootId, snapKey, afterOpen) {
+            if (afterOpen) afterOpen();
+            this[prop] = true;
+            this.$nextTick(() => { this[snapKey] = this.snapshotForm(document.getElementById(rootId)); });
+        },
+        async confirmCloseModal(prop, rootId, snapKey) {
+            const current = this.snapshotForm(document.getElementById(rootId));
+            if (current !== (this[snapKey] ?? '')) {
+                const ok = await confirmModal('Você tem alterações não salvas aqui. Fechar mesmo assim e perder essas alterações?');
+                if (!ok) return;
+            }
+            this[prop] = false;
+            window.location.reload();
+        },
 
         usersModalOpen: false,
         usersLoading: false,
         usersError: null,
         usersList: [],
+        snapUsers: '',
         departmentOptions: [],
         userForm: { id: null, name: '', email: '', password: '', password_confirmation: '', role: 'agente', is_active: true, department_ids: [] },
         userFormMode: 'create',
@@ -287,11 +318,13 @@
             this.userForm = { id: null, name: '', email: '', password: '', password_confirmation: '', role: 'agente', is_active: true, department_ids: [] };
             this.userFormMode = 'create';
             this.usersError = null;
+            this.$nextTick(() => { this.snapUsers = this.snapshotForm(document.getElementById('usersModalBody')); });
         },
         editUser(u) {
             this.userForm = { id: u.id, name: u.name, email: u.email, password: '', password_confirmation: '', role: u.role, is_active: !!u.is_active, department_ids: [...(u.department_ids || [])] };
             this.userFormMode = 'edit';
             this.usersError = null;
+            this.$nextTick(() => { this.snapUsers = this.snapshotForm(document.getElementById('usersModalBody')); });
         },
         toggleDept(id) {
             const idx = this.userForm.department_ids.indexOf(id);
@@ -402,6 +435,7 @@
         },
 
         envModalOpen: false,
+        snapEnv: '',
         envLoading: false,
         envError: null,
         envLogoLightUrl: @js($branding['logo_light_url']),
@@ -423,6 +457,7 @@
             this.envModalOpen = true;
             this.userMenuOpen = false;
             this.envError = null;
+            this.$nextTick(() => { this.snapEnv = this.snapshotForm(document.getElementById('envModalBody')); });
         },
         onEnvLogoLightFile(e) {
             const f = e.target.files[0];
@@ -567,7 +602,7 @@
         <div @click.away="profileModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative border border-slate-200">
             <div class="flex items-center justify-between mb-5">
                 <h3 class="text-base font-bold text-gray-800">Meu Perfil</h3>
-                <button type="button" @click="profileModalOpen = false; window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                <button type="button" @click="confirmCloseProfileModal()" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
@@ -632,7 +667,7 @@
                     <h3 class="text-base font-bold text-gray-800">Usuários</h3>
                     <p class="text-xs text-gray-500 mt-0.5">Gerencie os usuários que têm acesso ao painel administrativo.</p>
                 </div>
-                <button type="button" @click="usersModalOpen = false; window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                <button type="button" @click="confirmCloseModal('usersModalOpen', 'usersModalBody', 'snapUsers')" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
@@ -641,7 +676,7 @@
 
             <div class="flex flex-col md:flex-row gap-5 flex-1 min-h-0">
                 <!-- FORMULÁRIO: ESQUERDA (campos rolam, botão fica fixo no rodapé) -->
-                <div class="md:w-96 shrink-0 bg-gray-50 border border-gray-200 rounded-lg flex flex-col overflow-hidden">
+                <div id="usersModalBody" class="md:w-96 shrink-0 bg-gray-50 border border-gray-200 rounded-lg flex flex-col overflow-hidden">
                 <div class="p-4 overflow-y-auto flex-1 min-h-0 custom-scroll">
                     <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-3" x-text="userFormMode === 'edit' ? 'Editar Usuário' : 'Novo Usuário'"></h4>
                     <div class="space-y-3">
@@ -759,14 +794,14 @@
                     <h3 class="text-base font-bold text-gray-800 dark:text-gray-100">Ambiente</h3>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Identidade visual e informações do sistema.</p>
                 </div>
-                <button type="button" @click="envModalOpen = false; window.location.reload()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <button type="button" @click="confirmCloseModal('envModalOpen', 'envModalBody', 'snapEnv')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
 
             <div x-show="envError" x-cloak class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-4 shrink-0" x-text="envError"></div>
 
-            <div class="flex-1 min-h-0 space-y-3 pr-1">
+            <div id="envModalBody" class="flex-1 min-h-0 space-y-3 pr-1">
                 <div class="grid grid-cols-2 gap-3">
                     <div class="flex items-center gap-2">
                         <template x-if="envLogoLightPreview || envLogoLightUrl">

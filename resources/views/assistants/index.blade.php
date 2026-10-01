@@ -319,6 +319,9 @@
                     personalidadeModalOpen: false,
                     conexaoModalOpen: false,
                     canalWhatsappModalOpen: false,
+                    snapPersonalidade: '',
+                    snapConexao: '',
+                    snapCanal: '',
 
                     provider: '{{ $configuring->provider ?? 'openai' }}',
                     wa_provider: '{{ $configuring->whatsapp_provider ?? '' }}',
@@ -623,14 +626,42 @@
                     restoreOpenModal() {
                         const key = 'openmodal_config_' + {{ $configuring->id }};
                         const saved = sessionStorage.getItem(key);
-                        if (saved === 'personalidade') this.personalidadeModalOpen = true;
-                        if (saved === 'conexao') this.conexaoModalOpen = true;
-                        if (saved === 'canal') this.canalWhatsappModalOpen = true;
+                        if (saved === 'personalidade') this.openModal('personalidadeModalOpen', 'personalidadeModalBody', 'snapPersonalidade');
+                        if (saved === 'conexao') this.openModal('conexaoModalOpen', 'conexaoModalBody', 'snapConexao');
+                        if (saved === 'canal') this.openModal('canalWhatsappModalOpen', 'canalWhatsappModalBody', 'snapCanal');
                         if (saved === 'kb') { this.kbModalOpen = true; this.loadKbRows(); }
                         this.$watch('personalidadeModalOpen', v => this.persistOpenModal('personalidade', v));
                         this.$watch('conexaoModalOpen', v => this.persistOpenModal('conexao', v));
                         this.$watch('canalWhatsappModalOpen', v => this.persistOpenModal('canal', v));
                         this.$watch('kbModalOpen', v => this.persistOpenModal('kb', v));
+                    },
+
+                    // Tira uma foto dos campos de dentro do modal (nome+valor de cada input/select/
+                    // textarea) pra comparar depois - assim o X so recarrega direto se nada mudou; se
+                    // mudou algo e nao foi salvo, confirma antes de descartar (window.location.reload()
+                    // no X perderia a edicao sem aviso nenhum, senao).
+                    snapshotForm(root) {
+                        if (!root) return '';
+                        return Array.from(root.querySelectorAll('input, select, textarea')).map(el => {
+                            if (el.type === 'checkbox' || el.type === 'radio') return el.name + '=' + el.checked;
+                            return (el.name || el.id) + '=' + el.value;
+                        }).join('&');
+                    },
+
+                    openModal(prop, rootId, snapKey) {
+                        this[prop] = true;
+                        this.$nextTick(() => { this[snapKey] = this.snapshotForm(document.getElementById(rootId)); });
+                    },
+
+                    async confirmCloseModal(prop, rootId, snapKey, persistName) {
+                        const current = this.snapshotForm(document.getElementById(rootId));
+                        if (current !== (this[snapKey] ?? '')) {
+                            const ok = await confirmModal('Você tem alterações não salvas aqui. Fechar mesmo assim e perder essas alterações?');
+                            if (!ok) return;
+                        }
+                        this[prop] = false;
+                        if (persistName) this.persistOpenModal(persistName, false);
+                        window.location.reload();
                     },
 
                     async disconnectWa() {
@@ -851,7 +882,7 @@
                     <input type="hidden" name="assistant_id" value="{{ $configuring->id }}">
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-                        <button type="button" @click="personalidadeModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                        <button type="button" @click="openModal('personalidadeModalOpen', 'personalidadeModalBody', 'snapPersonalidade')" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                             <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
                                 <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white {{ trim($configuring->system_prompt ?? '') !== '' ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
@@ -867,7 +898,7 @@
                             <span class="font-bold text-gray-800 text-sm">Base de Conhecimento</span>
                         </button>
 
-                        <button type="button" @click="conexaoModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                        <button type="button" @click="openModal('conexaoModalOpen', 'conexaoModalBody', 'snapConexao')" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                             <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" /></svg>
                                 <span class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white" :class="aiStatus === 'connected' ? 'bg-emerald-500' : (aiStatus === 'disconnected' ? 'bg-red-500' : 'bg-gray-300 animate-pulse')"></span>
@@ -875,7 +906,7 @@
                             <span class="font-bold text-gray-800 text-sm">Conexão IA</span>
                         </button>
 
-                        <button type="button" @click="canalWhatsappModalOpen = true" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
+                        <button type="button" @click="openModal('canalWhatsappModalOpen', 'canalWhatsappModalBody', 'snapCanal')" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center text-center gap-2">
                             <span class="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center relative">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
                                 <span x-show="wa_provider !== ''" class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white" :class="waStatus === 'connected' ? 'bg-emerald-500' : (waStatus === 'disconnected' ? 'bg-red-500' : 'bg-gray-300 animate-pulse')"></span>
@@ -919,11 +950,11 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg>
                                     Personalidade e Prompt
                                 </h3>
-                                <button type="button" @click="personalidadeModalOpen = false; persistOpenModal('personalidade', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                                <button type="button" @click="confirmCloseModal('personalidadeModalOpen', 'personalidadeModalBody', 'snapPersonalidade', 'personalidade')" class="text-gray-400 hover:text-gray-600">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
-                            <div class="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-5">
+                            <div id="personalidadeModalBody" class="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-5">
                                 <div class="flex items-center justify-end mb-2">
                                     <button type="button" x-on:click="showLeadModal = true" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-1.5 px-3 rounded-lg border border-indigo-200 flex items-center gap-1.5 transition">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
@@ -956,11 +987,11 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" /></svg>
                                     Conexão IA
                                 </h3>
-                                <button type="button" @click="conexaoModalOpen = false; persistOpenModal('conexao', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                                <button type="button" @click="confirmCloseModal('conexaoModalOpen', 'conexaoModalBody', 'snapConexao', 'conexao')" class="text-gray-400 hover:text-gray-600">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
-                            <div class="flex-1 min-h-0 overflow-auto p-5">
+                            <div id="conexaoModalBody" class="flex-1 min-h-0 overflow-auto p-5">
                                 <div class="flex justify-end mb-3">
                                     <button type="button" x-on:click="testConnection()" :disabled="testing" class="dark-btn-fix text-xs font-bold py-1.5 px-3 rounded-lg border flex items-center shrink-0 transition"
                                         :class="testing || aiStatus === 'checking' ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200' : (aiStatus === 'connected' ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200')">
@@ -1045,11 +1076,11 @@
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                     </button>
                                 </h3>
-                                <button type="button" @click="canalWhatsappModalOpen = false; persistOpenModal('canal', false); window.location.reload()" class="text-gray-400 hover:text-gray-600">
+                                <button type="button" @click="confirmCloseModal('canalWhatsappModalOpen', 'canalWhatsappModalBody', 'snapCanal', 'canal')" class="text-gray-400 hover:text-gray-600">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
-                            <div class="flex-1 min-h-0 overflow-auto p-5">
+                            <div id="canalWhatsappModalBody" class="flex-1 min-h-0 overflow-auto p-5">
                                 <div class="flex items-center gap-1.5 mb-3" x-show="wa_provider !== ''" x-cloak>
                                     <span x-show="waStatus === 'checking'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 animate-pulse border border-gray-200">Verificando...</span>
                                     <span x-show="waStatus === 'connected'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 flex items-center gap-1 border border-emerald-200 shadow-sm">
