@@ -352,6 +352,8 @@
                     metaVerificationCode: '',
                     metaExistingNumbers: [],
                     metaLoadingNumbers: false,
+                    metaStatusChecking: false,
+                    metaStatusResult: null,
                     metaAppId: @js($metaAppId),
                     metaConfigId: @js($metaConfigId),
                     metaAppSecretSet: @js($metaAppSecretSet),
@@ -858,6 +860,32 @@
                         this.metaPhoneStep = 'choose_method';
                     },
 
+                    // Diagnostico: consulta o status real do numero direto na Meta (status,
+                    // name_status, code_verification_status, quality_rating) - pra ver exatamente
+                    // por que o WhatsApp Manager mostra Pendente, em vez de adivinhar. Nao existe
+                    // nenhum passo de API alem do register() pra ativar - o status muda sozinho
+                    // conforme a Meta termina a revisao do nome/emissao do certificado.
+                    async checkMetaPhoneStatusLive() {
+                        this.metaStatusChecking = true;
+                        try {
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({ action: 'meta_check_phone_status', assistant_id: {{ $configuring->id }} }),
+                            });
+                            const data = await res.json();
+                            if (res.ok && data.success) {
+                                this.metaStatusResult = data;
+                            } else {
+                                Alpine.store('toast').show(data.message || 'Erro ao consultar status.', 'error');
+                            }
+                        } catch (e) {
+                            Alpine.store('toast').show('Erro de conexão ao consultar status.', 'error');
+                        } finally {
+                            this.metaStatusChecking = false;
+                        }
+                    },
+
                     // Passo 1: cadastra o numero novo no WABA ja conectado.
                     async submitMetaPhoneNumber() {
                         if (!this.metaNewPhoneCc || !this.metaNewPhoneNumber || !this.metaVerifiedName) {
@@ -1359,6 +1387,15 @@
                                                         <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
                                                             <p class="font-bold mb-0.5">✅ Conectado via Meta</p>
                                                             <p>Phone Number ID: <span class="font-mono" x-text="wa_instance"></span></p>
+                                                            <button type="button" @click="checkMetaPhoneStatusLive()" :disabled="metaStatusChecking" class="text-[11px] text-emerald-800 underline hover:no-underline mt-1">
+                                                                <span x-text="metaStatusChecking ? 'Consultando...' : 'Verificar status na Meta'"></span>
+                                                            </button>
+                                                            <div x-show="metaStatusResult" class="mt-2 pt-2 border-t border-emerald-200 space-y-0.5 font-mono text-[10px]">
+                                                                <p>status: <span x-text="metaStatusResult?.status ?? '—'"></span></p>
+                                                                <p>name_status: <span x-text="metaStatusResult?.name_status ?? '—'"></span></p>
+                                                                <p>code_verification_status: <span x-text="metaStatusResult?.code_verification_status ?? '—'"></span></p>
+                                                                <p>quality_rating: <span x-text="metaStatusResult?.quality_rating ?? '—'"></span></p>
+                                                            </div>
                                                         </div>
                                                     </template>
                                                     <p class="text-[10px] text-gray-400 mt-2 leading-tight">Abre o login oficial da Meta pra você (ou seu cliente) escolher/criar o Portfólio de Negócios e conectar o número - inclusive o que já usa no WhatsApp Business do celular, sem perder o histórico.</p>

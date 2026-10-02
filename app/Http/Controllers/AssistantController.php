@@ -761,6 +761,7 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect') return $this->connectMeta($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect_waba') return $this->connectMetaWabaOnly($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_list_phone_numbers') return $this->listMetaPhoneNumbers($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_check_phone_status') return $this->checkMetaPhoneStatus($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_request_code') return $this->requestMetaVerificationCode($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_verify_code') return $this->verifyMetaCode($request);
@@ -1384,6 +1385,41 @@ class AssistantController extends Controller
         } catch (\Throwable $e) {
             Log::error('Exceção ao listar números do WABA na Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao listar números: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Diagnostico pontual: consulta o status real do numero direto na Meta
+     * (status/name_status/code_verification_status/quality_rating), pra saber exatamente POR QUE
+     * um numero aparece "Pendente" no WhatsApp Manager - sem adivinhar. Nao existe nenhum passo de
+     * API alem do register() pra "ativar" o numero; o status muda sozinho conforme a Meta conclui
+     * a revisao do nome de exibicao / emissao do certificado, entao esse endpoint so serve pra
+     * mostrar em qual dessas sub-etapas o numero esta parado.
+     */
+    private function checkMetaPhoneStatus(Request $request)
+    {
+        $request->validate(['assistant_id' => 'required|exists:assistants,id']);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        if (empty($assistant->whatsapp_instance) || empty($assistant->whatsapp_token)) {
+            return response()->json(['success' => false, 'message' => 'Esse assistente ainda não tem um número conectado via Meta.'], 422);
+        }
+
+        try {
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->get("https://graph.facebook.com/v21.0/{$assistant->whatsapp_instance}", [
+                    'fields' => 'status,name_status,code_verification_status,quality_rating,display_phone_number,verified_name',
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Erro ao consultar status do número na Meta: ' . $response->body());
+                return response()->json(['success' => false, 'message' => 'Não foi possível consultar o status na Meta.'], 422);
+            }
+
+            return response()->json(['success' => true] + $response->json());
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao consultar status do número na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao consultar status: ' . $e->getMessage()], 500);
         }
     }
 
