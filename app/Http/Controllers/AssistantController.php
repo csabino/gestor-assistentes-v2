@@ -762,7 +762,6 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect_waba') return $this->connectMetaWabaOnly($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_list_phone_numbers') return $this->listMetaPhoneNumbers($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_check_phone_status') return $this->checkMetaPhoneStatus($request);
-        if ($request->isMethod('post') && $request->input('action') === 'meta_reregister_phone') return $this->reregisterMetaPhone($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_request_code') return $this->requestMetaVerificationCode($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_verify_code') return $this->verifyMetaCode($request);
@@ -1390,12 +1389,66 @@ class AssistantController extends Controller
     }
 
     /**
-     * Diagnostico pontual: consulta o status real do numero direto na Meta
-     * (status/name_status/code_verification_status/quality_rating), pra saber exatamente POR QUE
-     * um numero aparece "Pendente" no WhatsApp Manager - sem adivinhar. Nao existe nenhum passo de
-     * API alem do register() pra "ativar" o numero; o status muda sozinho conforme a Meta conclui
-     * a revisao do nome de exibicao / emissao do certificado, entao esse endpoint so serve pra
-     * mostrar em qual dessas sub-etapas o numero esta parado.
+     * Consulta o status real do numero direto na Meta
+     * (status/name_status/code_verification_status/quality_rating) - sem documentacao oficial
+     * sobre o motivo exato de "Pendente", esses campos mostram em qual sub-etapa o numero esta
+     * parado (revisao do nome de exibicao / emissao do certificado / verificacao do codigo).
+     */
+    private function getMetaPhoneStatus(string $phoneNumberId, string $token): ?array
+    {
+        $response = Http::withToken($token)->get("https://graph.facebook.com/v21.0/{$phoneNumberId}", [
+            'fields' => 'status,name_status,code_verification_status,quality_rating,display_phone_number,verified_name',
+        ]);
+
+        if (!$response->successful()) {
+            Log::error('Erro ao consultar status do número na Meta: ' . $response->body());
+            return null;
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * Chama o register() no numero ja verificado. A documentacao da Meta nao lista nenhum passo
+     * depois do register(), mas ha relatos (de outros desenvolvedores reproduzindo o mesmo
+     * cenario) de que repetir essa chamada destrava um numero preso em status "Pendente".
+     * Idempotente do lado da Meta - chamar de novo em um numero ja registrado nao tem efeito
+     * colateral conhecido, so reafirma o registro.
+     */
+    private function registerMetaPhoneWithMeta(string $phoneNumberId, string $token, string $pin): bool
+    {
+        $response = Http::withToken($token)->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/register", [
+            'messaging_product' => 'whatsapp',
+            'pin' => $pin,
+        ]);
+
+        if (!$response->successful()) {
+            Log::error('Erro ao registrar número na Meta: ' . $response->body());
+        }
+
+        return $response->successful();
+    }
+
+    /**
+     * Autocura: confere o status real do numero e, se nao estiver CONNECTED, chama register() de
+     * novo sozinha - pra quem esta configurando (ou o cliente, na futura tela publica) nunca
+     * precisar notar ou agir manualmente sobre um numero preso em "Pendente". Roda tanto logo
+     * apos o primeiro registro quanto toda vez que o status e consultado no painel.
+     */
+    private function ensureMetaPhoneActive(string $phoneNumberId, string $token, string $pin): ?array
+    {
+        $status = $this->getMetaPhoneStatus($phoneNumberId, $token);
+        if ($status && ($status['status'] ?? null) !== 'CONNECTED') {
+            $this->registerMetaPhoneWithMeta($phoneNumberId, $token, $pin);
+            $status = $this->getMetaPhoneStatus($phoneNumberId, $token);
+        }
+        return $status;
+    }
+
+    /**
+     * Diagnostico no painel: consulta o status do numero e, se precisar, já aciona a autocura
+     * (ensureMetaPhoneActive) antes de responder - o admin nunca ve um status "Pendente" parado
+     * sem a aplicacao ja ter tentado resolver sozinha.
      */
     private function checkMetaPhoneStatus(Request $request)
     {
@@ -1407,56 +1460,22 @@ class AssistantController extends Controller
         }
 
         try {
-            $response = Http::withToken($assistant->whatsapp_token)
-                ->get("https://graph.facebook.com/v21.0/{$assistant->whatsapp_instance}", [
-                    'fields' => 'status,name_status,code_verification_status,quality_rating,display_phone_number,verified_name',
-                ]);
-
-            if (!$response->successful()) {
-                Log::error('Erro ao consultar status do número na Meta: ' . $response->body());
-                return response()->json(['success' => false, 'message' => 'Não foi possível consultar o status na Meta.'], 422);
-            }
-
-            return response()->json(['success' => true] + $response->json());
-        } catch (\Throwable $e) {
-            Log::error('Exceção ao consultar status do número na Meta: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Erro ao consultar status: ' . $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * Chama o register() de novo pro numero ja verificado - a documentacao da Meta nao lista
-     * nenhum passo depois do register(), mas ha relatos (inclusive de outro desenvolvedor,
-     * reproduzindo o mesmo cenario) de que repetir essa chamada destrava um numero preso em
-     * status "Pendente". Idempotente do lado da Meta - chamar de novo em um numero ja registrado
-     * nao tem efeito colateral conhecido, so reafirma o registro.
-     */
-    private function reregisterMetaPhone(Request $request)
-    {
-        $request->validate(['assistant_id' => 'required|exists:assistants,id']);
-
-        $assistant = Assistant::findOrFail($request->input('assistant_id'));
-        if (empty($assistant->whatsapp_instance) || empty($assistant->whatsapp_token)) {
-            return response()->json(['success' => false, 'message' => 'Esse assistente ainda não tem um número conectado via Meta.'], 422);
-        }
-
-        try {
             $pin = $assistant->whatsapp_pin ?: (string) random_int(100000, 999999);
-            $response = Http::withToken($assistant->whatsapp_token)
-                ->post("https://graph.facebook.com/v21.0/{$assistant->whatsapp_instance}/register", [
-                    'messaging_product' => 'whatsapp',
-                    'pin' => $pin,
-                ]);
+            $status = $this->ensureMetaPhoneActive($assistant->whatsapp_instance, $assistant->whatsapp_token, $pin);
 
             if ($assistant->whatsapp_pin !== $pin) {
                 $assistant->whatsapp_pin = $pin;
                 $assistant->save();
             }
 
-            return response()->json(['success' => $response->successful(), 'http_status' => $response->status(), 'response' => $response->json()]);
+            if (!$status) {
+                return response()->json(['success' => false, 'message' => 'Não foi possível consultar o status na Meta.'], 422);
+            }
+
+            return response()->json(['success' => true] + $status);
         } catch (\Throwable $e) {
-            Log::error('Exceção ao re-registrar número na Meta: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Erro ao re-registrar: ' . $e->getMessage()], 500);
+            Log::error('Exceção ao consultar status do número na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao consultar status: ' . $e->getMessage()], 500);
         }
     }
 
@@ -1560,21 +1579,20 @@ class AssistantController extends Controller
             }
 
             $pin = (string) random_int(100000, 999999);
-            $registerResponse = Http::withToken($assistant->whatsapp_token)
-                ->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/register", [
-                    'messaging_product' => 'whatsapp',
-                    'pin' => $pin,
-                ]);
-
-            if (!$registerResponse->successful()) {
-                Log::error('Erro ao registrar número (Meta): ' . $registerResponse->body());
-                return response()->json(['success' => false, 'message' => $registerResponse->json('error.error_user_msg') ?? $registerResponse->json('error.message') ?? 'Não foi possível concluir o registro do número.'], 422);
+            if (!$this->registerMetaPhoneWithMeta($phoneNumberId, $assistant->whatsapp_token, $pin)) {
+                return response()->json(['success' => false, 'message' => 'Não foi possível concluir o registro do número.'], 422);
             }
 
             $assistant->whatsapp_provider = 'meta';
             $assistant->whatsapp_instance = $phoneNumberId;
             $assistant->whatsapp_pin = $pin;
             $assistant->save();
+
+            // Autocura: o register() acima as vezes deixa o numero preso em status "Pendente" no
+            // WhatsApp Manager (comportamento conhecido e relatado, sem documentacao oficial da
+            // Meta sobre o motivo) - confere e repete o register() sozinho se precisar, pra quem
+            // esta configurando nunca precisar notar/agir manualmente sobre isso.
+            $this->ensureMetaPhoneActive($phoneNumberId, $assistant->whatsapp_token, $pin);
 
             return response()->json(['success' => true, 'message' => 'Número de WhatsApp conectado e verificado com sucesso!']);
         } catch (\Throwable $e) {
