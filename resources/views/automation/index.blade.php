@@ -8,6 +8,7 @@
                   messages: @js(count($automationMessages) ? $automationMessages : ['']),
                   isMeta: @js($assistant->whatsapp_provider === 'meta'),
                   metaTemplates: [],
+                  metaTemplatesRefreshing: false,
                   metaTemplateCreateOpen: false,
                   metaTemplateSaving: false,
                   metaTemplateError: null,
@@ -18,6 +19,7 @@
                       return !!(bodyComp && bodyComp.text && bodyComp.text.includes('@{{1}}'));
                   },
                   async loadMetaTemplates() {
+                      this.metaTemplatesRefreshing = true;
                       try {
                           const res = await fetch('/', {
                               method: 'POST',
@@ -29,6 +31,8 @@
                           this.metaTemplates = list.map(tpl => ({ ...tpl, hasVariable: this.templateHasVariable(tpl) }));
                       } catch (e) {
                           this.metaTemplates = [];
+                      } finally {
+                          this.metaTemplatesRefreshing = false;
                       }
                   },
                   async deleteMetaTemplateConfirm(tpl) {
@@ -102,7 +106,7 @@
                       this.$nextTick(() => this.$el.submit());
                   }
               }"
-              x-init="if (isMeta) loadMetaTemplates()"
+              x-init="if (isMeta) { loadMetaTemplates(); setInterval(() => loadMetaTemplates(), 60000); }"
               @submit="confirmSave($event)">
             @csrf
 
@@ -236,12 +240,26 @@
 
                             <template x-if="metaTemplates.length > 0">
                                 <div class="mt-3 space-y-1 max-w-md">
-                                    <p class="text-[11px] font-semibold text-gray-600">Templates cadastrados</p>
+                                    <p class="text-[11px] font-semibold text-gray-600 flex items-center gap-1.5">
+                                        Templates cadastrados
+                                        <span x-show="metaTemplatesRefreshing" x-cloak class="flex items-center gap-1 text-gray-400 font-normal">
+                                            <span class="inline-block animate-spin rounded-full h-2.5 w-2.5 border-2 border-gray-300 border-t-indigo-600"></span>
+                                            Atualizando lista
+                                        </span>
+                                    </p>
                                     <template x-for="tpl in metaTemplates" :key="tpl.name + tpl.language">
                                         <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
-                                            <span class="text-[11px] text-gray-700">
+                                            <span class="text-[11px] text-gray-700 flex items-center gap-1.5">
                                                 <span class="font-bold" x-text="tpl.name"></span>
-                                                <span class="text-gray-400" x-text="' (' + tpl.language + ') - ' + tpl.status"></span>
+                                                <span class="text-gray-400" x-text="'(' + tpl.language + ')'"></span>
+                                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                                                      :class="{
+                                                          'bg-amber-50 text-amber-700 border border-amber-200': tpl.status === 'PENDING',
+                                                          'bg-emerald-50 text-emerald-700 border border-emerald-200': tpl.status === 'APPROVED',
+                                                          'bg-red-50 text-red-700 border border-red-200': tpl.status === 'REJECTED',
+                                                          'bg-gray-100 text-gray-500 border border-gray-200': !['PENDING', 'APPROVED', 'REJECTED'].includes(tpl.status)
+                                                      }"
+                                                      x-text="tpl.status"></span>
                                             </span>
                                             <button type="button" @click="deleteMetaTemplateConfirm(tpl)" class="text-gray-400 hover:text-red-600 p-1 rounded transition" title="Remover template">
                                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
