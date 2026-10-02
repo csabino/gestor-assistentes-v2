@@ -84,6 +84,7 @@
 
         /* Superfícies que devem continuar sempre claras mesmo no tema escuro (ex: cards de assistente). */
         .dark .light-surface { background-color: #ffffff !important; border-color: #e5e7eb !important; }
+        .dark .light-surface .bg-white { background-color: #ffffff !important; }
         .dark .light-surface .text-gray-800 { color: #1f2937 !important; }
         .dark .light-surface .text-gray-700 { color: #374151 !important; }
         .dark .light-surface .text-gray-600 { color: #4b5563 !important; }
