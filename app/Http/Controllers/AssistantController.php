@@ -3983,11 +3983,27 @@ class AssistantController extends Controller
                 return response()->json(['success' => false, 'message' => 'Não foi possível listar os templates.'], 422);
             }
 
-            return response()->json(['success' => true, 'templates' => $response->json('data') ?? []]);
+            $templates = array_values(array_filter($response->json('data') ?? [], fn ($tpl) => !$this->isMetaSampleTemplate($tpl['name'] ?? '')));
+
+            return response()->json(['success' => true, 'templates' => $templates]);
         } catch (\Throwable $e) {
             Log::error('Exceção ao listar templates do WABA na Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao listar templates: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * A Meta cria sozinha alguns templates de demonstracao em toda conta nova (hello_world, e a
+     * familia "Jasper's Market" usada nos tutoriais deles) - nem da pra apagar esses. Filtra pelo
+     * prefixo do nome pra nao poluir a lista com template que o admin nunca vai usar de verdade.
+     */
+    private function isMetaSampleTemplate(string $name): bool
+    {
+        $name = strtolower($name);
+        foreach (['hello_world', 'sample_', 'jaspers_market'] as $prefix) {
+            if (str_starts_with($name, $prefix)) return true;
+        }
+        return false;
     }
 
     /**
