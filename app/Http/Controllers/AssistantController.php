@@ -760,6 +760,7 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'disconnect_whatsapp') return $this->disconnectWhatsapp($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect') return $this->connectMeta($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect_waba') return $this->connectMetaWabaOnly($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_connect_manual') return $this->connectMetaManual($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_list_phone_numbers') return $this->listMetaPhoneNumbers($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_check_phone_status') return $this->checkMetaPhoneStatus($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
@@ -1351,6 +1352,35 @@ class AssistantController extends Controller
             Log::error('Exceção ao conectar WABA via Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao conectar: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Conexao manual, colando credenciais ja prontas (phone_number_id + access_token + waba_id) -
+     * pensada pro numero de teste gratuito que a Meta da em "Etapa 1. Experimente" durante o App
+     * Review (ja vem pre-verificado, funciona com Standard Access, sem precisar passar pelo
+     * Embedded Signup nem pelo cadastro manual de numero novo). Util tambem pra qualquer numero
+     * que ja exista e so precise ser plugado no assistente sem repetir o fluxo todo.
+     */
+    private function connectMetaManual(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'phone_number_id' => 'required|string',
+            'access_token' => 'required|string',
+            'waba_id' => 'nullable|string',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+
+        $assistant->whatsapp_provider = 'meta';
+        $assistant->whatsapp_instance = $request->input('phone_number_id');
+        $assistant->whatsapp_token = $request->input('access_token');
+        if ($request->filled('waba_id')) {
+            $assistant->whatsapp_waba_id = $request->input('waba_id');
+        }
+        $assistant->save();
+
+        return response()->json(['success' => true, 'message' => 'Número conectado manualmente!']);
     }
 
     /**

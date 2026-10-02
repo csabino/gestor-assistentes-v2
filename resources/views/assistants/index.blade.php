@@ -354,6 +354,12 @@
                     metaLoadingNumbers: false,
                     metaStatusChecking: false,
                     metaStatusResult: null,
+                    metaManualOpen: false,
+                    metaManualSaving: false,
+                    metaManualError: null,
+                    metaManualPhoneNumberId: '',
+                    metaManualAccessToken: '',
+                    metaManualWabaId: '',
                     metaAppId: @js($metaAppId),
                     metaConfigId: @js($metaConfigId),
                     metaAppSecretSet: @js($metaAppSecretSet),
@@ -886,6 +892,50 @@
                         }
                     },
 
+                    // Conexao manual colando credenciais prontas - pro numero de teste gratuito da
+                    // Meta (tela Etapa 1. Experimente do App Review), que ja vem pre-verificado e
+                    // funciona com Standard Access, sem precisar passar pelo popup nem pelo cadastro
+                    // manual de numero novo.
+                    async connectMetaManualSubmit() {
+                        if (!this.metaManualPhoneNumberId || !this.metaManualAccessToken) {
+                            this.metaManualError = 'Preencha ao menos o Phone Number ID e o Access Token.';
+                            return;
+                        }
+                        this.metaManualSaving = true;
+                        this.metaManualError = null;
+                        try {
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({
+                                    action: 'meta_connect_manual',
+                                    assistant_id: {{ $configuring->id }},
+                                    phone_number_id: this.metaManualPhoneNumberId,
+                                    access_token: this.metaManualAccessToken,
+                                    waba_id: this.metaManualWabaId,
+                                }),
+                            });
+                            const data = await res.json();
+                            if (!res.ok || !data.success) {
+                                this.metaManualError = data.message || 'Não foi possível conectar manualmente.';
+                                return;
+                            }
+                            this.wa_instance = this.metaManualPhoneNumberId;
+                            this.wa_token = 'ok';
+                            if (this.metaManualWabaId) this.wa_waba_id = this.metaManualWabaId;
+                            this.savedWaProvider = 'meta';
+                            this.savedWaInstance = this.metaManualPhoneNumberId;
+                            this.savedWaToken = 'ok';
+                            this.waStatus = 'connected';
+                            this.metaManualOpen = false;
+                            Alpine.store('toast').show(data.message || 'Número conectado!', 'success');
+                        } catch (e) {
+                            this.metaManualError = 'Erro de conexão. Tente novamente.';
+                        } finally {
+                            this.metaManualSaving = false;
+                        }
+                    },
+
                     // Passo 1: cadastra o numero novo no WABA ja conectado.
                     async submitMetaPhoneNumber() {
                         if (!this.metaNewPhoneCc || !this.metaNewPhoneNumber || !this.metaVerifiedName) {
@@ -1399,7 +1449,31 @@
                                                         </div>
                                                     </template>
                                                     <p class="text-[10px] text-gray-400 mt-2 leading-tight">Abre o login oficial da Meta pra você (ou seu cliente) escolher/criar o Portfólio de Negócios e conectar o número - inclusive o que já usa no WhatsApp Business do celular, sem perder o histórico.</p>
-                                                    <button type="button" @click="metaConfigEditing = true" class="text-[11px] text-indigo-600 hover:text-indigo-800 mt-2">Editar configuração da Meta</button>
+                                                    <div class="flex items-center gap-3 mt-2">
+                                                        <button type="button" @click="metaConfigEditing = true" class="text-[11px] text-indigo-600 hover:text-indigo-800">Editar configuração da Meta</button>
+                                                        <button type="button" @click="metaManualOpen = !metaManualOpen" class="text-[11px] text-gray-500 hover:text-gray-700">Conectar manualmente (número de teste)</button>
+                                                    </div>
+                                                    <template x-if="metaManualOpen">
+                                                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 mt-2">
+                                                            <p class="text-[10px] text-gray-400 leading-tight">Pensado pro número de teste gratuito da Meta (tela "Etapa 1. Experimente" do App Review) - cola o Phone Number ID e o Access Token temporário de lá.</p>
+                                                            <div>
+                                                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Phone Number ID</label>
+                                                                <input type="text" x-model="metaManualPhoneNumberId" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                                            </div>
+                                                            <div>
+                                                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Access Token</label>
+                                                                <input type="text" x-model="metaManualAccessToken" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                                            </div>
+                                                            <div>
+                                                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">WABA ID (opcional)</label>
+                                                                <input type="text" x-model="metaManualWabaId" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                                            </div>
+                                                            <p x-show="metaManualError" x-text="metaManualError" class="text-[11px] text-red-600"></p>
+                                                            <button type="button" @click="connectMetaManualSubmit()" :disabled="metaManualSaving" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-1.5 rounded-lg text-[11px] transition">
+                                                                <span x-text="metaManualSaving ? 'Conectando...' : 'Conectar manualmente'"></span>
+                                                            </button>
+                                                        </div>
+                                                    </template>
                                                 </div>
                                             </template>
                                         </div>
