@@ -1371,16 +1371,26 @@ class AssistantController extends Controller
         ]);
 
         $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        $accessToken = $request->input('access_token');
+        $wabaId = $request->input('waba_id');
 
         $assistant->whatsapp_provider = 'meta';
         $assistant->whatsapp_instance = $request->input('phone_number_id');
-        $assistant->whatsapp_token = $request->input('access_token');
-        if ($request->filled('waba_id')) {
-            $assistant->whatsapp_waba_id = $request->input('waba_id');
+        $assistant->whatsapp_token = $accessToken;
+
+        if ($wabaId) {
+            $assistant->whatsapp_waba_id = $wabaId;
+            // Sem isso, a Meta nunca manda nada pro nosso webhook pra esse WABA - mesmo com
+            // numero/token certos, fica tudo em silencio (bug ja encontrado uma vez aqui).
+            $this->subscribeMetaWebhook($wabaId, $accessToken);
         }
         $assistant->save();
 
-        return response()->json(['success' => true, 'message' => 'Número conectado manualmente!']);
+        $message = $wabaId
+            ? 'Número conectado manualmente!'
+            : 'Número conectado, mas sem o WABA ID o App não foi inscrito nos webhooks desse WABA - a Meta não vai mandar mensagens pra gente assim. Preencha o campo WABA ID e conecte de novo.';
+
+        return response()->json(['success' => true, 'message' => $message]);
     }
 
     /**
