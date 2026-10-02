@@ -765,6 +765,7 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'meta_check_phone_status') return $this->checkMetaPhoneStatus($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_list_templates') return $this->listMetaTemplates($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_create_template') return $this->createMetaTemplate($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_delete_template') return $this->deleteMetaTemplate($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_request_code') return $this->requestMetaVerificationCode($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_verify_code') return $this->verifyMetaCode($request);
@@ -3243,6 +3244,7 @@ class AssistantController extends Controller
                 ?? $request->input('senderName')
                 ?? $request->input('pushName')
                 ?? $request->input('data.pushName')
+                ?? $request->input('entry.0.changes.0.value.contacts.0.profile.name')
                 ?? '';
 
             $clientName = trim((string)$rawPushName);
@@ -3919,7 +3921,7 @@ class AssistantController extends Controller
      * natureza acontecem fora dessa janela) sao OBRIGADAS a usar template. So existe pra Meta -
      * UazAPI nao tem esse conceito/restricao.
      */
-    private function sendWhatsappTemplate(Assistant $assistant, string $to, string $templateName, string $language): array
+    private function sendWhatsappTemplate(Assistant $assistant, string $to, string $templateName, string $language, ?string $clientName = null): array
     {
         if (empty($assistant->whatsapp_instance) || empty($assistant->whatsapp_token)) {
             return ['success' => false, 'error' => 'WhatsApp (Meta) não configurado.'];
@@ -3927,15 +3929,27 @@ class AssistantController extends Controller
 
         try {
             $cleanTo = $this->normalizeWaTarget($to);
+            $template = [
+                'name' => $templateName,
+                'language' => ['code' => $language],
+            ];
+
+            // {{1}} no corpo do template = nome do cliente (unica variavel suportada por enquanto).
+            // So manda o componente "body" com parametro se o admin realmente usou {{1}} no texto -
+            // mandar parametro pra um template sem variavel faria a Meta rejeitar o envio.
+            if ($clientName !== null) {
+                $template['components'] = [[
+                    'type' => 'body',
+                    'parameters' => [['type' => 'text', 'text' => $clientName]],
+                ]];
+            }
+
             $response = Http::withToken(trim($assistant->whatsapp_token))
                 ->post('https://graph.facebook.com/v21.0/' . $assistant->whatsapp_instance . '/messages', [
                     'messaging_product' => 'whatsapp',
                     'to' => $cleanTo,
                     'type' => 'template',
-                    'template' => [
-                        'name' => $templateName,
-                        'language' => ['code' => $language],
-                    ],
+                    'template' => $template,
                 ]);
 
             return ['success' => $response->successful(), 'error' => $response->failed() ? $response->body() : null];
@@ -3960,7 +3974,7 @@ class AssistantController extends Controller
         try {
             $response = Http::withToken($assistant->whatsapp_token)
                 ->get("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/message_templates", [
-                    'fields' => 'name,language,status,category',
+                    'fields' => 'name,language,status,category,components',
                     'limit' => 100,
                 ]);
 
@@ -3996,15 +4010,24 @@ class AssistantController extends Controller
             return response()->json(['success' => false, 'message' => 'Esse assistente não tem uma conta Meta conectada.'], 422);
         }
 
+        $body = $request->input('body');
+        $hasVariable = str_contains($body, '{{1}}');
+
+        $bodyComponent = ['type' => 'BODY', 'text' => $body];
+        if ($hasVariable) {
+            // A Meta exige um valor de exemplo pra {{1}} pra conseguir revisar o template - nao e
+            // o valor real que vai ser usado no envio (isso so acontece na hora do disparo, com o
+            // nome de verdade do cliente), e so uma amostra pro avaliador humano.
+            $bodyComponent['example'] = ['body_text' => [['Maria']]];
+        }
+
         try {
             $response = Http::withToken($assistant->whatsapp_token)
                 ->post("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/message_templates", [
                     'name' => $request->input('name'),
                     'language' => $request->input('language'),
                     'category' => 'UTILITY',
-                    'components' => [
-                        ['type' => 'BODY', 'text' => $request->input('body')],
-                    ],
+                    'components' => [$bodyComponent],
                 ]);
 
             if (!$response->successful()) {
@@ -4017,10 +4040,43 @@ class AssistantController extends Controller
                 'language' => $request->input('language'),
                 'status' => 'PENDING',
                 'category' => 'UTILITY',
+                'hasVariable' => $hasVariable,
             ]]);
         } catch (\Throwable $e) {
             Log::error('Exceção ao criar template na Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao criar template: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Deleta um template direto na Meta (DELETE /{waba_id}/message_templates?name=...) - a Meta
+     * remove TODAS as variacoes de idioma desse nome de uma vez (nao da pra deletar so uma).
+     */
+    private function deleteMetaTemplate(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'name' => 'required|string',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        if (empty($assistant->whatsapp_waba_id) || empty($assistant->whatsapp_token)) {
+            return response()->json(['success' => false, 'message' => 'Esse assistente não tem uma conta Meta conectada.'], 422);
+        }
+
+        try {
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->delete("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/message_templates?name=" . urlencode($request->input('name')));
+
+            if (!$response->successful()) {
+                Log::error('Erro ao deletar template na Meta: ' . $response->body());
+                return response()->json(['success' => false, 'message' => $response->json('error.error_user_msg') ?? $response->json('error.message') ?? 'Não foi possível deletar o template.'], 422);
+            }
+
+            return response()->json(['success' => true]);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao deletar template na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao deletar template: ' . $e->getMessage()], 500);
         }
     }
 
@@ -4258,12 +4314,20 @@ class AssistantController extends Controller
 
                     // Mensagem proativa fora da janela de 24h: assistente Meta precisa de um
                     // Template ja aprovado em vez de texto livre - identificado pelo prefixo
-                    // "tpl:nome:idioma" que a tela de Automacao grava quando o admin escolhe um
-                    // template, em vez do texto puro usado pela UazAPI.
+                    // "tpl:nome:idioma:temVariavel" que a tela de Automacao grava quando o admin
+                    // escolhe um template, em vez do texto puro usado pela UazAPI. O 4o campo
+                    // (0 ou 1) diz se o template usa {{1}} = nome do cliente - so manda esse
+                    // parametro quando o template de fato tem a variavel, senao a Meta rejeita.
                     if (str_starts_with($message, 'tpl:')) {
-                        [, $templateName, $templateLanguage] = array_pad(explode(':', $message, 3), 3, 'pt_BR');
-                        $waResult = $this->sendWhatsappTemplate($assistant, $followup->send_target, $templateName, $templateLanguage);
-                        $logMessage = "[Template: {$templateName} ({$templateLanguage})]";
+                        [, $templateName, $templateLanguage, $hasVariable] = array_pad(explode(':', $message, 4), 4, '');
+                        $clientName = null;
+                        if ($hasVariable === '1') {
+                            $clientName = WaContactName::where('assistant_id', $assistantId)
+                                ->where('phone_number', $followup->phone_number)
+                                ->value('name') ?: 'Cliente';
+                        }
+                        $waResult = $this->sendWhatsappTemplate($assistant, $followup->send_target, $templateName, $templateLanguage ?: 'pt_BR', $clientName);
+                        $logMessage = "[Template: {$templateName} ({$templateLanguage})]" . ($clientName ? " nome={$clientName}" : '');
                     } else {
                         $waResult = $this->sendWhatsappMessage($assistant, $followup->send_target, $message);
                         $logMessage = $message;

@@ -12,6 +12,11 @@
                   metaTemplateSaving: false,
                   metaTemplateError: null,
                   metaTemplateForm: { name: '', language: 'pt_BR', body: '' },
+                  templateHasVariable(tpl) {
+                      if (typeof tpl.hasVariable === 'boolean') return tpl.hasVariable;
+                      const bodyComp = (tpl.components || []).find(c => (c.type || '').toUpperCase() === 'BODY');
+                      return !!(bodyComp && bodyComp.text && bodyComp.text.includes('@{{1}}'));
+                  },
                   async loadMetaTemplates() {
                       try {
                           const res = await fetch('/', {
@@ -20,9 +25,29 @@
                               body: JSON.stringify({ action: 'meta_list_templates', assistant_id: {{ $assistant->id }} }),
                           });
                           const data = await res.json();
-                          this.metaTemplates = (res.ok && data.success) ? (data.templates || []) : [];
+                          const list = (res.ok && data.success) ? (data.templates || []) : [];
+                          this.metaTemplates = list.map(tpl => ({ ...tpl, hasVariable: this.templateHasVariable(tpl) }));
                       } catch (e) {
                           this.metaTemplates = [];
+                      }
+                  },
+                  async deleteMetaTemplateConfirm(tpl) {
+                      if (!(await confirmModal('Remover o template ' + tpl.name + '? Isso apaga todos os idiomas desse template na Meta.'))) return;
+                      try {
+                          const res = await fetch('/', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                              body: JSON.stringify({ action: 'meta_delete_template', assistant_id: {{ $assistant->id }}, name: tpl.name }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok || !data.success) {
+                              Alpine.store('toast').show(data.message || 'Não foi possível deletar o template.', 'error');
+                              return;
+                          }
+                          this.metaTemplates = this.metaTemplates.filter(t => t.name !== tpl.name);
+                          Alpine.store('toast').show('Template removido!', 'success');
+                      } catch (e) {
+                          Alpine.store('toast').show('Erro de conexão ao deletar.', 'error');
                       }
                   },
                   async createMetaTemplateSubmit() {
@@ -154,7 +179,7 @@
                                 <select :name="'messages[' + index + ']'" x-model="messages[index]" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white">
                                     <option value="">Selecione um template...</option>
                                     <template x-for="tpl in metaTemplates" :key="tpl.name + tpl.language">
-                                        <option :value="'tpl:' + tpl.name + ':' + tpl.language" x-text="tpl.name + ' (' + tpl.language + ') - ' + tpl.status"></option>
+                                        <option :value="'tpl:' + tpl.name + ':' + tpl.language + ':' + (tpl.hasVariable ? '1' : '0')" x-text="tpl.name + ' (' + tpl.language + ') - ' + tpl.status + (tpl.hasVariable ? ' [usa nome]' : '')"></option>
                                     </template>
                                 </select>
                             </template>
@@ -193,15 +218,36 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Corpo da mensagem</label>
-                                        <textarea x-model="metaTemplateForm.body" rows="3" maxlength="1024" placeholder="Ex: Olá! Notamos que nossa conversa ficou parada. Posso ajudar em mais alguma coisa?" class="w-full border border-gray-300 rounded-md p-1.5 text-xs"></textarea>
+                                        <div class="flex items-center justify-between mb-0.5">
+                                            <label class="block text-[11px] font-semibold text-gray-700">Corpo da mensagem</label>
+                                            <button type="button" @click="metaTemplateForm.body += '@{{1}}'" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold">+ Inserir nome do cliente</button>
+                                        </div>
+                                        <textarea x-model="metaTemplateForm.body" rows="3" maxlength="1024" placeholder="Ex: Olá @{{1}}! Notamos que nossa conversa ficou parada. Posso ajudar em mais alguma coisa?" class="w-full border border-gray-300 rounded-md p-1.5 text-xs"></textarea>
+                                        <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Usa <code>@{{1}}</code> no texto pra inserir o nome do cliente automaticamente na hora do envio.</p>
                                     </div>
                                     <p x-show="metaTemplateError" x-text="metaTemplateError" class="text-[11px] text-red-600"></p>
                                     <button type="button" @click="createMetaTemplateSubmit()" :disabled="metaTemplateSaving"
                                             class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-4 rounded-lg text-[11px] transition">
                                         <span x-text="metaTemplateSaving ? 'Criando...' : 'Criar Template'"></span>
                                     </button>
-                                    <p class="text-[10px] text-gray-400 leading-tight">O template passa por aprovação da Meta (minutos a horas) antes de poder ser usado de verdade - enquanto estiver "PENDING", evite selecioná-lo pra uma tentativa ainda.</p>
+                                    <p class="text-[10px] text-gray-400 leading-tight">O template passa por aprovação da Meta (minutos a horas) antes de poder ser usado de verdade - enquanto estiver PENDING, evite selecioná-lo pra uma tentativa ainda.</p>
+                                </div>
+                            </template>
+
+                            <template x-if="metaTemplates.length > 0">
+                                <div class="mt-3 space-y-1 max-w-md">
+                                    <p class="text-[11px] font-semibold text-gray-600">Templates cadastrados</p>
+                                    <template x-for="tpl in metaTemplates" :key="tpl.name + tpl.language">
+                                        <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                                            <span class="text-[11px] text-gray-700">
+                                                <span class="font-bold" x-text="tpl.name"></span>
+                                                <span class="text-gray-400" x-text="' (' + tpl.language + ') - ' + tpl.status"></span>
+                                            </span>
+                                            <button type="button" @click="deleteMetaTemplateConfirm(tpl)" class="text-gray-400 hover:text-red-600 p-1 rounded transition" title="Remover template">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
