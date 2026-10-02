@@ -762,6 +762,7 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect_waba') return $this->connectMetaWabaOnly($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_list_phone_numbers') return $this->listMetaPhoneNumbers($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_check_phone_status') return $this->checkMetaPhoneStatus($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_reregister_phone') return $this->reregisterMetaPhone($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_request_code') return $this->requestMetaVerificationCode($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_verify_code') return $this->verifyMetaCode($request);
@@ -1420,6 +1421,42 @@ class AssistantController extends Controller
         } catch (\Throwable $e) {
             Log::error('Exceção ao consultar status do número na Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao consultar status: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Chama o register() de novo pro numero ja verificado - a documentacao da Meta nao lista
+     * nenhum passo depois do register(), mas ha relatos (inclusive de outro desenvolvedor,
+     * reproduzindo o mesmo cenario) de que repetir essa chamada destrava um numero preso em
+     * status "Pendente". Idempotente do lado da Meta - chamar de novo em um numero ja registrado
+     * nao tem efeito colateral conhecido, so reafirma o registro.
+     */
+    private function reregisterMetaPhone(Request $request)
+    {
+        $request->validate(['assistant_id' => 'required|exists:assistants,id']);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        if (empty($assistant->whatsapp_instance) || empty($assistant->whatsapp_token)) {
+            return response()->json(['success' => false, 'message' => 'Esse assistente ainda não tem um número conectado via Meta.'], 422);
+        }
+
+        try {
+            $pin = $assistant->whatsapp_pin ?: (string) random_int(100000, 999999);
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->post("https://graph.facebook.com/v21.0/{$assistant->whatsapp_instance}/register", [
+                    'messaging_product' => 'whatsapp',
+                    'pin' => $pin,
+                ]);
+
+            if ($assistant->whatsapp_pin !== $pin) {
+                $assistant->whatsapp_pin = $pin;
+                $assistant->save();
+            }
+
+            return response()->json(['success' => $response->successful(), 'http_status' => $response->status(), 'response' => $response->json()]);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao re-registrar número na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao re-registrar: ' . $e->getMessage()], 500);
         }
     }
 

@@ -354,6 +354,7 @@
                     metaLoadingNumbers: false,
                     metaStatusChecking: false,
                     metaStatusResult: null,
+                    metaReregistering: false,
                     metaAppId: @js($metaAppId),
                     metaConfigId: @js($metaConfigId),
                     metaAppSecretSet: @js($metaAppSecretSet),
@@ -886,6 +887,29 @@
                         }
                     },
 
+                    // Chama o register() de novo no numero ja verificado - relatos de outros
+                    // desenvolvedores (e experiencia de quem usa isso no dia a dia) indicam que
+                    // repetir essa chamada destrava um numero preso em status Pendente.
+                    async reregisterMetaPhone() {
+                        this.metaReregistering = true;
+                        try {
+                            const res = await fetch('/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: JSON.stringify({ action: 'meta_reregister_phone', assistant_id: {{ $configuring->id }} }),
+                            });
+                            const data = await res.json();
+                            Alpine.store('toast').show(data.success ? 'Registrado de novo! Verificando status...' : (data.message || 'Falha ao registrar de novo.'), data.success ? 'success' : 'error');
+                            if (data.success) {
+                                await this.checkMetaPhoneStatusLive();
+                            }
+                        } catch (e) {
+                            Alpine.store('toast').show('Erro de conexão ao registrar de novo.', 'error');
+                        } finally {
+                            this.metaReregistering = false;
+                        }
+                    },
+
                     // Passo 1: cadastra o numero novo no WABA ja conectado.
                     async submitMetaPhoneNumber() {
                         if (!this.metaNewPhoneCc || !this.metaNewPhoneNumber || !this.metaVerifiedName) {
@@ -1387,9 +1411,14 @@
                                                         <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
                                                             <p class="font-bold mb-0.5">✅ Conectado via Meta</p>
                                                             <p>Phone Number ID: <span class="font-mono" x-text="wa_instance"></span></p>
-                                                            <button type="button" @click="checkMetaPhoneStatusLive()" :disabled="metaStatusChecking" class="text-[11px] text-emerald-800 underline hover:no-underline mt-1">
-                                                                <span x-text="metaStatusChecking ? 'Consultando...' : 'Verificar status na Meta'"></span>
-                                                            </button>
+                                                            <div class="flex items-center gap-2 mt-1">
+                                                                <button type="button" @click="checkMetaPhoneStatusLive()" :disabled="metaStatusChecking" class="text-[11px] text-emerald-800 underline hover:no-underline">
+                                                                    <span x-text="metaStatusChecking ? 'Consultando...' : 'Verificar status na Meta'"></span>
+                                                                </button>
+                                                                <button type="button" @click="reregisterMetaPhone()" :disabled="metaReregistering" class="text-[11px] text-emerald-800 underline hover:no-underline">
+                                                                    <span x-text="metaReregistering ? 'Registrando...' : 'Registrar de novo'"></span>
+                                                                </button>
+                                                            </div>
                                                             <div x-show="metaStatusResult" class="mt-2 pt-2 border-t border-emerald-200 space-y-0.5 font-mono text-[10px]">
                                                                 <p>status: <span x-text="metaStatusResult?.status ?? '—'"></span></p>
                                                                 <p>name_status: <span x-text="metaStatusResult?.name_status ?? '—'"></span></p>
