@@ -763,6 +763,8 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'meta_connect_manual') return $this->connectMetaManual($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_list_phone_numbers') return $this->listMetaPhoneNumbers($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_check_phone_status') return $this->checkMetaPhoneStatus($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_list_templates') return $this->listMetaTemplates($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_create_template') return $this->createMetaTemplate($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_request_code') return $this->requestMetaVerificationCode($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_verify_code') return $this->verifyMetaCode($request);
@@ -3911,6 +3913,118 @@ class AssistantController extends Controller
     }
 
     /**
+     * Envia um Modelo de Mensagem (Template) ja aprovado pela Meta - diferente de
+     * sendWhatsappMessage() (texto livre), que a Meta so aceita dentro da janela de 24h apos a
+     * ultima mensagem do cliente. Mensagens proativas (retomada de atendimento parado, que por
+     * natureza acontecem fora dessa janela) sao OBRIGADAS a usar template. So existe pra Meta -
+     * UazAPI nao tem esse conceito/restricao.
+     */
+    private function sendWhatsappTemplate(Assistant $assistant, string $to, string $templateName, string $language): array
+    {
+        if (empty($assistant->whatsapp_instance) || empty($assistant->whatsapp_token)) {
+            return ['success' => false, 'error' => 'WhatsApp (Meta) não configurado.'];
+        }
+
+        try {
+            $cleanTo = $this->normalizeWaTarget($to);
+            $response = Http::withToken(trim($assistant->whatsapp_token))
+                ->post('https://graph.facebook.com/v21.0/' . $assistant->whatsapp_instance . '/messages', [
+                    'messaging_product' => 'whatsapp',
+                    'to' => $cleanTo,
+                    'type' => 'template',
+                    'template' => [
+                        'name' => $templateName,
+                        'language' => ['code' => $language],
+                    ],
+                ]);
+
+            return ['success' => $response->successful(), 'error' => $response->failed() ? $response->body() : null];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Lista os Modelos de Mensagem (Templates) ja cadastrados no WABA do assistente - usado na
+     * tela de Automacao pra montar o seletor de templates aprovados, em vez de texto livre.
+     */
+    private function listMetaTemplates(Request $request)
+    {
+        $request->validate(['assistant_id' => 'required|exists:assistants,id']);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        if (empty($assistant->whatsapp_waba_id) || empty($assistant->whatsapp_token)) {
+            return response()->json(['success' => false, 'message' => 'Esse assistente não tem uma conta Meta conectada.'], 422);
+        }
+
+        try {
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->get("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/message_templates", [
+                    'fields' => 'name,language,status,category',
+                    'limit' => 100,
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Erro ao listar templates do WABA na Meta: ' . $response->body());
+                return response()->json(['success' => false, 'message' => 'Não foi possível listar os templates.'], 422);
+            }
+
+            return response()->json(['success' => true, 'templates' => $response->json('data') ?? []]);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao listar templates do WABA na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao listar templates: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Cria um Modelo de Mensagem novo direto na Meta, sem precisar abrir o WhatsApp Manager.
+     * Categoria fixa em UTILITY (nao exposta no formulario) - e o encaixe certo pra mensagem de
+     * retomada de uma conversa existente; a Meta reclassifica na propria revisao se achar que
+     * nao e. Todo template novo nasce com status PENDING (aprovacao leva minutos a horas).
+     */
+    private function createMetaTemplate(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'name' => 'required|string|max:512|regex:/^[a-z0-9_]+$/',
+            'language' => 'required|string|max:10',
+            'body' => 'required|string|max:1024',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        if (empty($assistant->whatsapp_waba_id) || empty($assistant->whatsapp_token)) {
+            return response()->json(['success' => false, 'message' => 'Esse assistente não tem uma conta Meta conectada.'], 422);
+        }
+
+        try {
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->post("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/message_templates", [
+                    'name' => $request->input('name'),
+                    'language' => $request->input('language'),
+                    'category' => 'UTILITY',
+                    'components' => [
+                        ['type' => 'BODY', 'text' => $request->input('body')],
+                    ],
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Erro ao criar template na Meta: ' . $response->body());
+                return response()->json(['success' => false, 'message' => $response->json('error.error_user_msg') ?? $response->json('error.message') ?? 'Não foi possível criar o template.'], 422);
+            }
+
+            return response()->json(['success' => true, 'template' => [
+                'name' => $request->input('name'),
+                'language' => $request->input('language'),
+                'status' => 'PENDING',
+                'category' => 'UTILITY',
+            ]]);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao criar template na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao criar template: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Itens do menu inicial no formato "texto|id|descrição" exigido pelo endpoint /send/menu (tipo
      * "list") da UazAPI. Mantidos em código (não no prompt) porque a tag [MENU_PRINCIPAL] sempre
      * dispara exatamente essas opções - a IA não escreve mais a lista numerada por conta própria.
@@ -4142,18 +4256,29 @@ class AssistantController extends Controller
                         continue;
                     }
 
-                    $waResult = $this->sendWhatsappMessage($assistant, $followup->send_target, $message);
-                    $this->sendToOmni($message, $followup->phone_number, 'output', $followup->send_target, $assistantId);
+                    // Mensagem proativa fora da janela de 24h: assistente Meta precisa de um
+                    // Template ja aprovado em vez de texto livre - identificado pelo prefixo
+                    // "tpl:nome:idioma" que a tela de Automacao grava quando o admin escolhe um
+                    // template, em vez do texto puro usado pela UazAPI.
+                    if (str_starts_with($message, 'tpl:')) {
+                        [, $templateName, $templateLanguage] = array_pad(explode(':', $message, 3), 3, 'pt_BR');
+                        $waResult = $this->sendWhatsappTemplate($assistant, $followup->send_target, $templateName, $templateLanguage);
+                        $logMessage = "[Template: {$templateName} ({$templateLanguage})]";
+                    } else {
+                        $waResult = $this->sendWhatsappMessage($assistant, $followup->send_target, $message);
+                        $logMessage = $message;
+                    }
+                    $this->sendToOmni($logMessage, $followup->phone_number, 'output', $followup->send_target, $assistantId);
 
                     DB::table('chat_messages')->insert([
                         'assistant_id' => $assistantId, 'phone_number' => $followup->phone_number, 'protocol' => null,
-                        'role' => 'assistant', 'content' => $message, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted,
+                        'role' => 'assistant', 'content' => $logMessage, 'created_at' => $nowFormatted, 'updated_at' => $nowFormatted,
                     ]);
                     DB::table('webhook_logs')->insert([
                         'assistant_id' => $assistantId,
                         'sender' => substr($followup->phone_number, 0, 255),
                         'user_message' => '[AUTOMAÇÃO] sem resposta do cliente',
-                        'ai_reply' => '[RETOMADA ' . ($followup->attempts_sent + 1) . '] ' . $message,
+                        'ai_reply' => '[RETOMADA ' . ($followup->attempts_sent + 1) . '] ' . $logMessage,
                         'wa_send_result' => json_encode($waResult, JSON_INVALID_UTF8_IGNORE),
                         'raw_snippet' => null,
                         'timestamp' => $nowFormatted,

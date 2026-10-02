@@ -6,6 +6,59 @@
         <form action="/" method="POST" class="container mx-auto px-6 max-w-4xl flex flex-col h-[calc(100vh-8rem)] pt-4"
               x-data="{
                   messages: @js(count($automationMessages) ? $automationMessages : ['']),
+                  isMeta: @js($assistant->whatsapp_provider === 'meta'),
+                  metaTemplates: [],
+                  metaTemplateCreateOpen: false,
+                  metaTemplateSaving: false,
+                  metaTemplateError: null,
+                  metaTemplateForm: { name: '', language: 'pt_BR', body: '' },
+                  async loadMetaTemplates() {
+                      try {
+                          const res = await fetch('/', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                              body: JSON.stringify({ action: 'meta_list_templates', assistant_id: {{ $assistant->id }} }),
+                          });
+                          const data = await res.json();
+                          this.metaTemplates = (res.ok && data.success) ? (data.templates || []) : [];
+                      } catch (e) {
+                          this.metaTemplates = [];
+                      }
+                  },
+                  async createMetaTemplateSubmit() {
+                      if (!this.metaTemplateForm.name || !this.metaTemplateForm.body) {
+                          this.metaTemplateError = 'Preencha o nome e o corpo do template.';
+                          return;
+                      }
+                      this.metaTemplateSaving = true;
+                      this.metaTemplateError = null;
+                      try {
+                          const res = await fetch('/', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                              body: JSON.stringify({
+                                  action: 'meta_create_template',
+                                  assistant_id: {{ $assistant->id }},
+                                  name: this.metaTemplateForm.name,
+                                  language: this.metaTemplateForm.language,
+                                  body: this.metaTemplateForm.body,
+                              }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok || !data.success) {
+                              this.metaTemplateError = data.message || 'Não foi possível criar o template.';
+                              return;
+                          }
+                          this.metaTemplates.push(data.template);
+                          this.metaTemplateForm = { name: '', language: 'pt_BR', body: '' };
+                          this.metaTemplateCreateOpen = false;
+                          Alpine.store('toast').show('Template criado! Aguardando aprovação da Meta.', 'success');
+                      } catch (e) {
+                          this.metaTemplateError = 'Erro de conexão. Tente novamente.';
+                      } finally {
+                          this.metaTemplateSaving = false;
+                      }
+                  },
                   async confirmSave(event) {
                       event.preventDefault();
                       const filled = this.messages.map(m => m.trim()).filter(m => m !== '');
@@ -24,6 +77,7 @@
                       this.$nextTick(() => this.$el.submit());
                   }
               }"
+              x-init="if (isMeta) loadMetaTemplates()"
               @submit="confirmSave($event)">
             @csrf
 
@@ -84,13 +138,26 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-2">Mensagens de retomada (uma por tentativa, nesta ordem)</label>
+                    <p x-show="isMeta" x-cloak class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2 leading-tight">
+                        Esse assistente usa a API oficial da Meta - mensagens proativas de retomada só podem ser enviadas como <strong>Modelo de Mensagem (Template)</strong> já aprovado, não texto livre.
+                    </p>
 
                     <template x-for="(msg, index) in messages" :key="index">
                         <div class="flex items-start gap-2 mb-2">
                             <span class="mt-2.5 text-xs font-bold text-gray-400 w-16 shrink-0" x-text="'Tentativa ' + (index + 1)"></span>
-                            <textarea :name="'messages[' + index + ']'" x-model="messages[index]" rows="2" maxlength="1000"
-                                      placeholder="Ex: Oi, ainda está por aí? Posso te ajudar com mais alguma coisa?"
-                                      class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"></textarea>
+                            <template x-if="!isMeta">
+                                <textarea :name="'messages[' + index + ']'" x-model="messages[index]" rows="2" maxlength="1000"
+                                          placeholder="Ex: Oi, ainda está por aí? Posso te ajudar com mais alguma coisa?"
+                                          class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"></textarea>
+                            </template>
+                            <template x-if="isMeta">
+                                <select :name="'messages[' + index + ']'" x-model="messages[index]" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white">
+                                    <option value="">Selecione um template...</option>
+                                    <template x-for="tpl in metaTemplates" :key="tpl.name + tpl.language">
+                                        <option :value="'tpl:' + tpl.name + ':' + tpl.language" x-text="tpl.name + ' (' + tpl.language + ') - ' + tpl.status"></option>
+                                    </template>
+                                </select>
+                            </template>
                             <button type="button" @click="if (messages.length > 1) messages.splice(index, 1)"
                                     class="mt-2 text-gray-400 hover:text-red-600 transition shrink-0" title="Remover tentativa">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -103,6 +170,42 @@
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                         Adicionar tentativa
                     </button>
+
+                    <template x-if="isMeta">
+                        <div class="mt-4 pt-4 border-t border-gray-100">
+                            <button type="button" @click="metaTemplateCreateOpen = !metaTemplateCreateOpen"
+                                    class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                                Criar novo template
+                            </button>
+                            <template x-if="metaTemplateCreateOpen">
+                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2 space-y-2 max-w-md">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Nome (minúsculas, sem espaço - use _)</label>
+                                        <input type="text" x-model="metaTemplateForm.name" placeholder="retomada_atendimento" class="w-full border border-gray-300 rounded-md p-1.5 text-xs font-mono">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Idioma</label>
+                                        <select x-model="metaTemplateForm.language" class="w-full border border-gray-300 rounded-md p-1.5 text-xs bg-white">
+                                            <option value="pt_BR">Português (Brasil)</option>
+                                            <option value="en_US">Inglês (EUA)</option>
+                                            <option value="es_ES">Espanhol</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Corpo da mensagem</label>
+                                        <textarea x-model="metaTemplateForm.body" rows="3" maxlength="1024" placeholder="Ex: Olá! Notamos que nossa conversa ficou parada. Posso ajudar em mais alguma coisa?" class="w-full border border-gray-300 rounded-md p-1.5 text-xs"></textarea>
+                                    </div>
+                                    <p x-show="metaTemplateError" x-text="metaTemplateError" class="text-[11px] text-red-600"></p>
+                                    <button type="button" @click="createMetaTemplateSubmit()" :disabled="metaTemplateSaving"
+                                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-4 rounded-lg text-[11px] transition">
+                                        <span x-text="metaTemplateSaving ? 'Criando...' : 'Criar Template'"></span>
+                                    </button>
+                                    <p class="text-[10px] text-gray-400 leading-tight">O template passa por aprovação da Meta (minutos a horas) antes de poder ser usado de verdade - enquanto estiver "PENDING", evite selecioná-lo pra uma tentativa ainda.</p>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
                 </div>
             </div>
 
