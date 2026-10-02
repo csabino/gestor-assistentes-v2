@@ -91,7 +91,10 @@
         .dark .light-surface .text-gray-400 { color: #9ca3af !important; }
         .dark .light-surface .border-gray-100 { border-color: #f3f4f6 !important; }
         .dark .light-surface .border-gray-200 { border-color: #e5e7eb !important; }
+        .dark .light-surface .border-gray-300 { border-color: #d1d5db !important; }
         .dark .light-surface .bg-gray-50 { background-color: #f9fafb !important; }
+        .dark .light-surface .bg-gray-100 { background-color: #f3f4f6 !important; }
+        .dark .light-surface .bg-gray-200 { background-color: #e5e7eb !important; }
         .dark .light-surface thead tr { background-color: #f9fafb !important; }
         .dark .light-surface .text-slate-800 { color: #1f2937 !important; }
         .dark .light-surface .text-slate-700 { color: #374151 !important; }
