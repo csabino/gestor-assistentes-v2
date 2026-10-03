@@ -1461,12 +1461,12 @@
                                                                 <input type="text" x-model="metaManualPhoneNumberId" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
                                                             </div>
                                                             <div>
-                                                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Access Token</label>
-                                                                <input type="text" x-model="metaManualAccessToken" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
-                                                            </div>
-                                                            <div>
                                                                 <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">WABA ID (opcional)</label>
                                                                 <input type="text" x-model="metaManualWabaId" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                                            </div>
+                                                            <div>
+                                                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Access Token</label>
+                                                                <input type="text" x-model="metaManualAccessToken" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
                                                             </div>
                                                             <p x-show="metaManualError" x-text="metaManualError" class="text-[11px] text-red-600"></p>
                                                             <button type="button" @click="connectMetaManualSubmit()" :disabled="metaManualSaving" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-1.5 rounded-lg text-[11px] transition">
