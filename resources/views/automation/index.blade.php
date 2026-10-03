@@ -141,38 +141,41 @@
             <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 pb-8">
 
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
-                <div class="flex items-start justify-between gap-4 mb-5">
-                    <div>
-                        <h2 class="text-sm font-bold text-gray-800">Retomada de atendimento parado</h2>
-                        <p class="text-xs text-gray-500 mt-1 max-w-xl">
-                            Quando o cliente para de responder depois de uma mensagem da IA, o sistema espera o
-                            intervalo abaixo e manda a próxima mensagem de retomada da lista. Depois da última
-                            tentativa, se o cliente continuar em silêncio, o atendimento é encerrado automaticamente
-                            (a própria IA gera a mensagem de encerramento configurada no prompt dela, disparando o
-                            fechamento do chamado no Omni).
-                        </p>
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+                    <h2 class="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                        Retomada de atendimento parado
+                        <svg class="w-4 h-4 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                             title="Quando o cliente para de responder depois de uma mensagem da IA, o sistema espera o intervalo ao lado e manda a próxima mensagem de retomada da lista. Depois da última tentativa, se o cliente continuar em silêncio, o atendimento é encerrado automaticamente (a própria IA gera a mensagem de encerramento configurada no prompt dela, disparando o fechamento do chamado no Omni).">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </h2>
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-1.5">
+                            <label class="text-xs font-semibold text-gray-700 whitespace-nowrap" title="Tempo de silêncio do cliente antes de cada nova tentativa (e antes do encerramento, após a última).">Intervalo (min)</label>
+                            <input type="number" name="automation_interval_minutes" min="1" required value="{{ $automationIntervalMinutes }}"
+                                   class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center outline-none focus:border-indigo-500">
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input type="checkbox" name="automation_enabled" value="1" x-ref="enabledToggle" class="sr-only peer" {{ $automationEnabled === '1' ? 'checked' : '' }}>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input type="checkbox" name="automation_enabled" value="1" x-ref="enabledToggle" class="sr-only peer" {{ $automationEnabled === '1' ? 'checked' : '' }}>
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                    </label>
-                </div>
-
-                <div class="mb-6">
-                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">Intervalo entre tentativas (minutos)</label>
-                    <input type="number" name="automation_interval_minutes" min="1" required value="{{ $automationIntervalMinutes }}"
-                           class="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500">
-                    <p class="text-xs text-gray-400 mt-1">Tempo de silêncio do cliente antes de cada nova tentativa (e antes do encerramento, após a última).</p>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 mb-2">Mensagens de retomada (uma por tentativa, nesta ordem)</label>
+                    <label class="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                        Mensagens de retomada
+                        <svg class="w-3.5 h-3.5 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" title="Uma mensagem por tentativa, nesta ordem.">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </label>
                     <p x-show="isMeta" x-cloak class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2 leading-tight">
                         Esse assistente usa a API oficial da Meta - mensagens proativas de retomada só podem ser enviadas como <strong>Modelo de Mensagem (Template)</strong> já aprovado, não texto livre.
                     </p>
 
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                     <template x-for="(msg, index) in messages" :key="index">
-                        <div class="flex items-start gap-2 mb-2">
+                        <div class="flex items-start gap-2">
                             <span class="mt-2.5 text-xs font-bold text-gray-400 w-16 shrink-0" x-text="'Tentativa ' + (index + 1)"></span>
                             <template x-if="!isMeta">
                                 <textarea :name="'messages[' + index + ']'" x-model="messages[index]" rows="2" maxlength="1000"
@@ -193,9 +196,10 @@
                             </button>
                         </div>
                     </template>
+                    </div>
 
                     <button type="button" @click="messages.push('')"
-                            class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold mt-1 flex items-center gap-1">
+                            class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold mt-3 flex items-center gap-1">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                         Adicionar tentativa
                     </button>
