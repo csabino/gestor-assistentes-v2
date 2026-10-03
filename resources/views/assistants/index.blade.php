@@ -1437,6 +1437,7 @@
                                                         <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
                                                             <p class="font-bold mb-0.5">✅ Conectado via Meta</p>
                                                             <p>Phone Number ID: <span class="font-mono" x-text="wa_instance"></span></p>
+                                                            <p>WABA ID: <span class="font-mono" x-text="wa_waba_id || '—'"></span></p>
                                                             <button type="button" @click="checkMetaPhoneStatusLive()" :disabled="metaStatusChecking" class="text-[11px] text-emerald-800 underline hover:no-underline mt-1">
                                                                 <span x-text="metaStatusChecking ? 'Consultando...' : 'Verificar status na Meta'"></span>
                                                             </button>
