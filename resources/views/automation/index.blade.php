@@ -237,17 +237,26 @@
             <!-- MODAL TEMPLATES CADASTRADOS -->
             <div x-show="metaTemplatesModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
                 <div @click.away="metaTemplatesModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col relative border border-slate-200">
-                    <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-                        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
-                            Templates cadastrados
-                            <span x-show="metaTemplatesRefreshing" x-cloak class="flex items-center gap-1 text-[11px] text-gray-400 font-normal">
-                                <span class="inline-block animate-spin rounded-full h-2.5 w-2.5 border-2 border-gray-300 border-t-indigo-600"></span>
-                                Atualizando
-                            </span>
-                        </h3>
-                        <button type="button" @click="metaTemplatesModalOpen = false" class="text-gray-400 hover:text-gray-600">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
+                    <div class="p-5 border-b border-gray-100 shrink-0">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                                Templates cadastrados
+                                <span x-show="metaTemplatesRefreshing" x-cloak class="flex items-center gap-1 text-[11px] text-gray-400 font-normal">
+                                    <span class="inline-block animate-spin rounded-full h-2.5 w-2.5 border-2 border-gray-300 border-t-indigo-600"></span>
+                                    Atualizando
+                                </span>
+                            </h3>
+                            <button type="button" @click="metaTemplatesModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        @if($assistant->whatsapp_waba_id)
+                            <a href="https://business.facebook.com/wa/manage/message-templates/?waba_id={{ $assistant->whatsapp_waba_id }}" target="_blank" rel="noopener"
+                               class="text-[11px] text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold flex items-center gap-1 mt-1.5 w-fit">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                Abrir modelos no Gerenciador da Meta
+                            </a>
+                        @endif
                     </div>
                     <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-1.5">
                         <p x-show="metaTemplatesError" x-text="metaTemplatesError" class="text-xs text-red-600 text-center py-4"></p>
