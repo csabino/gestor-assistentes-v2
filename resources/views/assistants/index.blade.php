@@ -1384,23 +1384,31 @@
                                         </div>
                                     </div>
 
-                                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Plataforma</label>
-                                    <select form="configForm" name="whatsapp_provider" x-model="wa_provider" x-on:change="checkWaStatusSilent()" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] focus:ring-2 focus:ring-indigo-500">
-                                        <option value="">Desativado</option>
-                                        <option value="uazapi">UaZapi</option>
-                                        <option value="meta">API Oficial (Meta)</option>
-                                    </select>
+                                    <div class="flex items-center gap-2">
+                                        <label class="text-[11px] font-semibold text-gray-700 w-32 shrink-0">Plataforma</label>
+                                        <select form="configForm" name="whatsapp_provider" x-model="wa_provider" x-on:change="checkWaStatusSilent()" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] focus:ring-2 focus:ring-indigo-500">
+                                            <option value="">Desativado</option>
+                                            <option value="uazapi">UaZapi</option>
+                                            <option value="meta">API Oficial (Meta)</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div x-show="wa_provider !== ''" x-transition class="space-y-3">
                                     <template x-if="wa_provider === 'uazapi'">
-                                        <div>
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">URL (UaZapi)</label>
-                                            <input form="configForm" type="url" name="whatsapp_url" x-model="wa_url" x-on:change="checkWaStatusSilent()" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2" placeholder="https://api.uazapi.dev">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Nome da Instância</label>
-                                            <input form="configForm" type="text" name="whatsapp_instance" x-model="wa_instance" x-on:change="checkWaStatusSilent()" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2" placeholder="Ex: suporte">
-                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Instance Token</label>
-                                            <input form="configForm" type="password" name="whatsapp_token" x-model="wa_token" x-on:change="checkWaStatusSilent()" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]" placeholder="Ex: T0K3N...">
+                                        <div class="space-y-1.5">
+                                            <div class="flex items-center gap-2">
+                                                <label class="text-[11px] font-semibold text-gray-700 w-32 shrink-0">URL (UaZapi)</label>
+                                                <input form="configForm" type="url" name="whatsapp_url" x-model="wa_url" x-on:change="checkWaStatusSilent()" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px]" placeholder="https://api.uazapi.dev">
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <label class="text-[11px] font-semibold text-gray-700 w-32 shrink-0">Nome da Instância</label>
+                                                <input form="configForm" type="text" name="whatsapp_instance" x-model="wa_instance" x-on:change="checkWaStatusSilent()" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px]" placeholder="Ex: suporte">
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <label class="text-[11px] font-semibold text-gray-700 w-32 shrink-0">Instance Token</label>
+                                                <input form="configForm" type="password" name="whatsapp_token" x-model="wa_token" x-on:change="checkWaStatusSilent()" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px]" placeholder="Ex: T0K3N...">
+                                            </div>
                                         </div>
                                     </template>
                                     <template x-if="wa_provider === 'meta'">
@@ -1437,7 +1445,7 @@
                                     </template>
                                 </div>
 
-                                <div x-show="wa_provider === 'uazapi'" x-transition class="border-t border-gray-100 pt-3 mt-4">
+                                <div x-show="wa_provider === 'uazapi'" x-transition class="border-t border-gray-100 pt-3 mt-3">
                                     <button type="button" x-on:click="startWaConnection()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" /></svg>
                                         Conectar / QR Code
