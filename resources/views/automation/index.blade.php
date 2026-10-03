@@ -9,6 +9,7 @@
                   isMeta: @js($assistant->whatsapp_provider === 'meta'),
                   metaTemplates: [],
                   metaTemplatesRefreshing: false,
+                  metaTemplatesError: null,
                   metaTemplateCreateOpen: false,
                   metaTemplateSaving: false,
                   metaTemplateError: null,
@@ -19,6 +20,10 @@
                       const bodyComp = (tpl.components || []).find(c => (c.type || '').toUpperCase() === 'BODY');
                       return !!(bodyComp && bodyComp.text && bodyComp.text.includes('@{{1}}'));
                   },
+                  statusLabel(status) {
+                      const map = { PENDING: 'Em análise', IN_APPEAL: 'Em recurso', APPROVED: 'Aprovado', REJECTED: 'Recusado', PAUSED: 'Pausado', DISABLED: 'Desativado' };
+                      return map[status] || status || '—';
+                  },
                   async loadMetaTemplates() {
                       this.metaTemplatesRefreshing = true;
                       try {
@@ -28,10 +33,16 @@
                               body: JSON.stringify({ action: 'meta_list_templates', assistant_id: {{ $assistant->id }} }),
                           });
                           const data = await res.json();
-                          const list = (res.ok && data.success) ? (data.templates || []) : [];
-                          this.metaTemplates = list.map(tpl => ({ ...tpl, hasVariable: this.templateHasVariable(tpl) }));
+                          if (res.ok && data.success) {
+                              this.metaTemplates = (data.templates || []).map(tpl => ({ ...tpl, hasVariable: this.templateHasVariable(tpl) }));
+                              this.metaTemplatesError = null;
+                          } else {
+                              this.metaTemplates = [];
+                              this.metaTemplatesError = data.message || 'Não foi possível buscar os templates na Meta.';
+                          }
                       } catch (e) {
                           this.metaTemplates = [];
+                          this.metaTemplatesError = 'Erro de conexão ao buscar os templates.';
                       } finally {
                           this.metaTemplatesRefreshing = false;
                       }
@@ -207,9 +218,9 @@
                             </template>
                             <template x-if="isMeta">
                                 <select :name="'messages[' + index + ']'" x-model="messages[index]" class="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white">
-                                    <option value="">Selecione um template...</option>
-                                    <template x-for="tpl in metaTemplates" :key="tpl.name + tpl.language">
-                                        <option :value="'tpl:' + tpl.name + ':' + tpl.language + ':' + (tpl.hasVariable ? '1' : '0')" x-text="tpl.name + ' (' + tpl.language + ') - ' + tpl.status + (tpl.hasVariable ? ' [usa nome]' : '')"></option>
+                                    <option value="">Selecione um template aprovado...</option>
+                                    <template x-for="tpl in metaTemplates.filter(t => t.status === 'APPROVED')" :key="tpl.name + tpl.language">
+                                        <option :value="'tpl:' + tpl.name + ':' + tpl.language + ':' + (tpl.hasVariable ? '1' : '0')" x-text="tpl.name + ' (' + tpl.language + ')' + (tpl.hasVariable ? ' [usa nome]' : '')"></option>
                                     </template>
                                 </select>
                             </template>
@@ -239,7 +250,8 @@
                         </button>
                     </div>
                     <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-1.5">
-                        <p x-show="metaTemplates.length === 0" class="text-xs text-gray-400 text-center py-4">Nenhum template cadastrado ainda.</p>
+                        <p x-show="metaTemplatesError" x-text="metaTemplatesError" class="text-xs text-red-600 text-center py-4"></p>
+                        <p x-show="!metaTemplatesError && metaTemplates.length === 0" class="text-xs text-gray-400 text-center py-4">Nenhum template cadastrado ainda.</p>
                         <template x-for="tpl in metaTemplates" :key="tpl.name + tpl.language">
                             <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
                                 <div class="flex items-center justify-between gap-2">
@@ -248,12 +260,12 @@
                                         <span class="text-gray-400" x-text="'(' + tpl.language + ')'"></span>
                                         <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
                                               :class="{
-                                                  'bg-amber-50 text-amber-700 border border-amber-200': tpl.status === 'PENDING',
+                                                  'bg-amber-50 text-amber-700 border border-amber-200': tpl.status === 'PENDING' || tpl.status === 'IN_APPEAL',
                                                   'bg-emerald-50 text-emerald-700 border border-emerald-200': tpl.status === 'APPROVED',
                                                   'bg-red-50 text-red-700 border border-red-200': tpl.status === 'REJECTED',
-                                                  'bg-gray-100 text-gray-500 border border-gray-200': !['PENDING', 'APPROVED', 'REJECTED'].includes(tpl.status)
+                                                  'bg-gray-100 text-gray-500 border border-gray-200': !['PENDING', 'IN_APPEAL', 'APPROVED', 'REJECTED'].includes(tpl.status)
                                               }"
-                                              x-text="tpl.status"></span>
+                                              x-text="statusLabel(tpl.status)"></span>
                                         <span x-show="tpl.category" class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-500 border border-gray-200" x-text="tpl.category"></span>
                                     </span>
                                     <button type="button" @click="deleteMetaTemplateConfirm(tpl)" class="text-gray-400 hover:text-red-600 p-1 rounded transition shrink-0" title="Remover template">
