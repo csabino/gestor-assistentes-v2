@@ -1346,25 +1346,51 @@
                                 </button>
                             </div>
                             <div id="canalWhatsappModalBody" class="flex-1 min-h-0 overflow-auto p-5">
-                                <div class="flex items-center gap-1.5 mb-3" x-show="wa_provider !== ''" x-cloak>
-                                    <span x-show="waStatus === 'checking'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 animate-pulse border border-gray-200">Verificando...</span>
-                                    <span x-show="waStatus === 'connected'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 flex items-center gap-1 border border-emerald-200 shadow-sm">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Conectado
-                                    </span>
-                                    <span x-show="waStatus === 'disconnected'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 flex items-center gap-1 border border-red-200 shadow-sm">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Desconectado
-                                    </span>
-                                    <button type="button" title="Desconectar" x-show="waStatus === 'connected' && wa_provider !== 'meta'" x-on:click="disconnectWa()" class="w-6 h-6 rounded-full bg-red-50 hover:bg-red-100 text-red-600 transition border border-red-200 flex items-center justify-center cursor-pointer shadow-sm shrink-0">
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.636 5.636a9 9 0 1012.728 0M12 3v9" /></svg>
-                                    </button>
-                                </div>
+                                <div class="sticky top-0 z-10 bg-white pb-3 mb-3 border-b border-gray-100">
+                                    <div class="flex items-center justify-between gap-2 flex-wrap mb-3" x-show="wa_provider !== ''" x-cloak>
+                                        <div class="flex items-center gap-1.5">
+                                            <span x-show="waStatus === 'checking'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 animate-pulse border border-gray-200">Verificando...</span>
+                                            <span x-show="waStatus === 'connected'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 flex items-center gap-1 border border-emerald-200 shadow-sm">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Conectado
+                                            </span>
+                                            <span x-show="waStatus === 'disconnected'" class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 flex items-center gap-1 border border-red-200 shadow-sm">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Desconectado
+                                            </span>
+                                            <button type="button" title="Desconectar" x-show="waStatus === 'connected' && wa_provider !== 'meta'" x-on:click="disconnectWa()" class="w-6 h-6 rounded-full bg-red-50 hover:bg-red-100 text-red-600 transition border border-red-200 flex items-center justify-center cursor-pointer shadow-sm shrink-0">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.636 5.636a9 9 0 1012.728 0M12 3v9" /></svg>
+                                            </button>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 flex-wrap" x-show="wa_provider === 'meta'" x-cloak>
+                                            <template x-if="(!wa_instance || !wa_token) && !wa_waba_id">
+                                                <button type="button" @click="startMetaConnect()" :disabled="metaConnecting" title="Conectar com WhatsApp" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-md transition text-[11px] font-semibold flex items-center gap-1 shadow-sm">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
+                                                    <span x-text="metaConnecting ? 'Conectando...' : 'Conectar'"></span>
+                                                </button>
+                                            </template>
+                                            <template x-if="!wa_instance && wa_waba_id">
+                                                <button type="button" @click="openMetaAddNumberStep()" title="Cadastrar Número de WhatsApp" class="dark-btn-fix bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-md transition text-[11px] font-semibold flex items-center gap-1 shadow-sm">
+                                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                                                    Cadastrar Nº
+                                                </button>
+                                            </template>
+                                            <button type="button" @click="metaConfigEditing = true" title="Editar configuração da Meta" class="dark-btn-fix bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 px-2 py-1 rounded-md transition text-[11px] font-medium flex items-center gap-1 shadow-sm">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                Config.
+                                            </button>
+                                            <button type="button" @click="metaManualOpen = true" title="Conectar manualmente (número de teste)" class="dark-btn-fix bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 px-2 py-1 rounded-md transition text-[11px] font-medium flex items-center gap-1 shadow-sm">
+                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
+                                                Manual
+                                            </button>
+                                        </div>
+                                    </div>
 
-                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Plataforma</label>
-                                <select form="configForm" name="whatsapp_provider" x-model="wa_provider" x-on:change="checkWaStatusSilent()" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-3 focus:ring-2 focus:ring-indigo-500">
-                                    <option value="">Desativado</option>
-                                    <option value="uazapi">UaZapi</option>
-                                    <option value="meta">API Oficial (Meta)</option>
-                                </select>
+                                    <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Plataforma</label>
+                                    <select form="configForm" name="whatsapp_provider" x-model="wa_provider" x-on:change="checkWaStatusSilent()" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] focus:ring-2 focus:ring-indigo-500">
+                                        <option value="">Desativado</option>
+                                        <option value="uazapi">UaZapi</option>
+                                        <option value="meta">API Oficial (Meta)</option>
+                                    </select>
+                                </div>
 
                                 <div x-show="wa_provider !== ''" x-transition class="space-y-3">
                                     <template x-if="wa_provider === 'uazapi'">
@@ -1381,102 +1407,32 @@
                                         <div>
                                             <!-- Phone Number ID/token/WABA ID da Meta NÃO vão pelo configForm/Salvar geral -
                                                  connectMeta() já grava isso direto no banco; reenviar por aqui sobrescreveria
-                                                 o token de verdade com o estado local (que nunca tem o token real). -->
-                                            <template x-if="metaConfigEditing">
-                                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 mb-3">
-                                                    <p class="text-[11px] font-bold text-gray-600">Credenciais do App Tech Provider (Meta)</p>
-                                                    <p class="text-[10px] text-gray-400 leading-tight">Valem pra todos os assistentes conectados via Meta - só precisa configurar uma vez.</p>
-                                                    <div class="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App ID</label>
-                                                            <input type="text" x-model="metaConfigForm.meta_app_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                                        </div>
-                                                        <div>
-                                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App Secret</label>
-                                                            <input type="password" x-model="metaConfigForm.meta_app_secret" :placeholder="metaAppSecretSet ? '•••••••• (deixe em branco pra manter o atual)' : ''" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                                        </div>
-                                                        <div>
-                                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Configuration ID (Embedded Signup)</label>
-                                                            <input type="text" x-model="metaConfigForm.meta_config_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                                        </div>
-                                                        <div>
-                                                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Verify Token do Webhook</label>
-                                                            <input type="text" x-model="metaConfigForm.meta_webhook_verify_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
-                                                        </div>
-                                                    </div>
-                                                    <p class="text-[10px] text-gray-400 leading-tight">Esse Verify Token precisa ser o mesmo configurado no painel da Meta pra URL <code class="text-[10px]">/webhook/whatsapp-meta</code>.</p>
-                                                    <p x-show="metaConfigError" x-text="metaConfigError" class="text-[11px] text-red-600"></p>
-                                                    <div class="flex items-center gap-2 pt-1">
-                                                        <button type="button" @click="saveMetaConfig()" :disabled="metaConfigSaving" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 rounded-lg text-[11px] transition">
-                                                            <span x-text="metaConfigSaving ? 'Salvando...' : 'Salvar Configuração da Meta'"></span>
-                                                        </button>
-                                                        <button type="button" x-show="metaAppId && metaConfigId && metaAppSecretSet" @click="metaConfigEditing = false" class="text-[11px] text-gray-500 hover:text-gray-700 px-2">Cancelar</button>
+                                                 o token de verdade com o estado local (que nunca tem o token real). As acoes
+                                                 de conexao/config/manual ficam nos 3 botoes do cabecalho fixo acima - aqui so
+                                                 sobra o status informativo, pra nao esticar o modal. -->
+                                            <template x-if="!wa_instance && wa_waba_id">
+                                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-700">
+                                                    <p class="font-bold mb-0.5">⚠️ Conta da Meta conectada, falta o número</p>
+                                                    <p>O WABA já está vinculado - clique em "Cadastrar Nº" acima pra concluir.</p>
+                                                </div>
+                                            </template>
+                                            <template x-if="wa_instance && wa_token">
+                                                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
+                                                    <p class="font-bold mb-0.5">✅ Conectado via Meta</p>
+                                                    <p>Phone Number ID: <span class="font-mono" x-text="wa_instance"></span></p>
+                                                    <p>WABA ID: <span class="font-mono" x-text="wa_waba_id || '—'"></span></p>
+                                                    <button type="button" @click="checkMetaPhoneStatusLive()" :disabled="metaStatusChecking" class="text-[11px] text-emerald-800 underline hover:no-underline mt-1">
+                                                        <span x-text="metaStatusChecking ? 'Consultando...' : 'Verificar status na Meta'"></span>
+                                                    </button>
+                                                    <div x-show="metaStatusResult" class="mt-2 pt-2 border-t border-emerald-200 space-y-0.5 font-mono text-[10px]">
+                                                        <p>status: <span x-text="metaStatusResult?.status ?? '—'"></span></p>
+                                                        <p>name_status: <span x-text="metaStatusResult?.name_status ?? '—'"></span></p>
+                                                        <p>code_verification_status: <span x-text="metaStatusResult?.code_verification_status ?? '—'"></span></p>
+                                                        <p>quality_rating: <span x-text="metaStatusResult?.quality_rating ?? '—'"></span></p>
                                                     </div>
                                                 </div>
                                             </template>
-                                            <template x-if="!metaConfigEditing">
-                                                <div>
-                                                    <template x-if="(!wa_instance || !wa_token) && !wa_waba_id">
-                                                        <button type="button" @click="startMetaConnect()" :disabled="metaConnecting" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.36.101 11.943c0 2.104.549 4.157 1.595 5.965L0 24l6.335-1.652a11.882 11.882 0 005.71 1.447h.005c6.582 0 11.94-5.36 11.943-11.943a11.86 11.86 0 00-3.473-8.403" /></svg>
-                                                            <span x-text="metaConnecting ? 'Conectando...' : 'Conectar com WhatsApp'"></span>
-                                                        </button>
-                                                    </template>
-                                                    <template x-if="!wa_instance && wa_waba_id">
-                                                        <div class="space-y-2">
-                                                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-700">
-                                                                <p class="font-bold mb-0.5">⚠️ Conta da Meta conectada, falta o número</p>
-                                                                <p>O WABA já está vinculado - cadastre o número de WhatsApp pra concluir.</p>
-                                                            </div>
-                                                            <button type="button" @click="openMetaAddNumberStep()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
-                                                                Cadastrar Número de WhatsApp
-                                                            </button>
-                                                        </div>
-                                                    </template>
-                                                    <template x-if="wa_instance && wa_token">
-                                                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] text-emerald-700">
-                                                            <p class="font-bold mb-0.5">✅ Conectado via Meta</p>
-                                                            <p>Phone Number ID: <span class="font-mono" x-text="wa_instance"></span></p>
-                                                            <p>WABA ID: <span class="font-mono" x-text="wa_waba_id || '—'"></span></p>
-                                                            <button type="button" @click="checkMetaPhoneStatusLive()" :disabled="metaStatusChecking" class="text-[11px] text-emerald-800 underline hover:no-underline mt-1">
-                                                                <span x-text="metaStatusChecking ? 'Consultando...' : 'Verificar status na Meta'"></span>
-                                                            </button>
-                                                            <div x-show="metaStatusResult" class="mt-2 pt-2 border-t border-emerald-200 space-y-0.5 font-mono text-[10px]">
-                                                                <p>status: <span x-text="metaStatusResult?.status ?? '—'"></span></p>
-                                                                <p>name_status: <span x-text="metaStatusResult?.name_status ?? '—'"></span></p>
-                                                                <p>code_verification_status: <span x-text="metaStatusResult?.code_verification_status ?? '—'"></span></p>
-                                                                <p>quality_rating: <span x-text="metaStatusResult?.quality_rating ?? '—'"></span></p>
-                                                            </div>
-                                                        </div>
-                                                    </template>
-                                                    <p class="text-[10px] text-gray-400 mt-2 leading-tight">Abre o login oficial da Meta pra você (ou seu cliente) escolher/criar o Portfólio de Negócios e conectar o número - inclusive o que já usa no WhatsApp Business do celular, sem perder o histórico.</p>
-                                                    <div class="flex items-center gap-3 mt-2">
-                                                        <button type="button" @click="metaConfigEditing = true" class="text-[11px] text-indigo-600 hover:text-indigo-800">Editar configuração da Meta</button>
-                                                        <button type="button" @click="metaManualOpen = !metaManualOpen" class="text-[11px] text-gray-500 hover:text-gray-700">Conectar manualmente (número de teste)</button>
-                                                    </div>
-                                                    <template x-if="metaManualOpen">
-                                                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 mt-2">
-                                                            <p class="text-[10px] text-gray-400 leading-tight mb-1">Pensado pro número de teste gratuito da Meta (tela "Etapa 1. Experimente" do App Review) - cola o Phone Number ID e o Access Token temporário de lá.</p>
-                                                            <div class="flex items-center gap-2">
-                                                                <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">Phone Number ID</label>
-                                                                <input type="text" x-model="metaManualPhoneNumberId" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
-                                                            </div>
-                                                            <div class="flex items-center gap-2">
-                                                                <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">WABA ID</label>
-                                                                <input type="text" x-model="metaManualWabaId" placeholder="opcional" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
-                                                            </div>
-                                                            <div class="flex items-center gap-2">
-                                                                <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">Access Token</label>
-                                                                <input type="text" x-model="metaManualAccessToken" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
-                                                            </div>
-                                                            <p x-show="metaManualError" x-text="metaManualError" class="text-[11px] text-red-600"></p>
-                                                            <button type="button" @click="connectMetaManualSubmit()" :disabled="metaManualSaving" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-1.5 rounded-lg text-[11px] transition">
-                                                                <span x-text="metaManualSaving ? 'Conectando...' : 'Conectar manualmente'"></span>
-                                                            </button>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                            </template>
+                                            <p class="text-[10px] text-gray-400 leading-tight" x-show="!wa_instance">Use "Conectar" acima pra abrir o login oficial da Meta e escolher/criar o Portfólio de Negócios - inclusive o número que já usa no WhatsApp Business do celular, sem perder o histórico.</p>
                                         </div>
                                     </template>
                                 </div>
@@ -1493,6 +1449,81 @@
                                     <svg x-show="!saving" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                                     <span x-show="saving" class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
                                     <span x-text="saving ? 'Salvando...' : 'Salvar'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL META: CONFIGURAÇÃO DO APP -->
+                    <div x-show="metaConfigEditing" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                        <div @click.away="if (metaAppId && metaConfigId && metaAppSecretSet) metaConfigEditing = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                            <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                                <h3 class="text-base font-bold text-gray-800">Configuração do App Meta</h3>
+                                <button type="button" x-show="metaAppId && metaConfigId && metaAppSecretSet" @click="metaConfigEditing = false" class="text-gray-400 hover:text-gray-600">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                            <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-2">
+                                <p class="text-[11px] font-bold text-gray-600">Credenciais do App Tech Provider (Meta)</p>
+                                <p class="text-[10px] text-gray-400 leading-tight">Valem pra todos os assistentes conectados via Meta - só precisa configurar uma vez.</p>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App ID</label>
+                                        <input type="text" x-model="metaConfigForm.meta_app_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">App Secret</label>
+                                        <input type="password" x-model="metaConfigForm.meta_app_secret" :placeholder="metaAppSecretSet ? '•••••••• (deixe em branco pra manter o atual)' : ''" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Configuration ID (Embedded Signup)</label>
+                                        <input type="text" x-model="metaConfigForm.meta_config_id" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Verify Token do Webhook</label>
+                                        <input type="text" x-model="metaConfigForm.meta_webhook_verify_token" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-gray-400 leading-tight">Esse Verify Token precisa ser o mesmo configurado no painel da Meta pra URL <code class="text-[10px]">/webhook/whatsapp-meta</code>.</p>
+                                <p x-show="metaConfigError" x-text="metaConfigError" class="text-[11px] text-red-600"></p>
+                            </div>
+                            <div class="flex items-center gap-2 p-5 border-t border-gray-100 shrink-0">
+                                <button type="button" @click="saveMetaConfig()" :disabled="metaConfigSaving" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-xs transition">
+                                    <span x-text="metaConfigSaving ? 'Salvando...' : 'Salvar Configuração da Meta'"></span>
+                                </button>
+                                <button type="button" x-show="metaAppId && metaConfigId && metaAppSecretSet" @click="metaConfigEditing = false" class="text-[11px] text-gray-500 hover:text-gray-700 px-2">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL META: CONECTAR MANUALMENTE -->
+                    <div x-show="metaManualOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                        <div @click.away="metaManualOpen = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                            <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                                <h3 class="text-base font-bold text-gray-800">Conectar manualmente</h3>
+                                <button type="button" @click="metaManualOpen = false" class="text-gray-400 hover:text-gray-600">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                            <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-2">
+                                <p class="text-[10px] text-gray-400 leading-tight">Pensado pro número de teste gratuito da Meta (tela "Etapa 1. Experimente" do App Review) - cola o Phone Number ID e o Access Token temporário de lá.</p>
+                                <div class="flex items-center gap-2">
+                                    <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">Phone Number ID</label>
+                                    <input type="text" x-model="metaManualPhoneNumberId" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">WABA ID</label>
+                                    <input type="text" x-model="metaManualWabaId" placeholder="opcional" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">Access Token</label>
+                                    <input type="text" x-model="metaManualAccessToken" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                </div>
+                                <p x-show="metaManualError" x-text="metaManualError" class="text-[11px] text-red-600"></p>
+                            </div>
+                            <div class="p-5 border-t border-gray-100 shrink-0">
+                                <button type="button" @click="connectMetaManualSubmit()" :disabled="metaManualSaving" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 rounded-lg text-xs transition">
+                                    <span x-text="metaManualSaving ? 'Conectando...' : 'Conectar manualmente'"></span>
                                 </button>
                             </div>
                         </div>
