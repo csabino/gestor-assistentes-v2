@@ -1459,7 +1459,7 @@
                         <div @click.away="if (metaAppId && metaConfigId && metaAppSecretSet) metaConfigEditing = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800">Configuração do App Meta</h3>
-                                <button type="button" x-show="metaAppId && metaConfigId && metaAppSecretSet" @click="metaConfigEditing = false" class="text-gray-400 hover:text-gray-600">
+                                <button type="button" x-show="metaAppId && metaConfigId && metaAppSecretSet" @click.stop="metaConfigEditing = false" class="text-gray-400 hover:text-gray-600">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -1494,7 +1494,7 @@
                                 <button type="button" @click="saveMetaConfig()" :disabled="metaConfigSaving" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-xs transition">
                                     <span x-text="metaConfigSaving ? 'Salvando...' : 'Salvar Configuração da Meta'"></span>
                                 </button>
-                                <button type="button" x-show="metaAppId && metaConfigId && metaAppSecretSet" @click="metaConfigEditing = false" class="text-[11px] text-gray-500 hover:text-gray-700 px-2">Cancelar</button>
+                                <button type="button" x-show="metaAppId && metaConfigId && metaAppSecretSet" @click.stop="metaConfigEditing = false" class="text-[11px] text-gray-500 hover:text-gray-700 px-2">Cancelar</button>
                             </div>
                         </div>
                     </div>
@@ -1504,7 +1504,7 @@
                         <div @click.away="metaManualOpen = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                             <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                                 <h3 class="text-base font-bold text-gray-800">Conectar manualmente</h3>
-                                <button type="button" @click="metaManualOpen = false" class="text-gray-400 hover:text-gray-600">
+                                <button type="button" @click.stop="metaManualOpen = false" class="text-gray-400 hover:text-gray-600">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -1540,7 +1540,7 @@
                                     <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
                                     Cadastrar Número
                                 </h3>
-                                <button type="button" @click="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
+                                <button type="button" @click.stop="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -1591,7 +1591,7 @@
                                     <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" /></svg>
                                     Como quer receber o código?
                                 </h3>
-                                <button type="button" @click="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
+                                <button type="button" @click.stop="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -1625,7 +1625,7 @@
                                     <svg class="w-5 h-5 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     Digite o Código
                                 </h3>
-                                <button type="button" @click="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
+                                <button type="button" @click.stop="metaPhoneStep = null; metaPhoneError = null" class="text-gray-400 hover:text-gray-600">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
