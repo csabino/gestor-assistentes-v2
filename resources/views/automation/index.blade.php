@@ -139,14 +139,14 @@
                 </button>
             </div>
 
-            <div class="flex-1 min-h-0 overflow-y-auto custom-scroll pr-1 pb-8">
+            <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scroll pr-1 pb-8">
 
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
                     <h2 class="text-sm font-bold text-gray-800 flex items-center gap-1.5">
                         Retomada de atendimento parado
-                        <svg class="w-4 h-4 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                             title="Quando o cliente para de responder depois de uma mensagem da IA, o sistema espera o intervalo ao lado e manda a próxima mensagem de retomada da lista. Depois da última tentativa, se o cliente continuar em silêncio, o atendimento é encerrado automaticamente (a própria IA gera a mensagem de encerramento configurada no prompt dela, disparando o fechamento do chamado no Omni).">
+                        <svg class="w-4 h-4 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <title>Quando o cliente para de responder depois de uma mensagem da IA, o sistema espera o intervalo ao lado e manda a próxima mensagem de retomada da lista. Depois da última tentativa, se o cliente continuar em silêncio, o atendimento é encerrado automaticamente (a própria IA gera a mensagem de encerramento configurada no prompt dela, disparando o fechamento do chamado no Omni).</title>
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                         </svg>
                     </h2>
@@ -167,22 +167,22 @@
                     <label class="text-xs font-semibold text-gray-700 flex items-center gap-1.5 mb-2">
                         Mensagens de retomada
                         <svg class="w-3.5 h-3.5 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <title x-text="isMeta ? 'Uma mensagem por tentativa, nesta ordem. Esse assistente usa a API oficial da Meta - mensagens proativas de retomada só podem ser enviadas como Modelo de Mensagem (Template) já aprovado, não texto livre.' : 'Uma mensagem por tentativa, nesta ordem.'"></title>
+                            <title>@if($assistant->whatsapp_provider === 'meta')Uma mensagem por tentativa, nesta ordem. Esse assistente usa a API oficial da Meta - mensagens proativas de retomada só podem ser enviadas como Modelo de Mensagem (Template) já aprovado, não texto livre.@else Uma mensagem por tentativa, nesta ordem.@endif</title>
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                         </svg>
                     </label>
 
                     <div class="flex items-center gap-4 mb-3 flex-wrap">
                         <template x-if="isMeta">
-                            <button type="button" @click="metaTemplateCreateOpen = !metaTemplateCreateOpen"
-                                    class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold flex items-center gap-1">
+                            <button type="button" @click="metaTemplateCreateOpen = true"
+                                    class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 text-xs font-semibold flex items-center gap-1">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                 Criar novo template
                             </button>
                         </template>
                         <template x-if="isMeta">
                             <button type="button" @click="metaTemplatesModalOpen = true"
-                                    class="text-gray-600 hover:text-gray-800 text-xs font-semibold flex items-center gap-1.5">
+                                    class="text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white text-xs font-semibold flex items-center gap-1.5">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H5.25a2.25 2.25 0 01-2.25-2.25V6.75a2.25 2.25 0 012.25-2.25h5.379a1.5 1.5 0 011.06.44l2.122 2.122a1.5 1.5 0 001.06.44H18.75a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25z" /></svg>
                                 Templates cadastrados
                                 <span x-show="metaTemplates.length > 0" x-text="'(' + metaTemplates.length + ')'"></span>
@@ -196,17 +196,17 @@
                         </button>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3 min-w-0">
                     <template x-for="(msg, index) in messages" :key="index">
-                        <div class="flex items-start gap-2" :class="index % 2 === 1 ? 'sm:border-l sm:border-gray-200 sm:pl-6' : ''">
+                        <div class="flex items-start gap-2 min-w-0" :class="index % 2 === 1 ? 'sm:border-l sm:border-gray-200 sm:pl-6' : 'sm:pr-6'">
                             <span class="mt-2.5 text-xs font-bold text-gray-400 w-16 shrink-0" x-text="'Tentativa ' + (index + 1)"></span>
                             <template x-if="!isMeta">
                                 <textarea :name="'messages[' + index + ']'" x-model="messages[index]" rows="2" maxlength="1000"
                                           placeholder="Ex: Oi, ainda está por aí? Posso te ajudar com mais alguma coisa?"
-                                          class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"></textarea>
+                                          class="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"></textarea>
                             </template>
                             <template x-if="isMeta">
-                                <select :name="'messages[' + index + ']'" x-model="messages[index]" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white">
+                                <select :name="'messages[' + index + ']'" x-model="messages[index]" class="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white">
                                     <option value="">Selecione um template...</option>
                                     <template x-for="tpl in metaTemplates" :key="tpl.name + tpl.language">
                                         <option :value="'tpl:' + tpl.name + ':' + tpl.language + ':' + (tpl.hasVariable ? '1' : '0')" x-text="tpl.name + ' (' + tpl.language + ') - ' + tpl.status + (tpl.hasVariable ? ' [usa nome]' : '')"></option>
@@ -241,38 +241,54 @@
                     <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-1.5">
                         <p x-show="metaTemplates.length === 0" class="text-xs text-gray-400 text-center py-4">Nenhum template cadastrado ainda.</p>
                         <template x-for="tpl in metaTemplates" :key="tpl.name + tpl.language">
-                            <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
-                                <span class="text-[11px] text-gray-700 flex items-center gap-1.5">
-                                    <span class="font-bold" x-text="tpl.name"></span>
-                                    <span class="text-gray-400" x-text="'(' + tpl.language + ')'"></span>
-                                    <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
-                                          :class="{
-                                              'bg-amber-50 text-amber-700 border border-amber-200': tpl.status === 'PENDING',
-                                              'bg-emerald-50 text-emerald-700 border border-emerald-200': tpl.status === 'APPROVED',
-                                              'bg-red-50 text-red-700 border border-red-200': tpl.status === 'REJECTED',
-                                              'bg-gray-100 text-gray-500 border border-gray-200': !['PENDING', 'APPROVED', 'REJECTED'].includes(tpl.status)
-                                          }"
-                                          x-text="tpl.status"></span>
-                                </span>
-                                <button type="button" @click="deleteMetaTemplateConfirm(tpl)" class="text-gray-400 hover:text-red-600 p-1 rounded transition" title="Remover template">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[11px] text-gray-700 flex items-center gap-1.5 flex-wrap">
+                                        <span class="font-bold" x-text="tpl.name"></span>
+                                        <span class="text-gray-400" x-text="'(' + tpl.language + ')'"></span>
+                                        <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                                              :class="{
+                                                  'bg-amber-50 text-amber-700 border border-amber-200': tpl.status === 'PENDING',
+                                                  'bg-emerald-50 text-emerald-700 border border-emerald-200': tpl.status === 'APPROVED',
+                                                  'bg-red-50 text-red-700 border border-red-200': tpl.status === 'REJECTED',
+                                                  'bg-gray-100 text-gray-500 border border-gray-200': !['PENDING', 'APPROVED', 'REJECTED'].includes(tpl.status)
+                                              }"
+                                              x-text="tpl.status"></span>
+                                        <span x-show="tpl.category" class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-500 border border-gray-200" x-text="tpl.category"></span>
+                                    </span>
+                                    <button type="button" @click="deleteMetaTemplateConfirm(tpl)" class="text-gray-400 hover:text-red-600 p-1 rounded transition shrink-0" title="Remover template">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+                                <template x-if="tpl.rejected_reason && tpl.rejected_reason !== 'NONE'">
+                                    <p class="text-[10px] text-red-600 mt-1 leading-tight">Motivo (Meta): <span x-text="tpl.rejected_reason"></span></p>
+                                </template>
+                                <template x-if="tpl.status !== 'APPROVED'">
+                                    <p class="text-[10px] text-gray-400 mt-1 leading-tight">Se a categoria mudou ou foi rejeitado, apague e crie de novo com o texto ajustado - a Meta não permite reenviar o mesmo template pra revisão.</p>
+                                </template>
                             </div>
                         </template>
                     </div>
                 </div>
             </div>
 
-            <template x-if="isMeta && metaTemplateCreateOpen">
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6 -mt-4">
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 max-w-md">
+            <!-- MODAL CRIAR NOVO TEMPLATE -->
+            <div x-show="metaTemplateCreateOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                <div @click.away="metaTemplateCreateOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                    <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                        <h3 class="text-base font-bold text-gray-800">Criar novo template</h3>
+                        <button type="button" @click="metaTemplateCreateOpen = false" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-3">
                         <div>
                             <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Nome (minúsculas, sem espaço - use _)</label>
-                            <input type="text" x-model="metaTemplateForm.name" placeholder="retomada_atendimento" class="w-full border border-gray-300 rounded-md p-1.5 text-xs font-mono">
+                            <input type="text" x-model="metaTemplateForm.name" placeholder="retomada_atendimento" class="w-full border border-gray-300 rounded-md p-2 text-xs font-mono">
                         </div>
                         <div>
                             <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Idioma</label>
-                            <select x-model="metaTemplateForm.language" class="w-full border border-gray-300 rounded-md p-1.5 text-xs bg-white">
+                            <select x-model="metaTemplateForm.language" class="w-full border border-gray-300 rounded-md p-2 text-xs bg-white">
                                 <option value="pt_BR">Português (Brasil)</option>
                                 <option value="en_US">Inglês (EUA)</option>
                                 <option value="es_ES">Espanhol</option>
@@ -283,18 +299,20 @@
                                 <label class="block text-[11px] font-semibold text-gray-700">Corpo da mensagem</label>
                                 <button type="button" @click="metaTemplateForm.body += '@{{1}}'" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold">+ Inserir nome do cliente</button>
                             </div>
-                            <textarea x-model="metaTemplateForm.body" rows="3" maxlength="1024" placeholder="Ex: Olá @{{1}}! Notamos que nossa conversa ficou parada. Posso ajudar em mais alguma coisa?" class="w-full border border-gray-300 rounded-md p-1.5 text-xs"></textarea>
+                            <textarea x-model="metaTemplateForm.body" rows="4" maxlength="1024" placeholder="Ex: Olá @{{1}}! Notamos que nossa conversa ficou parada. Posso ajudar em mais alguma coisa?" class="w-full border border-gray-300 rounded-md p-2 text-xs"></textarea>
                             <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Usa <code>@{{1}}</code> no texto pra inserir o nome do cliente automaticamente na hora do envio.</p>
                         </div>
                         <p x-show="metaTemplateError" x-text="metaTemplateError" class="text-[11px] text-red-600"></p>
-                        <button type="button" @click="createMetaTemplateSubmit()" :disabled="metaTemplateSaving"
-                                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1.5 px-4 rounded-lg text-[11px] transition">
-                            <span x-text="metaTemplateSaving ? 'Criando...' : 'Criar Template'"></span>
-                        </button>
                         <p class="text-[10px] text-gray-400 leading-tight">O template passa por aprovação da Meta (minutos a horas) antes de poder ser usado de verdade - enquanto estiver PENDING, evite selecioná-lo pra uma tentativa ainda.</p>
                     </div>
+                    <div class="p-5 border-t border-gray-100 shrink-0">
+                        <button type="button" @click="createMetaTemplateSubmit()" :disabled="metaTemplateSaving"
+                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition disabled:opacity-60">
+                            <span x-text="metaTemplateSaving ? 'Criando...' : 'Criar Template'"></span>
+                        </button>
+                    </div>
                 </div>
-            </template>
+            </div>
 
             </div>
         </form>

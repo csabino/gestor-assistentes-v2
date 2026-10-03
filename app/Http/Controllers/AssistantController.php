@@ -3974,7 +3974,7 @@ class AssistantController extends Controller
         try {
             $response = Http::withToken($assistant->whatsapp_token)
                 ->get("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/message_templates", [
-                    'fields' => 'name,language,status,category,components',
+                    'fields' => 'name,language,status,category,components,rejected_reason',
                     'limit' => 100,
                 ]);
 
