@@ -374,32 +374,43 @@
                             <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Nome (minúsculas, sem espaço - use _)</label>
                             <input type="text" x-model="metaTemplateForm.name" :disabled="!!metaTemplateEditingId" placeholder="retomada_atendimento" class="w-full border border-gray-300 rounded-md p-2 text-xs font-mono disabled:bg-gray-100 disabled:text-gray-500">
                         </div>
-                        <div>
-                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Idioma</label>
-                            <select x-model="metaTemplateForm.language" :disabled="!!metaTemplateEditingId" class="w-full border border-gray-300 rounded-md p-2 text-xs bg-white disabled:bg-gray-100 disabled:text-gray-500">
-                                <option value="pt_BR">Português (Brasil)</option>
-                                <option value="en_US">Inglês (EUA)</option>
-                                <option value="es_ES">Espanhol</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Categoria</label>
-                            <select x-model="metaTemplateForm.category" class="w-full border border-gray-300 rounded-md p-2 text-xs bg-white">
-                                <option value="UTILITY">Utilidade (acompanhamento de atendimento em andamento)</option>
-                                <option value="MARKETING">Marketing (reengajamento/promoção)</option>
-                            </select>
-                            <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Mensagens de retomada de atendimento parado costumam ser classificadas pela Meta como Marketing, mesmo quando parecem utilidade - se a Meta recusar como Utilidade, tente de novo como Marketing.</p>
+                        <div class="flex gap-3">
+                            <div class="w-1/2">
+                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Idioma</label>
+                                <select x-model="metaTemplateForm.language" :disabled="!!metaTemplateEditingId" class="w-full border border-gray-300 rounded-md p-2 text-xs bg-white disabled:bg-gray-100 disabled:text-gray-500">
+                                    <option value="pt_BR">Português (Brasil)</option>
+                                    <option value="en_US">Inglês (EUA)</option>
+                                    <option value="es_ES">Espanhol</option>
+                                </select>
+                            </div>
+                            <div class="w-1/2">
+                                <label class="text-[11px] font-semibold text-gray-700 mb-0.5 flex items-center gap-1">
+                                    Categoria
+                                    <svg class="w-3.5 h-3.5 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <title>Utilidade: mensagens de acompanhamento de um atendimento já em andamento. Marketing: mensagens de reengajamento/promoção. Mensagens de retomada de atendimento parado costumam ser classificadas pela Meta como Marketing, mesmo quando parecem utilidade - se a Meta recusar como Utilidade, tente de novo como Marketing.</title>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                                    </svg>
+                                </label>
+                                <select x-model="metaTemplateForm.category" class="w-full border border-gray-300 rounded-md p-2 text-xs bg-white">
+                                    <option value="UTILITY">Utilidade</option>
+                                    <option value="MARKETING">Marketing</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-0.5">
-                                <label class="block text-[11px] font-semibold text-gray-700">Corpo da mensagem</label>
+                                <label class="text-[11px] font-semibold text-gray-700 flex items-center gap-1">
+                                    Corpo da mensagem
+                                    <svg class="w-3.5 h-3.5 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <title>Usa @{{1}} no texto pra inserir o nome do cliente automaticamente na hora do envio. O template passa por aprovação da Meta (minutos a horas) antes de poder ser usado de verdade - enquanto estiver PENDING, evite selecioná-lo pra uma tentativa ainda.</title>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                                    </svg>
+                                </label>
                                 <button type="button" @click="metaTemplateForm.body += '@{{1}}'" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold">+ Inserir nome do cliente</button>
                             </div>
                             <textarea x-model="metaTemplateForm.body" rows="4" maxlength="1024" placeholder="Ex: Olá @{{1}}! Notamos que nossa conversa ficou parada. Posso ajudar em mais alguma coisa?" class="w-full border border-gray-300 rounded-md p-2 text-xs"></textarea>
-                            <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Usa <code>@{{1}}</code> no texto pra inserir o nome do cliente automaticamente na hora do envio.</p>
                         </div>
                         <p x-show="metaTemplateError" x-text="metaTemplateError" class="text-[11px] text-red-600"></p>
-                        <p class="text-[10px] text-gray-400 leading-tight">O template passa por aprovação da Meta (minutos a horas) antes de poder ser usado de verdade - enquanto estiver PENDING, evite selecioná-lo pra uma tentativa ainda.</p>
                     </div>
                     <div class="p-5 border-t border-gray-100 shrink-0">
                         <button type="button" @click="createMetaTemplateSubmit()" :disabled="metaTemplateSaving"
