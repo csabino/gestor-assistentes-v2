@@ -766,6 +766,7 @@ class AssistantController extends Controller
         if ($request->isMethod('post') && $request->input('action') === 'meta_list_templates') return $this->listMetaTemplates($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_create_template') return $this->createMetaTemplate($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_delete_template') return $this->deleteMetaTemplate($request);
+        if ($request->isMethod('post') && $request->input('action') === 'meta_update_template') return $this->updateMetaTemplate($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_add_phone_number') return $this->addMetaPhoneNumber($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_request_code') return $this->requestMetaVerificationCode($request);
         if ($request->isMethod('post') && $request->input('action') === 'meta_verify_code') return $this->verifyMetaCode($request);
@@ -3974,7 +3975,7 @@ class AssistantController extends Controller
         try {
             $response = Http::withToken($assistant->whatsapp_token)
                 ->get("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/message_templates", [
-                    'fields' => 'name,language,status,category,components,rejected_reason',
+                    'fields' => 'id,name,language,status,category,components,rejected_reason',
                     'limit' => 100,
                 ]);
 
@@ -4022,6 +4023,7 @@ class AssistantController extends Controller
             'assistant_id' => 'required|exists:assistants,id',
             'name' => 'required|string|max:512|regex:/^[a-z0-9_]+$/',
             'language' => 'required|string|max:10',
+            'category' => 'required|in:UTILITY,MARKETING',
             'body' => 'required|string|max:1024',
         ]);
 
@@ -4046,7 +4048,7 @@ class AssistantController extends Controller
                 ->post("https://graph.facebook.com/v21.0/{$assistant->whatsapp_waba_id}/message_templates", [
                     'name' => $request->input('name'),
                     'language' => $request->input('language'),
-                    'category' => 'UTILITY',
+                    'category' => $request->input('category'),
                     'components' => [$bodyComponent],
                 ]);
 
@@ -4059,12 +4061,59 @@ class AssistantController extends Controller
                 'name' => $request->input('name'),
                 'language' => $request->input('language'),
                 'status' => 'PENDING',
-                'category' => 'UTILITY',
+                'category' => $request->input('category'),
                 'hasVariable' => $hasVariable,
             ]]);
         } catch (\Throwable $e) {
             Log::error('Exceção ao criar template na Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao criar template: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Edita um template ja existente direto pelo id numerico dele (nao o name) - endereco
+     * diferente do create, que usa o WABA. Editar categoria/corpo manda o template de volta pra
+     * revisao da Meta (status some do APPROVED/REJECTED e volta pra PENDING), que e exatamente o
+     * "reenviar pra aprovacao" que o admin precisa quando um template e recusado ou reclassificado.
+     */
+    private function updateMetaTemplate(Request $request)
+    {
+        $request->validate([
+            'assistant_id' => 'required|exists:assistants,id',
+            'template_id' => 'required|string',
+            'category' => 'required|in:UTILITY,MARKETING',
+            'body' => 'required|string|max:1024',
+        ]);
+
+        $assistant = Assistant::findOrFail($request->input('assistant_id'));
+        if (empty($assistant->whatsapp_token)) {
+            return response()->json(['success' => false, 'message' => 'Esse assistente não tem uma conta Meta conectada.'], 422);
+        }
+
+        $body = $request->input('body');
+        $hasVariable = str_contains($body, '{{1}}');
+
+        $bodyComponent = ['type' => 'BODY', 'text' => $body];
+        if ($hasVariable) {
+            $bodyComponent['example'] = ['body_text' => [['Maria']]];
+        }
+
+        try {
+            $response = Http::withToken($assistant->whatsapp_token)
+                ->post("https://graph.facebook.com/v21.0/{$request->input('template_id')}", [
+                    'category' => $request->input('category'),
+                    'components' => [$bodyComponent],
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Erro ao editar template na Meta: ' . $response->body());
+                return response()->json(['success' => false, 'message' => $response->json('error.error_user_msg') ?? $response->json('error.message') ?? 'Não foi possível editar o template.'], 422);
+            }
+
+            return response()->json(['success' => true]);
+        } catch (\Throwable $e) {
+            Log::error('Exceção ao editar template na Meta: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao editar template: ' . $e->getMessage()], 500);
         }
     }
 

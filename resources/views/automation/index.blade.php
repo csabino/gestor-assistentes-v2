@@ -14,8 +14,27 @@
                   metaTemplateCreateOpen: false,
                   metaTemplateSaving: false,
                   metaTemplateError: null,
-                  metaTemplateForm: { name: '', language: 'pt_BR', body: '' },
+                  metaTemplateForm: { name: '', language: 'pt_BR', category: 'UTILITY', body: '' },
+                  metaTemplateEditingId: null,
                   metaTemplatesModalOpen: false,
+                  openCreateMetaTemplate() {
+                      this.metaTemplateEditingId = null;
+                      this.metaTemplateForm = { name: '', language: 'pt_BR', category: 'UTILITY', body: '' };
+                      this.metaTemplateError = null;
+                      this.metaTemplateCreateOpen = true;
+                  },
+                  openEditMetaTemplate(tpl) {
+                      const bodyComp = (tpl.components || []).find(c => (c.type || '').toUpperCase() === 'BODY');
+                      this.metaTemplateEditingId = tpl.id;
+                      this.metaTemplateForm = {
+                          name: tpl.name,
+                          language: tpl.language,
+                          category: tpl.category || 'UTILITY',
+                          body: bodyComp?.text || '',
+                      };
+                      this.metaTemplateError = null;
+                      this.metaTemplateCreateOpen = true;
+                  },
                   templateHasVariable(tpl) {
                       if (typeof tpl.hasVariable === 'boolean') return tpl.hasVariable;
                       const bodyComp = (tpl.components || []).find(c => (c.type || '').toUpperCase() === 'BODY');
@@ -85,27 +104,44 @@
                       }
                       this.metaTemplateSaving = true;
                       this.metaTemplateError = null;
+                      const isEditing = !!this.metaTemplateEditingId;
                       try {
                           const res = await fetch('/', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                               body: JSON.stringify({
-                                  action: 'meta_create_template',
+                                  action: isEditing ? 'meta_update_template' : 'meta_create_template',
                                   assistant_id: {{ $assistant->id }},
+                                  template_id: this.metaTemplateEditingId,
                                   name: this.metaTemplateForm.name,
                                   language: this.metaTemplateForm.language,
+                                  category: this.metaTemplateForm.category,
                                   body: this.metaTemplateForm.body,
                               }),
                           });
                           const data = await res.json();
                           if (!res.ok || !data.success) {
-                              this.metaTemplateError = data.message || 'Não foi possível criar o template.';
+                              this.metaTemplateError = data.message || 'Não foi possível salvar o template.';
                               return;
                           }
-                          this.metaTemplates.push(data.template);
-                          this.metaTemplateForm = { name: '', language: 'pt_BR', body: '' };
+                          if (isEditing) {
+                              const idx = this.metaTemplates.findIndex(t => t.id === this.metaTemplateEditingId);
+                              const updated = {
+                                  ...this.metaTemplates[idx],
+                                  category: this.metaTemplateForm.category,
+                                  status: 'PENDING',
+                                  rejected_reason: null,
+                                  components: [{ type: 'BODY', text: this.metaTemplateForm.body }],
+                                  hasVariable: this.metaTemplateForm.body.includes('@{{1}}'),
+                              };
+                              if (idx >= 0) this.metaTemplates.splice(idx, 1, updated);
+                          } else {
+                              this.metaTemplates.push(data.template);
+                          }
+                          this.metaTemplateForm = { name: '', language: 'pt_BR', category: 'UTILITY', body: '' };
+                          this.metaTemplateEditingId = null;
                           this.metaTemplateCreateOpen = false;
-                          Alpine.store('toast').show('Template criado! Aguardando aprovação da Meta.', 'success');
+                          Alpine.store('toast').show(isEditing ? 'Template reenviado pra aprovação da Meta!' : 'Template criado! Aguardando aprovação da Meta.', 'success');
                       } catch (e) {
                           this.metaTemplateError = 'Erro de conexão. Tente novamente.';
                       } finally {
@@ -206,7 +242,7 @@
 
                     <div class="flex items-center gap-4 mb-3 flex-wrap">
                         <template x-if="isMeta">
-                            <button type="button" @click="metaTemplateCreateOpen = true"
+                            <button type="button" @click="openCreateMetaTemplate()"
                                     class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 text-xs font-semibold flex items-center gap-1">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                 Criar novo template
@@ -298,9 +334,16 @@
                                               x-text="statusLabel(tpl.status)"></span>
                                         <span x-show="tpl.category" class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-500 border border-gray-200" x-text="tpl.category"></span>
                                     </span>
-                                    <button type="button" @click="deleteMetaTemplateConfirm(tpl)" class="text-gray-400 hover:text-red-600 p-1 rounded transition shrink-0" title="Remover template">
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <template x-if="tpl.status === 'REJECTED'">
+                                            <button type="button" @click="openEditMetaTemplate(tpl)" class="text-gray-400 hover:text-indigo-600 p-1 rounded transition" title="Editar e reenviar pra aprovação">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
+                                            </button>
+                                        </template>
+                                        <button type="button" @click="deleteMetaTemplateConfirm(tpl)" class="text-gray-400 hover:text-red-600 p-1 rounded transition" title="Remover template">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
                                 </div>
                                 <template x-if="tpl.rejected_reason && tpl.rejected_reason !== 'NONE'">
                                     <p class="text-[10px] text-red-600 mt-1 leading-tight">Motivo (Meta): <span x-text="tpl.rejected_reason"></span></p>
@@ -318,23 +361,34 @@
             <div x-show="metaTemplateCreateOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
                 <div @click.away="metaTemplateCreateOpen = false" class="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col relative border border-slate-200">
                     <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-                        <h3 class="text-base font-bold text-gray-800">Criar novo template</h3>
+                        <h3 class="text-base font-bold text-gray-800" x-text="metaTemplateEditingId ? 'Editar template' : 'Criar novo template'"></h3>
                         <button type="button" @click="metaTemplateCreateOpen = false" class="text-gray-400 hover:text-gray-600">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
                     <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-3">
+                        <template x-if="metaTemplateEditingId">
+                            <p class="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-tight">Editar categoria e/ou corpo manda o template de volta pra revisão da Meta - nome e idioma não podem mudar.</p>
+                        </template>
                         <div>
                             <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Nome (minúsculas, sem espaço - use _)</label>
-                            <input type="text" x-model="metaTemplateForm.name" placeholder="retomada_atendimento" class="w-full border border-gray-300 rounded-md p-2 text-xs font-mono">
+                            <input type="text" x-model="metaTemplateForm.name" :disabled="!!metaTemplateEditingId" placeholder="retomada_atendimento" class="w-full border border-gray-300 rounded-md p-2 text-xs font-mono disabled:bg-gray-100 disabled:text-gray-500">
                         </div>
                         <div>
                             <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Idioma</label>
-                            <select x-model="metaTemplateForm.language" class="w-full border border-gray-300 rounded-md p-2 text-xs bg-white">
+                            <select x-model="metaTemplateForm.language" :disabled="!!metaTemplateEditingId" class="w-full border border-gray-300 rounded-md p-2 text-xs bg-white disabled:bg-gray-100 disabled:text-gray-500">
                                 <option value="pt_BR">Português (Brasil)</option>
                                 <option value="en_US">Inglês (EUA)</option>
                                 <option value="es_ES">Espanhol</option>
                             </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Categoria</label>
+                            <select x-model="metaTemplateForm.category" class="w-full border border-gray-300 rounded-md p-2 text-xs bg-white">
+                                <option value="UTILITY">Utilidade (acompanhamento de atendimento em andamento)</option>
+                                <option value="MARKETING">Marketing (reengajamento/promoção)</option>
+                            </select>
+                            <p class="text-[10px] text-gray-400 mt-0.5 leading-tight">Mensagens de retomada de atendimento parado costumam ser classificadas pela Meta como Marketing, mesmo quando parecem utilidade - se a Meta recusar como Utilidade, tente de novo como Marketing.</p>
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-0.5">
@@ -350,7 +404,7 @@
                     <div class="p-5 border-t border-gray-100 shrink-0">
                         <button type="button" @click="createMetaTemplateSubmit()" :disabled="metaTemplateSaving"
                                 class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition disabled:opacity-60">
-                            <span x-text="metaTemplateSaving ? 'Criando...' : 'Criar Template'"></span>
+                            <span x-text="metaTemplateSaving ? 'Salvando...' : (metaTemplateEditingId ? 'Reenviar pra Aprovação' : 'Criar Template')"></span>
                         </button>
                     </div>
                 </div>
