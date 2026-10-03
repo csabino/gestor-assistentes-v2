@@ -10,6 +10,7 @@
                   metaTemplates: [],
                   metaTemplatesRefreshing: false,
                   metaTemplatesError: null,
+                  metaPhoneInfo: null,
                   metaTemplateCreateOpen: false,
                   metaTemplateSaving: false,
                   metaTemplateError: null,
@@ -46,6 +47,17 @@
                       } finally {
                           this.metaTemplatesRefreshing = false;
                       }
+                  },
+                  async loadMetaPhoneInfo() {
+                      try {
+                          const res = await fetch('/', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                              body: JSON.stringify({ action: 'meta_check_phone_status', assistant_id: {{ $assistant->id }} }),
+                          });
+                          const data = await res.json();
+                          if (res.ok && data.success) this.metaPhoneInfo = data;
+                      } catch (e) { /* mantem so o ID estatico se a consulta falhar */ }
                   },
                   async deleteMetaTemplateConfirm(tpl) {
                       if (!(await confirmModal('Remover o template ' + tpl.name + '? Isso apaga todos os idiomas desse template na Meta.'))) return;
@@ -118,7 +130,7 @@
                       this.$nextTick(() => this.$el.submit());
                   }
               }"
-              x-init="if (isMeta) { loadMetaTemplates(); setInterval(() => loadMetaTemplates(), 60000); }"
+              x-init="if (isMeta) { loadMetaTemplates(); setInterval(() => loadMetaTemplates(), 60000); loadMetaPhoneInfo(); }"
               @submit="confirmSave($event)">
             @csrf
 
@@ -141,6 +153,15 @@
                             Automação — {{ $assistant->name }}
                         </h1>
                         <p class="text-xs text-gray-500 mt-0.5">Retomada automática de atendimento quando o cliente para de responder.</p>
+                        @if($assistant->whatsapp_provider === 'meta' && $assistant->whatsapp_instance)
+                            <p class="text-[11px] text-gray-400 mt-1">
+                                Número: <span class="font-semibold text-gray-500" x-text="metaPhoneInfo?.display_phone_number || '...'"></span>
+                                <span class="text-gray-300">·</span> ID: <span class="font-mono">{{ $assistant->whatsapp_instance }}</span>
+                                <template x-if="metaPhoneInfo?.verified_name">
+                                    <span><span class="text-gray-300">·</span> <span x-text="metaPhoneInfo.verified_name"></span></span>
+                                </template>
+                            </p>
+                        @endif
                     </div>
                 </div>
 
