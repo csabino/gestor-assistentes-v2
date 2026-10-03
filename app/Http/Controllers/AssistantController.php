@@ -3980,7 +3980,11 @@ class AssistantController extends Controller
 
             if (!$response->successful()) {
                 Log::error('Erro ao listar templates do WABA na Meta: ' . $response->body());
-                return response()->json(['success' => false, 'message' => 'Não foi possível listar os templates.'], 422);
+                $metaMessage = $response->json('error.error_user_msg') ?? $response->json('error.message');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Não foi possível listar os templates.' . ($metaMessage ? ' Meta: ' . $metaMessage : ''),
+                ], 422);
             }
 
             $templates = array_values(array_filter($response->json('data') ?? [], fn ($tpl) => !$this->isMetaSampleTemplate($tpl['name'] ?? '')));
