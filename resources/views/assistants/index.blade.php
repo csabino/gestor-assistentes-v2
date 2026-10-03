@@ -1455,19 +1455,19 @@
                                                         <button type="button" @click="metaManualOpen = !metaManualOpen" class="text-[11px] text-gray-500 hover:text-gray-700">Conectar manualmente (número de teste)</button>
                                                     </div>
                                                     <template x-if="metaManualOpen">
-                                                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 mt-2">
-                                                            <p class="text-[10px] text-gray-400 leading-tight">Pensado pro número de teste gratuito da Meta (tela "Etapa 1. Experimente" do App Review) - cola o Phone Number ID e o Access Token temporário de lá.</p>
-                                                            <div>
-                                                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Phone Number ID</label>
-                                                                <input type="text" x-model="metaManualPhoneNumberId" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 mt-2">
+                                                            <p class="text-[10px] text-gray-400 leading-tight mb-1">Pensado pro número de teste gratuito da Meta (tela "Etapa 1. Experimente" do App Review) - cola o Phone Number ID e o Access Token temporário de lá.</p>
+                                                            <div class="flex items-center gap-2">
+                                                                <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">Phone Number ID</label>
+                                                                <input type="text" x-model="metaManualPhoneNumberId" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
                                                             </div>
-                                                            <div>
-                                                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">WABA ID (opcional)</label>
-                                                                <input type="text" x-model="metaManualWabaId" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                                            <div class="flex items-center gap-2">
+                                                                <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">WABA ID</label>
+                                                                <input type="text" x-model="metaManualWabaId" placeholder="opcional" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
                                                             </div>
-                                                            <div>
-                                                                <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Access Token</label>
-                                                                <input type="text" x-model="metaManualAccessToken" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
+                                                            <div class="flex items-center gap-2">
+                                                                <label class="text-[11px] font-semibold text-gray-700 w-28 shrink-0">Access Token</label>
+                                                                <input type="text" x-model="metaManualAccessToken" class="flex-1 min-w-0 border border-gray-300 rounded-md p-1.5 text-[11px] font-mono">
                                                             </div>
                                                             <p x-show="metaManualError" x-text="metaManualError" class="text-[11px] text-red-600"></p>
                                                             <button type="button" @click="connectMetaManualSubmit()" :disabled="metaManualSaving" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-1.5 rounded-lg text-[11px] transition">
