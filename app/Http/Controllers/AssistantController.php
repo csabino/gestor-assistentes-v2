@@ -2511,6 +2511,7 @@ class AssistantController extends Controller
                 if (empty($content) && !empty($file['path']) && Storage::exists($file['path'])) {
                     $content = $this->extractTextFromFile(Storage::path($file['path']), $name);
                 }
+                $content = $this->stripSourceLines($content);
 
                 if (!empty($content)) {
                     $cleanUrl = str_replace('🌐 ', '', $name);
@@ -2537,6 +2538,20 @@ class AssistantController extends Controller
         }
 
         return $prompt;
+    }
+
+    /**
+     * O prompt instrui a IA a nunca citar "Fonte:" numa resposta, mas alguns documentos da base
+     * de conhecimento trazem essa linha no proprio texto (ex: credito da origem do conteudo) - se
+     * a IA for fiel ao texto literal do documento, corre o risco de vazar isso mesmo assim. Trava
+     * em codigo, removendo a linha antes dela entrar no prompt, pra nao depender só da IA obedecer.
+     */
+    private function stripSourceLines(string $content): string
+    {
+        if ($content === '') {
+            return $content;
+        }
+        return trim(preg_replace('/^\s*Fonte:.*$/im', '', $content));
     }
 
     private function extractTextFromFile(string $filePath, string $fileName): string
