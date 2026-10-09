@@ -2065,6 +2065,7 @@
                     activeCount: {{ $assistants->where('is_active', true)->count() }},
                     inactiveCount: {{ $assistants->filter(fn($a) => !$a->is_active && ($a->status ?? null) !== 'maintenance')->count() }},
                     maintenanceCount: {{ $assistants->where('status', 'maintenance')->count() }},
+                    createAssistantModalOpen: false,
                     get currentCount() {
                         if (this.filter === 'active') return this.activeCount;
                         if (this.filter === 'inactive') return this.inactiveCount;
@@ -2075,19 +2076,14 @@
                     $watch('filter', value => localStorage.setItem('assistant_filter', value));
                     $watch('view', value => localStorage.setItem('assistant_view', value));
                 " class="flex flex-col h-[calc(100vh-10rem)]">
-                <div class="mb-3 shrink-0">
-                    <h1 class="text-xl font-bold text-gray-800">Gestão de Assistentes IA</h1>
-                    <p class="text-xs text-gray-500 mt-1">Crie, configure e monitore seus assistentes virtuais multimodais integrados ao WhatsApp e canais de atendimento.</p>
-                </div>
-
-                <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-200 mb-3 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-                    <form action="/" method="POST" class="flex items-center gap-2 w-full md:w-auto flex-1 max-w-lg">
-                        @csrf
-                        <input type="text" name="name" placeholder="Nome do assistente (ex: Vânia - Vendas)" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 px-5 rounded-lg transition shadow-sm flex items-center gap-1.5 whitespace-nowrap">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Criar
-                        </button>
-                    </form>
+                <div class="mb-3 shrink-0 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <h1 class="text-xl font-bold text-gray-800">Gestão de Assistentes IA</h1>
+                        <p class="text-xs text-gray-500 mt-1">Crie, configure e monitore seus assistentes virtuais multimodais integrados ao WhatsApp e canais de atendimento.</p>
+                    </div>
+                    <button type="button" @click="createAssistantModalOpen = true" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition shadow-sm flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Novo Assistente
+                    </button>
                 </div>
 
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 shrink-0">
@@ -2118,10 +2114,10 @@
                 </div>
 
                 <div class="border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/40 dark:bg-gray-900 p-4 flex-1 min-h-0 overflow-y-auto custom-scroll">
-                <div x-show="view === 'card'" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div x-show="view === 'card'" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     @forelse($assistants as $assistant)
                         <div x-show="(filter === 'all') || (filter === 'active' && {{ $assistant->is_active ? 'true' : 'false' }}) || (filter === 'inactive' && {{ (!$assistant->is_active && ($assistant->status ?? null) !== 'maintenance') ? 'true' : 'false' }}) || (filter === 'maintenance' && {{ ($assistant->status ?? null) === 'maintenance' ? 'true' : 'false' }})"
-                            class="light-surface bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition duration-200 flex flex-col justify-between gap-4">
+                            class="light-surface bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-300 hover:shadow-md transition duration-200 flex flex-col justify-between gap-3">
 
                             <div class="flex justify-between items-start gap-2">
                                 <div class="min-w-0">
@@ -2162,7 +2158,7 @@
                                 </div>
                             </div>
 
-                            <div class="flex items-center justify-between border-t border-gray-100 pt-4 mt-2">
+                            <div class="flex items-center justify-between border-t border-gray-100 pt-3 mt-1">
                                 <div class="flex items-center gap-0.5">
                                     <a href="/?configure={{ $assistant->id }}" title="Configurar" onclick="sessionStorage.removeItem('scrollpos_config_{{ $assistant->id }}'); sessionStorage.removeItem('openmodal_config_{{ $assistant->id }}');" class="text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition flex items-center justify-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>
@@ -2207,9 +2203,9 @@
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
                             <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
-                                <th class="py-4 px-5 font-semibold">Nome do Assistente</th>
-                                <th class="py-4 px-5 font-semibold">Status</th>
-                                <th class="py-4 px-5 font-semibold text-right">Ações</th>
+                                <th class="py-3 px-5 font-semibold">Nome do Assistente</th>
+                                <th class="py-3 px-5 font-semibold">Status</th>
+                                <th class="py-3 px-5 font-semibold text-right">Ações</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -2217,7 +2213,7 @@
                                 <tr x-show="(filter === 'all') || (filter === 'active' && {{ $assistant->is_active ? 'true' : 'false' }}) || (filter === 'inactive' && {{ (!$assistant->is_active && ($assistant->status ?? null) !== 'maintenance') ? 'true' : 'false' }}) || (filter === 'maintenance' && {{ ($assistant->status ?? null) === 'maintenance' ? 'true' : 'false' }})"
                                     class="hover:bg-gray-50 transition duration-150 group">
                                     
-                                    <td class="py-4 px-5">
+                                    <td class="py-2 px-5">
                                         <div class="flex items-center gap-1.5">
                                             <span class="font-bold text-gray-800 text-base">{{ $assistant->name }}</span>
                                             
@@ -2235,7 +2231,7 @@
                                         </div>
                                     </td>
 
-                                    <td class="py-4 px-5">
+                                    <td class="py-2 px-5">
                                         @php
                                             $rowCurrentStatus = $assistant->status ?? ($assistant->is_active ? 'active' : 'inactive');
                                             $rowStatusMeta = [
@@ -2267,10 +2263,14 @@
                                         </div>
                                     </td>
 
-                                    <td class="py-4 px-5 text-right flex justify-end items-center gap-2 opacity-90 group-hover:opacity-100 transition">
+                                    <td class="py-2 px-5 text-right flex justify-end items-center gap-2 opacity-90 group-hover:opacity-100 transition">
                                         <a href="/?conversations_id={{ $assistant->id }}" class="dark-btn-fix bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.573 16.49 16.638 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                             Conversas
+                                        </a>
+
+                                        <a href="/?view=surveys&assistant_id={{ $assistant->id }}" class="dark-btn-fix bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" /></svg> Pesquisas
                                         </a>
 
                                         <a href="/?view=agenda&assistant_id={{ $assistant->id }}" class="dark-btn-fix bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 text-gray-600 font-bold py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
@@ -2292,6 +2292,28 @@
                         </tbody>
                     </table>
                 </div>
+                </div>
+
+                <!-- MODAL NOVO ASSISTENTE -->
+                <div x-show="createAssistantModalOpen" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div @click.away="createAssistantModalOpen = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full flex flex-col relative border border-slate-200">
+                        <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                            <h3 class="text-base font-bold text-gray-800">Novo Assistente</h3>
+                            <button type="button" @click="createAssistantModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form action="/" method="POST" class="p-5 space-y-3">
+                            @csrf
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Nome do assistente</label>
+                                <input type="text" name="name" placeholder="Ex: Vânia - Vendas" required autofocus class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                            </div>
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-lg transition shadow-sm flex items-center justify-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Criar Assistente
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 </div>
             @endif
