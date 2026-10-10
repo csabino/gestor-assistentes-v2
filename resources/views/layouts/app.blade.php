@@ -538,7 +538,6 @@
                 @if(auth()->user()->isAdmin())
                     <a href="/" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'robots' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">Assistentes</a>
                     <a href="/?view=equipe" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'equipe' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">Equipe & Agendas</a>
-                    <a href="/?view=tester" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'tester' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">Testador</a>
                 @endif
                 <a href="/?view=agenda" class="px-3 py-2 rounded-lg transition whitespace-nowrap {{ $navView === 'agenda' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">Calendário</a>
             </nav>
@@ -582,6 +581,11 @@
                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" /></svg>
                         Ambiente
                     </button>
+
+                    <a href="/?view=tester" class="w-full flex items-center gap-2.5 px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                        Validador
+                    </a>
                 @endif
 
                 <form action="/logout" method="POST" class="border-t border-gray-100 dark:border-gray-700 mt-1 pt-1">
