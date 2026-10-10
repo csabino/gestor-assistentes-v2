@@ -25,6 +25,7 @@ class TesterController extends AssistantController
             if ($action === 'stop_test_run') return $this->stopTestRun($request);
             if ($action === 'upload_test_kb_file') return $this->uploadTestKbFile($request);
             if ($action === 'store_test_harness_assistant') return $this->storeTestHarnessAssistant($request);
+            if ($action === 'save_harness_connection') return $this->saveHarnessConnection($request);
         }
 
         if ($request->isMethod('get') && $request->input('action') === 'get_test_run_detail') {
@@ -55,6 +56,48 @@ class TesterController extends AssistantController
         }
 
         return redirect('/?view=tester')->with('success', 'Número de teste criado! Agora conecte o WhatsApp dele abaixo.');
+    }
+
+    /**
+     * Salva a conexão WhatsApp (UazAPI) e a IA do número de teste num único passo dedicado - ele
+     * não é um assistente de verdade (sem personalidade/prompt/base), só uma conexão mais a IA
+     * usada pra conduzir os testes, então não reusa o configForm geral de um assistente normal.
+     */
+    private function saveHarnessConnection(Request $request)
+    {
+        $harnessAssistant = Assistant::where('is_test_harness', true)->first();
+        if (!$harnessAssistant) {
+            return response()->json(['success' => false, 'message' => 'Número de teste não existe.'], 422);
+        }
+
+        $request->validate([
+            'whatsapp_provider' => 'nullable|string',
+            'whatsapp_url' => 'nullable|string',
+            'whatsapp_instance' => 'nullable|string',
+            'whatsapp_token' => 'nullable|string',
+            'ai_provider' => 'nullable|string|in:openai,gemini,anthropic,grok',
+            'ai_model' => 'nullable|string',
+            'ai_api_key' => 'nullable|string',
+        ]);
+
+        $data = [
+            'whatsapp_provider' => $request->input('whatsapp_provider'),
+            'whatsapp_url' => $request->input('whatsapp_url'),
+            'whatsapp_instance' => $request->input('whatsapp_instance'),
+            'whatsapp_token' => $request->input('whatsapp_token'),
+        ];
+
+        if ($request->filled('ai_provider')) {
+            $data['provider'] = $request->input('ai_provider');
+            $data['model'] = $request->input('ai_model');
+            if ($request->filled('ai_api_key')) {
+                $data[$request->input('ai_provider') . '_api_key'] = $request->input('ai_api_key');
+            }
+        }
+
+        $harnessAssistant->forceFill($data)->save();
+
+        return response()->json(['success' => true]);
     }
 
     private function startTestRun(Request $request)
@@ -97,7 +140,7 @@ class TesterController extends AssistantController
 
         app(TestHarnessService::class)->launchRun($this, $testRun);
 
-        return redirect('/?view=tester')->with('success', 'Teste "' . $name . '" iniciado!');
+        return redirect('/?view=tester')->with('success', 'Teste "' . $name . '" iniciado!')->with('new_test_run_id', $testRun->id);
     }
 
     private function stopTestRun(Request $request)

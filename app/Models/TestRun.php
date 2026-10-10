@@ -18,6 +18,8 @@ class TestRun extends Model
         'scenarios' => 'array',
         'transcript' => 'array',
         'report' => 'array',
+        'current_scenario_index' => 'integer',
+        'current_scenario_turn' => 'integer',
         'last_message_sent_at' => 'datetime',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',

@@ -17,6 +17,100 @@
                  showKbModal: false,
                  showModal: false,
                  modalData: {},
+                 showConnectionModal: false,
+                 showWaModal: false,
+                 wa_provider: @js($harnessAssistant->whatsapp_provider ?? ''),
+                 wa_url: @js($harnessAssistant->whatsapp_url ?? ''),
+                 wa_instance: @js($harnessAssistant->whatsapp_instance ?? ''),
+                 wa_token: @js($harnessAssistant->whatsapp_token ?? ''),
+                 ai_provider: @js($harnessAssistant->provider ?? 'openai'),
+                 ai_model: @js($harnessAssistant->model ?? 'gpt-4o-mini'),
+                 ai_api_key: '',
+                 waStatus: 'checking',
+                 waSaving: false,
+                 waLoading: false,
+                 waResult: null,
+                 pollAttempts: 0,
+                 getWaParams() {
+                     return { assistant_id: {{ $harnessAssistant->id ?? 'null' }}, url: this.wa_url, instance: this.wa_instance, token: this.wa_token, provider: this.wa_provider };
+                 },
+                 async checkWaStatusSilent() {
+                     if (!this.wa_provider || !this.wa_url || !this.wa_token) { this.waStatus = 'disconnected'; return; }
+                     this.waStatus = 'checking';
+                     try {
+                         const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ action: 'status_whatsapp', ...this.getWaParams() }) });
+                         const data = await res.json();
+                         this.waStatus = data.connected ? 'connected' : 'disconnected';
+                     } catch (e) {
+                         this.waStatus = 'disconnected';
+                     }
+                 },
+                 async saveWaConnection() {
+                     this.waSaving = true;
+                     this.wa_provider = 'uazapi';
+                     try {
+                         const res = await fetch('/?view=tester', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({
+                             action: 'save_harness_connection',
+                             whatsapp_provider: this.wa_provider, whatsapp_url: this.wa_url, whatsapp_instance: this.wa_instance, whatsapp_token: this.wa_token,
+                             ai_provider: this.ai_provider, ai_model: this.ai_model, ai_api_key: this.ai_api_key,
+                         }) });
+                         const data = await res.json();
+                         if (data.success) {
+                             Alpine.store('toast').show('Conexão salva!', 'success');
+                             this.ai_api_key = '';
+                             this.checkWaStatusSilent();
+                         } else {
+                             Alpine.store('toast').show(data.message || 'Não foi possível salvar.', 'error');
+                         }
+                     } catch (e) {
+                         Alpine.store('toast').show('Erro de conexão.', 'error');
+                     } finally {
+                         this.waSaving = false;
+                     }
+                 },
+                 async disconnectWa() {
+                     if (!(await confirmModal('Tem certeza que deseja desconectar a sessão do WhatsApp?'))) return;
+                     this.waStatus = 'checking';
+                     try {
+                         const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ action: 'disconnect_whatsapp', ...this.getWaParams() }) });
+                         const data = await res.json();
+                         if (data.success) {
+                             this.waStatus = 'disconnected';
+                         } else {
+                             alertModal('Não foi possível desconectar: ' + (data.message || 'Erro desconhecido.'));
+                             this.checkWaStatusSilent();
+                         }
+                     } catch (e) {
+                         alertModal('Erro na requisição.');
+                         this.checkWaStatusSilent();
+                     }
+                 },
+                 async startWaConnection() {
+                     this.showWaModal = true;
+                     this.pollAttempts = 0;
+                     this.waResult = null;
+                     await this.runWaPoll();
+                 },
+                 async runWaPoll() {
+                     if (!this.showWaModal) return;
+                     if (!this.waResult || (!this.waResult.qr && !this.waResult.connected)) this.waLoading = true;
+                     const hasQr = !!(this.waResult && this.waResult.qr);
+                     try {
+                         const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ action: 'test_whatsapp', has_qr: hasQr, ...this.getWaParams() }) });
+                         const data = await res.json();
+                         if (hasQr && !data.connected) data.qr = this.waResult.qr;
+                         this.waResult = data;
+                         if (data.connected) {
+                             this.waStatus = 'connected';
+                         } else if (data.success && this.pollAttempts < 20 && this.showWaModal) {
+                             this.pollAttempts++;
+                             setTimeout(() => { if (this.showWaModal) this.runWaPoll(); }, 3000);
+                         }
+                     } catch (e) {
+                     } finally {
+                         this.waLoading = false;
+                     }
+                 },
                  selectTarget() {
                      const t = this.targets.find(x => x.id == this.target_assistant_id);
                      if (!t) return;
@@ -48,37 +142,63 @@
                          event.target.value = '';
                      }
                  },
+                 pollTimer: null,
                  async openRun(id) {
                      const res = await fetch('/?view=tester&action=get_test_run_detail&test_run_id=' + id);
                      this.modalData = await res.json();
                      this.showModal = true;
+                     this.maybePoll();
+                 },
+                 maybePoll() {
+                     if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
+                     if (this.showModal && this.modalData.status === 'running') {
+                         this.pollTimer = setTimeout(async () => {
+                             const res = await fetch('/?view=tester&action=get_test_run_detail&test_run_id=' + this.modalData.id);
+                             this.modalData = await res.json();
+                             this.maybePoll();
+                         }, 5000);
+                     }
+                 },
+                 closeDetailModal() {
+                     this.showModal = false;
+                     if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
                  },
                  scenarioGroups() {
                      if (!this.modalData.scenarios) return [];
                      return this.modalData.scenarios.map((s, i) => ({
                          ...s,
-                         messages: (this.modalData.transcript || []).filter(t => t.scenario_index === i),
+                         number: i + 1,
+                         current: i === Number(this.modalData.current_scenario_index),
+                         messages: (this.modalData.transcript || []).filter(t => Number(t.scenario_index) === i),
                      }));
                  }
-             }">
+             }"
+             x-init="
+                 @if($harnessAssistant) checkWaStatusSilent(); @endif
+                 @if(session('new_test_run_id')) openRun({{ session('new_test_run_id') }}); @endif
+             ">
             <div class="mb-3 shrink-0">
-                <h1 class="text-xl font-bold text-gray-800">Validador</h1>
-                <p class="text-xs text-gray-500 mt-1">QA automatizado: conversa de verdade via WhatsApp entre um número de teste e o assistente que você quiser avaliar, com cenários positivos e negativos gerados por IA.</p>
+                <h1 class="text-xl font-bold text-gray-800 flex items-center gap-1.5">
+                    Validador
+                    <svg class="w-4 h-4 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <title>QA automatizado: conversa de verdade via WhatsApp entre um número de teste e o assistente que você quiser avaliar, com cenários positivos e negativos gerados por IA.</title>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                    </svg>
+                </h1>
             </div>
-
-            @if(session('success'))
-                <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg px-4 py-2 mb-3 shrink-0">{{ session('success') }}</div>
-            @endif
-            @if(session('error'))
-                <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 mb-3 shrink-0">{{ session('error') }}</div>
-            @endif
 
             <div class="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 flex-1 min-h-0">
                 <!-- COLUNA ESQUERDA: configuração e disparo -->
                 <div class="flex flex-col gap-4 min-h-0">
                     <!-- Número de teste -->
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 shrink-0">
-                        <h2 class="text-sm font-bold text-gray-800 mb-2">Número de teste</h2>
+                        <h2 class="text-sm font-bold text-gray-800 mb-2 flex items-center gap-1.5">
+                            Número de teste
+                            <svg class="w-3.5 h-3.5 text-gray-400 cursor-help shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <title>É um assistente normal nos bastidores, dedicado só pro módulo Validador - conecte o WhatsApp dele e configure a chave de IA aqui. Ele nunca atende cliente de verdade, só conversa com o assistente que você quiser avaliar durante um teste.</title>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                        </h2>
                         @if(!$harnessAssistant)
                             <p class="text-xs text-gray-500 mb-3">Nenhum número de teste criado ainda - ele é o "cliente" que vai conversar de verdade com o assistente sendo avaliado.</p>
                             <form action="/?view=tester" method="POST">
@@ -89,11 +209,11 @@
                         @else
                             <div class="flex items-center justify-between gap-2 text-xs">
                                 <span class="text-gray-600">{{ $harnessAssistant->name }}</span>
-                                @if($harnessAssistant->whatsapp_provider && $harnessAssistant->whatsapp_token)
-                                    <span class="px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Conectado ({{ $harnessAssistant->whatsapp_provider }})</span>
-                                @else
-                                    <span class="px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">Não conectado</span>
-                                @endif
+                                <span class="flex items-center gap-1">
+                                    <span x-show="waStatus === 'checking'" class="px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-500 border border-gray-200 animate-pulse">Verificando...</span>
+                                    <span x-show="waStatus === 'connected'" class="px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Conectado</span>
+                                    <span x-show="waStatus === 'disconnected'" class="px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">Não conectado</span>
+                                </span>
                             </div>
                             @php $providerKeyField = ($harnessAssistant->provider ?? 'openai') . '_api_key'; @endphp
                             <div class="flex items-center justify-between gap-2 text-xs mt-1.5">
@@ -104,9 +224,14 @@
                                     <span class="px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">Faltando</span>
                                 @endif
                             </div>
-                            <a href="/?configure={{ $harnessAssistant->id }}" class="mt-3 w-full text-indigo-600 hover:text-indigo-800 text-xs font-semibold flex items-center justify-center gap-1 border border-indigo-200 hover:border-indigo-300 rounded-lg py-2 transition">
-                                Gerenciar conexão e chave de IA
-                            </a>
+                            <div class="flex items-center gap-2 mt-3">
+                                <button type="button" @click="showConnectionModal = true" class="flex-1 text-indigo-600 hover:text-indigo-800 text-xs font-semibold flex items-center justify-center gap-1 border border-indigo-200 hover:border-indigo-300 rounded-lg py-2 transition">
+                                    Conectar
+                                </button>
+                                <a href="/?configure={{ $harnessAssistant->id }}" title="Chave de IA, conexão via Meta e outras configurações avançadas" class="shrink-0 text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 rounded-lg py-2 px-2.5 transition">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.27-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                </a>
+                            </div>
                         @endif
                     </div>
 
@@ -136,8 +261,10 @@
                                 </button>
                             </div>
 
-                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition mt-3">Iniciar Teste</button>
-                            <p class="text-[10px] text-gray-400 leading-tight mt-2">Até 8 cenários (positivos e negativos) de até 12 mensagens cada, conversando de verdade pelo WhatsApp - pode levar um bom tempo. Acompanhe pelo grid ao lado.</p>
+                            <div class="flex items-center gap-3 mt-3">
+                                <button type="submit" class="w-1/3 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition">Iniciar Teste</button>
+                                <p class="text-[10px] text-gray-400 leading-tight">Até 8 cenários (positivos e negativos) de até 12 mensagens cada, conversando de verdade pelo WhatsApp - pode levar um bom tempo. Acompanhe pelo grid ao lado.</p>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -256,12 +383,140 @@
                 </div>
             </div>
 
+            <!-- MODAL CONECTAR NÚMERO DE TESTE -->
+            <div x-show="showConnectionModal" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                <div @click.away="showConnectionModal = false" class="bg-white rounded-xl shadow-2xl max-w-sm w-full max-h-[85vh] flex flex-col relative border border-slate-200">
+                    <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                        <h3 class="text-base font-bold text-gray-800">Conectar número de teste</h3>
+                        <button type="button" @click="showConnectionModal = false" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+                        <div>
+                            <div class="flex items-center gap-1.5 mb-2">
+                                <span x-show="waStatus === 'checking'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 animate-pulse">Verificando...</span>
+                                <span x-show="waStatus === 'connected'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Conectado</span>
+                                <span x-show="waStatus === 'disconnected'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Não conectado</span>
+                                <button type="button" x-show="waStatus === 'connected'" @click="disconnectWa()" class="text-[10px] text-red-600 hover:text-red-800 font-semibold ml-auto">Desconectar</button>
+                            </div>
+                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">URL (UazAPI)</label>
+                            <input type="url" x-model="wa_url" placeholder="https://api.uazapi.dev" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
+                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Nome da Instância</label>
+                            <input type="text" x-model="wa_instance" placeholder="Ex: teste" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
+                            <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">Instance Token</label>
+                            <input type="password" x-model="wa_token" placeholder="Ex: T0K3N..." class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                        </div>
+
+                        <div class="border-t border-gray-100 pt-3">
+                            <label class="block text-[11px] font-semibold text-gray-700 mb-1">IA usada pra conduzir os testes</label>
+                            <select x-model="ai_provider" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] bg-white mb-2">
+                                <option value="openai">OpenAI</option>
+                                <option value="gemini">Google Gemini</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="grok">xAI Grok</option>
+                            </select>
+                            <input type="text" x-model="ai_model" placeholder="Ex: gpt-4o-mini" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
+                            <input type="password" x-model="ai_api_key" placeholder="Cole a chave de API aqui (deixe em branco pra manter a atual)" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
+                        </div>
+                    </div>
+                    <div class="p-5 border-t border-gray-100 shrink-0 space-y-2">
+                        <button type="button" @click="saveWaConnection()" :disabled="waSaving" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-xs transition">
+                            <span x-text="waSaving ? 'Salvando...' : 'Salvar'"></span>
+                        </button>
+                        <button type="button" @click="startWaConnection()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c0 .621.504 1.125 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" /></svg>
+                            Conectar / QR Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL QR CODE -->
+            <div x-show="showWaModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4" x-transition>
+                <div x-on:click.away="showWaModal = false" class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center relative border border-gray-100">
+                    <button type="button" x-on:click.stop="showWaModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition p-1 rounded-lg">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                    <h3 class="text-lg font-bold text-gray-800 mb-1 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" /></svg>
+                        Conexão WhatsApp
+                    </h3>
+                    <p class="text-xs text-gray-500 mb-6">Número de teste</p>
+
+                    <div x-show="waLoading && !waResult" class="py-8 space-y-3">
+                        <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-emerald-500 border-t-transparent"></div>
+                        <p class="text-sm font-semibold text-gray-600">Acessando API...</p>
+                    </div>
+
+                    <div x-show="waResult !== null">
+                        <template x-if="waResult?.connected">
+                            <div class="py-6 space-y-3">
+                                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                                    <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                </div>
+                                <h4 class="text-base font-bold text-gray-800">WhatsApp Conectado!</h4>
+                                <p class="text-xs text-gray-500" x-text="waResult?.message"></p>
+                            </div>
+                        </template>
+
+                        <template x-if="waResult?.qr && !waResult?.connected">
+                            <div class="space-y-4">
+                                <p class="text-xs text-gray-600 font-medium" x-text="waResult?.message"></p>
+                                <div class="bg-gray-50 p-4 rounded-xl inline-block border border-gray-200 shadow-inner">
+                                    <img :src="waResult.qr" alt="QR Code" class="w-56 h-56 object-contain mx-auto rounded-lg">
+                                </div>
+                                <p class="text-[11px] text-gray-400">1. Abra o WhatsApp no celular<br>2. Toque em <b>Aparelhos Conectados</b> &gt; <b>Conectar um Aparelho</b></p>
+                                <div class="text-[10px] text-gray-400 mt-2 flex items-center justify-center gap-1.5 bg-gray-50 py-1.5 rounded border border-gray-100">
+                                    <span class="inline-block animate-spin rounded-full h-3 w-3 border-2 border-emerald-500 border-t-transparent"></span>
+                                    Aguardando leitura... (Tentativa <span x-text="pollAttempts"></span>/20)
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="!waResult?.qr && !waResult?.connected && waResult?.success">
+                            <div class="py-6 space-y-3">
+                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-3 border-emerald-500 border-t-transparent"></div>
+                                <p class="text-xs text-gray-600 font-semibold">Instância acordou! Obtendo imagem do QR Code...</p>
+                                <p class="text-[11px] text-gray-400" x-text="`Tentativa ${pollAttempts} de 20 (Aguarde 3s...)`"></p>
+                            </div>
+                        </template>
+
+                        <template x-if="!waResult?.success">
+                            <div class="py-4 space-y-2">
+                                <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                                </div>
+                                <p class="text-xs font-semibold text-red-600" x-text="waResult?.message"></p>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-gray-100 flex gap-2">
+                        <button type="button" x-on:click="runWaPoll()" :disabled="waLoading" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg text-xs transition">
+                            Atualizar / Tentar Novamente
+                        </button>
+                        <button type="button" x-on:click.stop="showWaModal = false" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2 rounded-lg text-xs transition">
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- MODAL DETALHE DO TESTE -->
             <div x-show="showModal" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-                <div @click.away="showModal = false" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col relative border border-slate-200">
+                <div @click.away="closeDetailModal()" class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col relative border border-slate-200">
                     <div class="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-                        <h3 class="text-base font-bold text-gray-800" x-text="modalData.name"></h3>
-                        <button type="button" @click="showModal = false" class="text-gray-400 hover:text-gray-600">
+                        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                            <span x-text="modalData.name"></span>
+                            <span x-show="modalData.status === 'running'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                                <span class="inline-block animate-spin rounded-full h-2.5 w-2.5 border-2 border-amber-300 border-t-amber-600"></span>
+                                Rodando
+                            </span>
+                            <span x-show="modalData.status === 'completed'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Concluído</span>
+                            <span x-show="modalData.status === 'error' || modalData.status === 'stopped'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200" x-text="modalData.status"></span>
+                        </h3>
+                        <button type="button" @click="closeDetailModal()" class="text-gray-400 hover:text-gray-600">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
@@ -290,9 +545,15 @@
                             </div>
                         </template>
 
-                        <template x-for="scenario in scenarioGroups()" :key="scenario.title">
+                        <template x-for="scenario in scenarioGroups()" :key="scenario.number">
                             <div>
-                                <p class="text-xs font-bold text-gray-700 mb-1.5" x-text="scenario.title + ' (' + scenario.category + ')'"></p>
+                                <div class="flex items-center gap-2 flex-wrap mb-1">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" x-text="'Cenário ' + scenario.number"></span>
+                                    <span class="text-xs font-bold text-gray-700" x-text="scenario.title"></span>
+                                    <span class="text-[10px] text-gray-400" x-text="'· ' + scenario.category"></span>
+                                    <span x-show="scenario.current && modalData.status === 'running'" class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">Em andamento</span>
+                                </div>
+                                <p class="text-[11px] text-gray-500 italic mb-1.5" x-text="scenario.objective"></p>
                                 <div class="space-y-1.5">
                                     <template x-for="(msg, mIdx) in scenario.messages" :key="mIdx">
                                         <p class="text-[11px]"
