@@ -238,12 +238,18 @@
                  },
                  scenarioGroups() {
                      if (!this.modalData.scenarios) return [];
-                     return this.modalData.scenarios.map((s, i) => ({
-                         ...s,
-                         number: i + 1,
-                         current: i === Number(this.modalData.current_scenario_index),
-                         messages: (this.modalData.transcript || []).filter(t => Number(t.scenario_index) === i),
-                     }));
+                     const currentIndex = Number(this.modalData.current_scenario_index);
+                     return this.modalData.scenarios
+                         // Só mostra os cenários já alcançados (não a lista inteira de uma vez) -
+                         // senão o scroll automático pro fim da tela pula pra depois de um monte de
+                         // cenário ainda vazio, escondendo a conversa que está acontecendo de verdade.
+                         .filter((s, i) => i <= currentIndex || this.modalData.status !== 'running')
+                         .map((s, i) => ({
+                             ...s,
+                             number: i + 1,
+                             current: i === currentIndex,
+                             messages: (this.modalData.transcript || []).filter(t => Number(t.scenario_index) === i),
+                         }));
                  }
              }"
              x-init="
