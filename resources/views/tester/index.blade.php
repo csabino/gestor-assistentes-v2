@@ -278,9 +278,9 @@
                             <div class="flex items-center justify-between gap-2 text-xs">
                                 <span class="text-gray-600">{{ $harnessAssistant->name }}</span>
                                 <span class="flex items-center gap-1">
-                                    <span x-show="waStatus === 'checking'" class="px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-500 border border-gray-200 animate-pulse">Verificando...</span>
-                                    <span x-show="waStatus === 'connected'" class="px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Conectado</span>
-                                    <span x-show="waStatus === 'disconnected'" class="px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">Não conectado</span>
+                                    <span x-show="waStatus === 'checking'" x-cloak class="px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-500 border border-gray-200 animate-pulse">Verificando...</span>
+                                    <span x-show="waStatus === 'connected'" x-cloak class="px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Conectado</span>
+                                    <span x-show="waStatus === 'disconnected'" x-cloak class="px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">Não conectado</span>
                                 </span>
                             </div>
                             @php $providerKeyField = ($harnessAssistant->provider ?? 'openai') . '_api_key'; @endphp
@@ -466,10 +466,10 @@
                     <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
                         <div>
                             <div class="flex items-center gap-1.5 mb-2">
-                                <span x-show="waStatus === 'checking'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 animate-pulse">Verificando...</span>
-                                <span x-show="waStatus === 'connected'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Conectado</span>
-                                <span x-show="waStatus === 'disconnected'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Não conectado</span>
-                                <button type="button" x-show="waStatus === 'connected'" @click="disconnectWa()" class="text-[10px] text-red-600 hover:text-red-800 font-semibold ml-auto">Desconectar</button>
+                                <span x-show="waStatus === 'checking'" x-cloak class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 animate-pulse">Verificando...</span>
+                                <span x-show="waStatus === 'connected'" x-cloak class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Conectado</span>
+                                <span x-show="waStatus === 'disconnected'" x-cloak class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Não conectado</span>
+                                <button type="button" x-show="waStatus === 'connected'" x-cloak @click="disconnectWa()" class="text-[10px] text-red-600 hover:text-red-800 font-semibold ml-auto">Desconectar</button>
                             </div>
                             <label class="block text-[11px] font-semibold text-gray-700 mb-0.5">URL (UazAPI)</label>
                             <input type="url" x-model="wa_url" placeholder="https://api.uazapi.dev" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] mb-2">
