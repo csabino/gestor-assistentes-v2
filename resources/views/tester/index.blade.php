@@ -189,7 +189,7 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 flex-1 min-h-0">
                 <!-- COLUNA ESQUERDA: configuração e disparo -->
-                <div class="flex flex-col gap-4 min-h-0">
+                <div class="flex flex-col gap-4 min-h-0 h-full">
                     <!-- Número de teste -->
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 shrink-0">
                         <div class="flex items-center justify-between gap-2 mb-2">
@@ -270,7 +270,7 @@
                 </div>
 
                 <!-- COLUNA DIREITA: histórico de testes -->
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0 h-full">
                     <div class="flex-1 min-h-0 overflow-y-auto">
                         <table class="w-full text-left border-collapse text-sm">
                             <thead class="sticky top-0 z-10">
