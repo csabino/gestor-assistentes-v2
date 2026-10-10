@@ -408,6 +408,16 @@
                             <input type="password" x-model="wa_token" placeholder="Ex: T0K3N..." class="w-full border border-gray-300 rounded-md p-1.5 text-[11px]">
                         </div>
 
+                        @if($harnessAssistant)
+                            <div class="border-t border-gray-100 pt-3">
+                                <label class="block text-[11px] font-semibold text-gray-700 mb-1">URL do Webhook (cola na plataforma da UazAPI)</label>
+                                <div class="flex items-center gap-1.5">
+                                    <input type="text" readonly id="testerWebhookUrl" value="{{ request()->schemeAndHttpHost() }}/webhook/whatsapp/{{ $harnessAssistant->id }}" class="w-full bg-gray-50 border border-gray-300 rounded-md p-1.5 text-[10px] font-mono text-gray-600 outline-none">
+                                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('testerWebhookUrl').value); Alpine.store('toast').show('URL copiada!', 'success');" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-1.5 px-3 rounded-md text-[11px] transition shrink-0">Copiar</button>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="border-t border-gray-100 pt-3">
                             <label class="block text-[11px] font-semibold text-gray-700 mb-1">IA usada pra conduzir os testes</label>
                             <select x-model="ai_provider" class="w-full border border-gray-300 rounded-md p-1.5 text-[11px] bg-white mb-2">
