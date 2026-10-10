@@ -190,7 +190,7 @@
                          (full.report.findings || []).forEach((f, i) => {
                              lines.push((i + 1) + '. [' + (f.severity || '') + '] [' + (f.category || '') + '] ' + (f.scenario_title || ''));
                              lines.push('   Problema: ' + (f.description || ''));
-                             lines.push('   Trecho: "' + (f.evidence_quote || '') + '"');
+                             lines.push('   Trecho: &quot;' + (f.evidence_quote || '') + '&quot;');
                              if (f.suggested_fix) lines.push('   Corrigir em (' + (f.fix_location || '') + '): ' + f.suggested_fix);
                              lines.push('');
                          });
@@ -213,7 +213,7 @@
                      }
                  },
                  async deleteRun(id, name) {
-                     if (!(await confirmModal('Excluir o teste "' + name + '"? Essa ação não pode ser desfeita.'))) return;
+                     if (!(await confirmModal('Excluir o teste &quot;' + name + '&quot;? Essa ação não pode ser desfeita.'))) return;
                      try {
                          const res = await fetch('/?view=tester', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ action: 'delete_test_run', test_run_id: id }) });
                          const data = await res.json();
