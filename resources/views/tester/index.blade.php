@@ -187,9 +187,9 @@
                 </h1>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 flex-1 min-h-0">
+            <div class="flex flex-col lg:flex-row items-stretch gap-6 flex-1 min-h-0">
                 <!-- COLUNA ESQUERDA: configuração e disparo -->
-                <div class="flex flex-col gap-4 min-h-0 h-full">
+                <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-4 min-h-0">
                     <!-- Número de teste -->
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 shrink-0">
                         <div class="flex items-center justify-between gap-2 mb-2">
@@ -201,10 +201,7 @@
                                 </svg>
                             </h2>
                             @if($harnessAssistant)
-                                <div class="flex items-center gap-1.5 shrink-0">
-                                    <a href="/?configure={{ $harnessAssistant->id }}" title="Chave de IA, conexão via Meta e outras configurações avançadas" class="text-gray-500 hover:text-indigo-600 text-[11px] font-semibold px-2 py-1 rounded-md border border-gray-200 hover:border-indigo-300 transition">Configurações</a>
-                                    <button type="button" @click="showConnectionModal = true" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-semibold px-2 py-1 rounded-md border border-indigo-200 hover:border-indigo-300 transition">Conectar</button>
-                                </div>
+                                <button type="button" @click="showConnectionModal = true" class="shrink-0 text-indigo-600 hover:text-indigo-800 text-[11px] font-semibold px-2 py-1 rounded-md border border-indigo-200 hover:border-indigo-300 transition">Conectar</button>
                             @endif
                         </div>
                         @if(!$harnessAssistant)
@@ -270,7 +267,7 @@
                 </div>
 
                 <!-- COLUNA DIREITA: histórico de testes -->
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0 h-full">
+                <div class="flex-1 min-w-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
                     <div class="flex-1 min-h-0 overflow-y-auto">
                         <table class="w-full text-left border-collapse text-sm">
                             <thead class="sticky top-0 z-10">
