@@ -236,7 +236,7 @@
                     </div>
 
                     <!-- Novo teste -->
-                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 shrink-0">
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex-1">
                         <h2 class="text-sm font-bold text-gray-800 mb-3">Novo teste</h2>
                         <form action="/?view=tester" method="POST" @submit="if (!target_label || !target_phone_number || !target_prompt_snapshot) { alertModal('Preencha o nome do agente, o número do WhatsApp (em \'Novo teste\') e o Prompt antes de iniciar o teste.'); $event.preventDefault(); }">
                             @csrf
