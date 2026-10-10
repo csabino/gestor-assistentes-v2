@@ -111,7 +111,7 @@
                          this.waLoading = false;
                      }
                  },
-                 selectTarget() {
+                 async selectTarget() {
                      const t = this.targets.find(x => x.id == this.target_assistant_id);
                      if (!t) return;
                      this.target_label = t.name;
@@ -119,6 +119,16 @@
                      this.target_knowledge_snapshot = (t.knowledge_files || [])
                          .map(f => '## ' + (f.name || 'Documento') + '\n' + (f.content || ''))
                          .join('\n\n');
+                     this.target_phone_number = '';
+                     // Tentativa best-effort de capturar o número já conectado desse assistente, pra
+                     // não precisar digitar na mão - nem toda resposta de provedor traz esse dado.
+                     try {
+                         const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ action: 'status_whatsapp', assistant_id: t.id }) });
+                         const data = await res.json();
+                         if (data.connected && data.number) {
+                             this.target_phone_number = data.number;
+                         }
+                     } catch (e) { /* segue sem o número - usuário pode digitar na mão */ }
                  },
                  async uploadKbFile(event) {
                      const file = event.target.files[0];

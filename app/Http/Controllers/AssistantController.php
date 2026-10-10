@@ -997,6 +997,32 @@ class AssistantController extends Controller
         ]);
     }
 
+    /**
+     * Tentativa best-effort de achar o número de telefone real conectado na resposta de status da
+     * UazAPI - a API só devolve isso quando já está conectada, e o nome exato do campo varia por
+     * provedor/versão (não documentado de forma estável), então checa alguns nomes plausíveis e
+     * aceita não achar nada (retorna null) sem quebrar o resto do status check.
+     */
+    private function extractWaNumber(array $json): ?string
+    {
+        $raw = $json['owner']
+            ?? $json['number']
+            ?? $json['wid']
+            ?? $json['instance']['owner']
+            ?? $json['instance']['number']
+            ?? $json['instance']['wid']
+            ?? $json['instance']['profileName'] ?? null;
+
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        // Formatos comuns: "5511999999999@s.whatsapp.net", "5511999999999@c.us" - fica só com os dígitos.
+        $digits = preg_replace('/[^0-9]/', '', explode('@', $raw)[0]);
+
+        return ($digits && strlen($digits) >= 10) ? $digits : null;
+    }
+
     private function checkWhatsappStatus(Request $request, $isTest = false)
     {
         $assistantId = $request->input('assistant_id');
@@ -1045,6 +1071,7 @@ class AssistantController extends Controller
             ];
 
             $connected = false;
+            $connectedNumber = null;
             $statusParams = $isUazapi ? [] : $params;
 
             foreach ($statusPaths as $path) {
@@ -1066,6 +1093,7 @@ class AssistantController extends Controller
                             (!empty($json['status']['connected']) && $json['status']['connected'] === true)
                         ) {
                             $connected = true;
+                            $connectedNumber = $this->extractWaNumber($json);
                             break;
                         }
 
@@ -1084,6 +1112,7 @@ class AssistantController extends Controller
                             $stateClean = strtolower(trim($state));
                             if (in_array($stateClean, ['open', 'connected', 'conectado', 'connecting_online', 'pair', 'paired', 'working', 'online'])) {
                                 $connected = true;
+                                $connectedNumber = $this->extractWaNumber($json);
                                 break;
                             }
                         }
@@ -1092,7 +1121,7 @@ class AssistantController extends Controller
             }
 
             if ($connected) {
-                return response()->json(['connected' => true, 'success' => true, 'message' => 'WhatsApp conectado!']);
+                return response()->json(['connected' => true, 'success' => true, 'message' => 'WhatsApp conectado!', 'number' => $connectedNumber]);
             }
 
             // O front-end já tem um QR Code na tela e está só perguntando se já conectou.
