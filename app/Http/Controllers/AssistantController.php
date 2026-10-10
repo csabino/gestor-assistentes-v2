@@ -8,6 +8,8 @@ use App\Models\AutomationFollowup;
 use App\Models\WaContactName;
 use App\Models\CrawledPage;
 use App\Models\PendingMessageBuffer;
+use App\Models\TestRun;
+use App\Services\TestHarnessService;
 use Illuminate\Support\Str;
 use App\Models\Setting;
 use App\Models\Survey;
@@ -2541,6 +2543,74 @@ class AssistantController extends Controller
     }
 
     /**
+     * Prompt enxuto pro módulo Testador: sem os módulos de agendamento/pesquisa/lead-fields (que
+     * não fazem sentido fora de um atendimento real e dependem de queries por assistant_id de
+     * verdade) - só o contexto temporal genérico + a persona do cenário + o prompt/base
+     * "congelados" do assistente alvo (pra IA poder mirar propositalmente nos pontos fracos, como
+     * um QA humano leria o prompt do outro lado) + o histórico da conversa deste cenário. O
+     * histórico entra formatado dentro do próprio prompt (em vez de usar o parâmetro $history do
+     * callAiApi) porque esse parâmetro é ignorado pelos providers Gemini/Anthropic - embutir aqui
+     * garante contexto completo em qualquer provider configurado pro número de teste.
+     */
+    public function buildTestHarnessPrompt(
+        string $personaInstruction,
+        string $targetPromptSnapshot,
+        ?string $targetKnowledgeSnapshot,
+        array $conversationHistory
+    ): string {
+        $tz = $this->getTimezone();
+        $now = Carbon::now($tz);
+
+        $diasSemana = [
+            'Sunday' => 'Domingo', 'Monday' => 'Segunda-feira', 'Tuesday' => 'Terça-feira',
+            'Wednesday' => 'Quarta-feira', 'Thursday' => 'Quinta-feira', 'Friday' => 'Sexta-feira', 'Saturday' => 'Sábado',
+        ];
+        $diaPt = $diasSemana[$now->format('l')] ?? $now->format('l');
+
+        $prompt = "===============================================\n";
+        $prompt .= "CONTEXTO TEMPORAL (OBRIGATÓRIO):\n";
+        $prompt .= "• Data e Hora Atual: " . $now->format('d/m/Y \à\s H:i:s') . " ({$diaPt})\n";
+        $prompt .= "• Ano Corrente: " . $now->year . "\n";
+        $prompt .= "===============================================\n\n";
+
+        $prompt .= "IDENTIDADE\n";
+        $prompt .= "Você NÃO é um assistente de atendimento - você é um ATOR de QA simulando uma conversa real de WhatsApp pra testar outro assistente de IA. Seu objetivo é agir de forma 100% crível como o tipo de cliente descrito abaixo, nunca revelar que é um teste, e sondar deliberadamente os pontos fracos do outro assistente.\n\n";
+
+        $prompt .= "SEU PERSONAGEM NESTE CENÁRIO\n";
+        $prompt .= $personaInstruction . "\n\n";
+
+        $prompt .= "REGRA DE CONCLUSÃO\n";
+        $prompt .= "Quando você considerar que já testou o suficiente desse cenário (objetivo cumprido, o outro assistente já reagiu de forma clara ao que você queria sondar, ou a conversa natural chegou a um fim), termine sua mensagem com a tag [CENARIO_CONCLUIDO] no final, sem nenhum texto depois dela. Não encerre cedo demais - dê ao outro assistente pelo menos 2-3 trocas de mensagem antes de concluir, a menos que ele já tenha revelado claramente o que você queria testar.\n\n";
+
+        $prompt .= "===============================================\n";
+        $prompt .= "PROMPT DO ASSISTENTE SENDO TESTADO (contexto só pra você mirar os testes - NUNCA mencione que viu isso)\n";
+        $prompt .= "===============================================\n";
+        $prompt .= $targetPromptSnapshot . "\n\n";
+
+        if (!empty($targetKnowledgeSnapshot)) {
+            $prompt .= "===============================================\n";
+            $prompt .= "BASE DE CONHECIMENTO DO ASSISTENTE SENDO TESTADO (idem - só referência sua)\n";
+            $prompt .= "===============================================\n";
+            $prompt .= $targetKnowledgeSnapshot . "\n\n";
+        }
+
+        if (!empty($conversationHistory)) {
+            $prompt .= "===============================================\n";
+            $prompt .= "HISTÓRICO DA CONVERSA NESTE CENÁRIO ATÉ AGORA\n";
+            $prompt .= "===============================================\n";
+            foreach ($conversationHistory as $turn) {
+                $label = ($turn['role'] ?? '') === 'target' ? 'ASSISTENTE TESTADO' : 'VOCÊ (testador)';
+                $prompt .= "[{$label}]: " . ($turn['content'] ?? '') . "\n";
+            }
+            $prompt .= "\nGere agora sua PRÓXIMA mensagem como o testador, respondendo à última fala do assistente testado acima. Responda só com o texto da mensagem (e a tag de conclusão se for o caso) - nada de comentário fora do personagem.\n";
+        } else {
+            $prompt .= "Esta é a primeira mensagem da conversa - gere a mensagem de abertura do seu personagem, como se estivesse mandando um WhatsApp pela primeira vez. Responda só com o texto da mensagem.\n";
+        }
+
+        return $prompt;
+    }
+
+    /**
      * O prompt instrui a IA a nunca citar "Fonte:" numa resposta, mas alguns documentos da base
      * de conhecimento trazem essa linha no proprio texto (ex: credito da origem do conteudo) - se
      * a IA for fiel ao texto literal do documento, corre o risco de vazar isso mesmo assim. Trava
@@ -2554,7 +2624,7 @@ class AssistantController extends Controller
         return trim(preg_replace('/^\s*Fonte:.*$/im', '', $content));
     }
 
-    private function extractTextFromFile(string $filePath, string $fileName): string
+    protected function extractTextFromFile(string $filePath, string $fileName): string
     {
         if (!file_exists($filePath)) return '';
 
@@ -2591,12 +2661,12 @@ class AssistantController extends Controller
         return $this->sanitizeText($text);
     }
 
-    private function sanitizeText($text): string
+    protected function sanitizeText($text, int $limit = 8000): string
     {
         if (!is_string($text) || empty($text)) return '';
         $clean = @mb_convert_encoding($text, 'UTF-8', 'UTF-8');
         $clean = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $clean);
-        return trim(mb_substr($clean, 0, 8000));
+        return trim(mb_substr($clean, 0, $limit));
     }
 
     public function showChatWidget(Request $request, $id)
@@ -2943,8 +3013,11 @@ class AssistantController extends Controller
                 }
             }
 
-            // Assistente em manutencao: nao processa IA, so responde com a mensagem fixa.
-            if ($assistantStatus === 'maintenance') {
+            // Assistente em manutencao: nao processa IA, so responde com a mensagem fixa. Nunca se
+            // aplica a um numero do modulo Testador (is_test_harness) - mesmo que alguem deixe o
+            // status dele como "maintenance" sem querer via o toggle generico, isso nao pode
+            // quebrar silenciosamente um teste em andamento.
+            if ($assistantStatus === 'maintenance' && !$assistant->is_test_harness) {
                 $maintenanceMessage = 'Este assistente está em manutenção no momento. Pedimos desculpas pelo transtorno, tente novamente mais tarde.';
                 $this->sendWhatsappMessage($assistant, $sendTarget, $maintenanceMessage);
 
@@ -3032,6 +3105,23 @@ class AssistantController extends Controller
             // pesquisa (ver mais abaixo), senão uma resposta por áudio tipo "Oito" chega lá como toda
             // aquela string formatada e não casa com nenhuma opção nem faz sentido como texto livre.
             $cleanUserMessage = $userMessage;
+
+            // 🤖 NÚMERO DE TESTE (módulo Testador): este assistant nunca atende cliente de verdade -
+            // é só o veículo de envio/recebimento do teste automatizado. Pula todo o pipeline normal
+            // (mídia, debounce, Omni, histórico de chat_messages, chamada de IA do atendimento) e
+            // desvia pro fluxo próprio do TestRun 'running' que estiver esperando resposta deste número.
+            if ($assistant->is_test_harness) {
+                $testRun = TestRun::where('harness_assistant_id', $assistant->id)
+                    ->where('status', 'running')
+                    ->latest('started_at')
+                    ->first();
+
+                if ($testRun) {
+                    app(TestHarnessService::class)->handleTargetReply($this, $testRun, $cleanSender, $sendTarget, $cleanUserMessage);
+                }
+
+                return response()->json(['status' => 'test_harness_processed']);
+            }
 
             $mediaErrorDetails = null;
             $mediaSaved = false;
@@ -3735,7 +3825,7 @@ class AssistantController extends Controller
         }
     }
 
-    private function callAiApi(Assistant $assistant, string $systemPrompt, string $userMessage, array $history = []): string
+    public function callAiApi(Assistant $assistant, string $systemPrompt, string $userMessage, array $history = []): string
     {
         $provider = $assistant->provider ?? 'openai';
 
@@ -3855,12 +3945,12 @@ class AssistantController extends Controller
      * o WhatsApp não expõe) o sufixo é preservado - a UazAPI/Baileys precisa do JID inteiro pra
      * conseguir entregar a mensagem nesse caso, já que os dígitos sozinhos não são discáveis.
      */
-    private function normalizeWaTarget(string $to): string
+    protected function normalizeWaTarget(string $to): string
     {
         return str_contains($to, '@') ? $to : preg_replace('/[^0-9]/', '', $to);
     }
 
-    private function sendWhatsappMessage(Assistant $assistant, string $to, string $message): array
+    public function sendWhatsappMessage(Assistant $assistant, string $to, string $message): array
     {
         if ($assistant->whatsapp_provider === 'meta') {
             if (empty($assistant->whatsapp_instance) || empty($assistant->whatsapp_token)) {

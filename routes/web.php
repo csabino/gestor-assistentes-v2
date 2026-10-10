@@ -13,6 +13,7 @@ use App\Http\Controllers\EnvironmentController;
 use App\Http\Controllers\ThemeController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\AutomationController;
+use App\Http\Controllers\TesterController;
 
 // Webhook do WhatsApp: chamado pelo provedor externo (Evolution/UazAPI), sem sessão de navegador.
 // A UazAPI (uazapiGO) acrescenta um sufixo com o tipo de evento na URL configurada
@@ -39,6 +40,19 @@ Route::get('/cron/automation-followups/{secret}', function (string $secret) {
     }
     app(AssistantController::class)->processFollowupAutomations();
     return response()->json(['status' => 'ok']);
+})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
+// Watchdog do módulo Testador: mesmo padrão da rota acima (serviço externo de cron, protegida por
+// segredo na URL) - marca como erro um teste que ficou "running" sem resposta do alvo por tempo
+// demais, já que este app não tem fila/worker capaz de notar isso sozinho. Configure
+// TEST_HARNESS_CRON_SECRET no .env e aponte um serviço de cron externo pra esta URL.
+Route::get('/cron/test-runs-watchdog/{secret}', function (string $secret) {
+    $expected = env('TEST_HARNESS_CRON_SECRET', '');
+    if (empty($expected) || !hash_equals($expected, $secret)) {
+        abort(404);
+    }
+    $swept = app(\App\Services\TestHarnessService::class)->sweepStaleRuns();
+    return response()->json(['status' => 'ok', 'swept' => $swept]);
 })->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 // Encaminhamento para o sistema Omni: endpoint público chamado por integração externa.
@@ -73,6 +87,7 @@ Route::middleware('auth')->group(function () {
         if ($request->input('view') === 'settings') return app(SettingController::class)->handle($request);
         if ($request->input('view') === 'surveys') return app(SurveyController::class)->handle($request);
         if ($request->input('view') === 'automation') return app(AutomationController::class)->handle($request);
+        if ($request->input('view') === 'tester') return app(TesterController::class)->handle($request);
 
         return app(AssistantController::class)->index($request);
     });

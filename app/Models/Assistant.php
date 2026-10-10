@@ -10,12 +10,13 @@ class Assistant extends Model
         'name', 'company_name', 'provider', 'model', 'system_prompt',
         'openai_api_key', 'gemini_api_key', 'anthropic_api_key', 'grok_api_key',
         'whatsapp_provider', 'whatsapp_url', 'whatsapp_instance', 'whatsapp_waba_id', 'whatsapp_pin', 'whatsapp_token', 'whatsapp_verify_token',
-        'knowledge_files', 'is_active', 'status'
+        'knowledge_files', 'is_active', 'status', 'is_test_harness'
     ];
 
     protected $casts = [
         'knowledge_files' => 'array',
         'is_active' => 'boolean',
+        'is_test_harness' => 'boolean',
     ];
 
     public function departments()
