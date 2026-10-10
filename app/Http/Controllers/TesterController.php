@@ -7,6 +7,7 @@ use App\Models\TestRun;
 use App\Services\TestHarnessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 /**
  * Módulo Testador: QA automatizado via WhatsApp real, desacoplado de qualquer assistente
@@ -26,6 +27,7 @@ class TesterController extends AssistantController
             if ($action === 'upload_test_kb_file') return $this->uploadTestKbFile($request);
             if ($action === 'store_test_harness_assistant') return $this->storeTestHarnessAssistant($request);
             if ($action === 'save_harness_connection') return $this->saveHarnessConnection($request);
+            if ($action === 'delete_test_run') return $this->deleteTestRun($request);
         }
 
         if ($request->isMethod('get') && $request->input('action') === 'get_test_run_detail') {
@@ -125,7 +127,11 @@ class TesterController extends AssistantController
             return redirect('/?view=tester')->with('error', 'Já existe um teste em andamento - aguarde ele terminar (ou pare manualmente) antes de iniciar outro.');
         }
 
-        $name = $request->input('target_label') . '_' . now()->format('Ymd') . '_' . now()->format('H\hi');
+        // now() usa o timezone padrão da aplicação (UTC) - o resto do sistema sempre usa
+        // America/Sao_Paulo como padrão (ver AssistantController::getTimezone()), então o nome
+        // do teste precisa do mesmo fuso, senão o horário cravado no nome fica 3h adiantado.
+        $nowLocal = Carbon::now('America/Sao_Paulo');
+        $name = $request->input('target_label') . '_' . $nowLocal->format('Ymd') . '_' . $nowLocal->format('H\hi');
 
         $testRun = TestRun::create([
             'name' => $name,
@@ -141,6 +147,14 @@ class TesterController extends AssistantController
         app(TestHarnessService::class)->launchRun($this, $testRun);
 
         return redirect('/?view=tester')->with('success', 'Teste "' . $name . '" iniciado!')->with('new_test_run_id', $testRun->id);
+    }
+
+    private function deleteTestRun(Request $request)
+    {
+        $testRun = TestRun::findOrFail($request->input('test_run_id'));
+        $testRun->delete();
+
+        return response()->json(['success' => true]);
     }
 
     private function stopTestRun(Request $request)

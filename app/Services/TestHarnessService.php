@@ -19,8 +19,8 @@ use Illuminate\Support\Facades\Log;
  */
 class TestHarnessService
 {
-    private const MAX_SCENARIOS = 8;
-    private const MAX_TURNS_PER_SCENARIO = 12;
+    private const MAX_SCENARIOS = 20;
+    private const MAX_TURNS_PER_SCENARIO = 15;
     private const STALE_RUN_MINUTES = 30;
 
     /**
@@ -246,7 +246,15 @@ class TestHarnessService
 
     private function buildReportPrompt(TestRun $testRun): string
     {
-        $prompt = "Você é o maior especialista em QA de assistentes de IA conversacionais do mundo. Abaixo está o plano de cenários de um teste e o transcript completo das conversas reais que aconteceram. Analise tudo e produza um relatório de achados.\n\n";
+        $prompt = "Você é o maior especialista em QA de assistentes de IA conversacionais do mundo, contratado pra fazer uma auditoria profunda e acionável - não um resumo superficial. Abaixo está o prompt+base de conhecimento do assistente testado, o plano de cenários e o transcript completo das conversas reais que aconteceram. Analise tudo e produza um relatório rico, específico e acionável.\n\n";
+
+        $prompt .= "===============================================\nPROMPT DO ASSISTENTE TESTADO\n===============================================\n";
+        $prompt .= $testRun->target_prompt_snapshot . "\n\n";
+        if (!empty($testRun->target_knowledge_snapshot)) {
+            $prompt .= "===============================================\nBASE DE CONHECIMENTO DO ASSISTENTE TESTADO\n===============================================\n";
+            $prompt .= $testRun->target_knowledge_snapshot . "\n\n";
+        }
+
         $prompt .= "===============================================\nPLANO DE CENÁRIOS\n===============================================\n";
         $prompt .= json_encode($testRun->scenarios, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
 
@@ -261,9 +269,15 @@ class TestHarnessService
             $prompt .= "[{$scenarioTitle}] [{$label}]: " . ($turn['content'] ?? '') . "\n";
         }
 
-        $prompt .= "\nResponda SOMENTE com um JSON válido, sem markdown, sem texto fora do JSON, neste formato exato:\n";
-        $prompt .= '{"summary": "resumo geral de 2-4 frases", "findings": [{"category": "aderencia_regras|alucinacao|tom|prompt_injection|casos_de_borda_encerramento|lacuna_base_conhecimento|outros", "severity": "critico|alto|medio|baixo", "scenario_title": "...", "description": "descrição clara do problema encontrado", "evidence_quote": "trecho exato da conversa que comprova o achado"}]}';
-        $prompt .= "\nSe um cenário não revelou nenhum problema, não crie um achado falso pra ele - só inclua achados reais.";
+        $prompt .= "\nPra CADA achado real que você encontrar, seja específico e acionável - não descreva só o sintoma, diga exatamente ONDE e O QUE mudar:\n";
+        $prompt .= "- fix_location = 'prompt': o problema é de instrução/regra/comportamento - explique qual trecho do prompt está causando isso e sugira a mudança concreta de texto.\n";
+        $prompt .= "- fix_location = 'base_de_conhecimento': o assistente não tinha a informação, inventou algo, ou a base está incompleta/desatualizada/mal organizada - diga exatamente que conteúdo falta ou precisa ser adicionado/corrigido na base.\n";
+        $prompt .= "- fix_location = 'bug_de_sistema': NÃO é um problema de conteúdo (prompt/base) - é um problema técnico do próprio fluxo da aplicação (ex: resposta vazia, mensagem cortada no meio, resposta duplicada, erro bruto de API aparecendo pro cliente, tag técnica tipo [MENU_PRINCIPAL] vazando sem ser processada, formatação quebrada). Descreva o sintoma técnico com precisão pra virar um bug report de verdade.\n";
+        $prompt .= "- fix_location = 'nao_aplicavel': observação importante que não se encaixa nas anteriores.\n\n";
+
+        $prompt .= "Responda SOMENTE com um JSON válido, sem markdown, sem texto fora do JSON, neste formato exato:\n";
+        $prompt .= '{"summary": "resumo geral de 3-5 frases cobrindo os pontos mais importantes", "findings": [{"category": "aderencia_regras|alucinacao|tom|prompt_injection|casos_de_borda_encerramento|lacuna_base_conhecimento|outros", "severity": "critico|alto|medio|baixo", "scenario_title": "...", "description": "descrição clara e detalhada do problema encontrado e por que isso importa na prática", "evidence_quote": "trecho exato da conversa que comprova o achado", "fix_location": "prompt|base_de_conhecimento|bug_de_sistema|nao_aplicavel", "suggested_fix": "o que fazer concretamente pra resolver - texto específico a adicionar/mudar, não genérico"}]}';
+        $prompt .= "\nSe um cenário não revelou nenhum problema, não crie um achado falso pra ele - só inclua achados reais, mas seja minucioso: um teste bem conduzido costuma revelar pelo menos alguns achados médios/baixos mesmo quando não há nada crítico.";
 
         return $prompt;
     }

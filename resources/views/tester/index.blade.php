@@ -143,10 +143,17 @@
                      }
                  },
                  pollTimer: null,
+                 scrollDetailToBottom() {
+                     this.$nextTick(() => {
+                         const el = this.$refs.detailScrollArea;
+                         if (el) el.scrollTop = el.scrollHeight;
+                     });
+                 },
                  async openRun(id) {
                      const res = await fetch('/?view=tester&action=get_test_run_detail&test_run_id=' + id);
                      this.modalData = await res.json();
                      this.showModal = true;
+                     this.scrollDetailToBottom();
                      this.maybePoll();
                  },
                  maybePoll() {
@@ -155,6 +162,7 @@
                          this.pollTimer = setTimeout(async () => {
                              const res = await fetch('/?view=tester&action=get_test_run_detail&test_run_id=' + this.modalData.id);
                              this.modalData = await res.json();
+                             this.scrollDetailToBottom();
                              this.maybePoll();
                          }, 5000);
                      }
@@ -162,6 +170,61 @@
                  closeDetailModal() {
                      this.showModal = false;
                      if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
+                 },
+                 async copyRunToClipboard(run) {
+                     let full = run;
+                     if (!run.transcript && run.id) {
+                         const res = await fetch('/?view=tester&action=get_test_run_detail&test_run_id=' + run.id);
+                         full = await res.json();
+                     }
+                     const lines = [];
+                     lines.push('TESTE: ' + full.name);
+                     lines.push('ALVO: ' + full.target_label + ' (' + full.target_phone_number + ')');
+                     lines.push('STATUS: ' + full.status);
+                     lines.push('');
+                     if (full.report) {
+                         lines.push('=== RESUMO ===');
+                         lines.push(full.report.summary || '');
+                         lines.push('');
+                         lines.push('=== ACHADOS ===');
+                         (full.report.findings || []).forEach((f, i) => {
+                             lines.push((i + 1) + '. [' + (f.severity || '') + '] [' + (f.category || '') + '] ' + (f.scenario_title || ''));
+                             lines.push('   Problema: ' + (f.description || ''));
+                             lines.push('   Trecho: "' + (f.evidence_quote || '') + '"');
+                             if (f.suggested_fix) lines.push('   Corrigir em (' + (f.fix_location || '') + '): ' + f.suggested_fix);
+                             lines.push('');
+                         });
+                     }
+                     lines.push('=== CENÁRIOS E CONVERSAS ===');
+                     (full.scenarios || []).forEach((s, i) => {
+                         lines.push('Cenário ' + (i + 1) + ': ' + s.title + ' (' + s.category + ')');
+                         lines.push('Objetivo: ' + s.objective);
+                         (full.transcript || []).filter(t => Number(t.scenario_index) === i).forEach(t => {
+                             const label = t.role === 'tester' ? 'TESTADOR' : (t.role === 'target' ? 'ASSISTENTE TESTADO' : 'SISTEMA');
+                             lines.push('[' + label + '] ' + t.content);
+                         });
+                         lines.push('');
+                     });
+                     try {
+                         await navigator.clipboard.writeText(lines.join('\n'));
+                         Alpine.store('toast').show('Resultado copiado!', 'success');
+                     } catch (e) {
+                         Alpine.store('toast').show('Não foi possível copiar.', 'error');
+                     }
+                 },
+                 async deleteRun(id, name) {
+                     if (!(await confirmModal('Excluir o teste "' + name + '"? Essa ação não pode ser desfeita.'))) return;
+                     try {
+                         const res = await fetch('/?view=tester', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ action: 'delete_test_run', test_run_id: id }) });
+                         const data = await res.json();
+                         if (data.success) {
+                             window.location.reload();
+                         } else {
+                             Alpine.store('toast').show(data.message || 'Não foi possível excluir.', 'error');
+                         }
+                     } catch (e) {
+                         Alpine.store('toast').show('Erro de conexão.', 'error');
+                     }
                  },
                  scenarioGroups() {
                      if (!this.modalData.scenarios) return [];
@@ -260,7 +323,7 @@
 
                             <div class="flex items-center gap-3 mt-3">
                                 <button type="submit" class="w-1/3 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition">Iniciar Teste</button>
-                                <p class="text-[10px] text-gray-400 leading-tight">Até 8 cenários (positivos e negativos) de até 12 mensagens cada, conversando de verdade pelo WhatsApp - pode levar um bom tempo. Acompanhe pelo grid ao lado.</p>
+                                <p class="text-[10px] text-gray-400 leading-tight">Até 20 cenários (positivos e negativos) de até 15 mensagens cada, conversando de verdade pelo WhatsApp - pode levar bastante tempo. Acompanhe pelo grid ao lado.</p>
                             </div>
                         </form>
                     </div>
@@ -276,14 +339,15 @@
                                     <th class="py-3 px-4 font-semibold">Alvo</th>
                                     <th class="py-3 px-4 font-semibold">Status</th>
                                     <th class="py-3 px-4 font-semibold">Data</th>
+                                    <th class="py-3 px-4 font-semibold text-right">Ações</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
                                 @forelse($testRuns as $run)
-                                    <tr @click="openRun({{ $run->id }})" class="hover:bg-gray-50 cursor-pointer transition">
-                                        <td class="py-2.5 px-4 font-bold text-gray-800">{{ $run->name }}</td>
-                                        <td class="py-2.5 px-4 text-gray-600">{{ $run->target_label }}</td>
-                                        <td class="py-2.5 px-4">
+                                    <tr class="hover:bg-gray-50 transition group">
+                                        <td @click="openRun({{ $run->id }})" class="py-2.5 px-4 font-bold text-gray-800 cursor-pointer">{{ $run->name }}</td>
+                                        <td @click="openRun({{ $run->id }})" class="py-2.5 px-4 text-gray-600 cursor-pointer">{{ $run->target_label }}</td>
+                                        <td @click="openRun({{ $run->id }})" class="py-2.5 px-4 cursor-pointer">
                                             <span @class([
                                                 'px-2 py-0.5 rounded-full text-[10px] font-bold',
                                                 'bg-amber-50 text-amber-700 border border-amber-200' => in_array($run->status, ['draft', 'running']),
@@ -291,10 +355,20 @@
                                                 'bg-red-50 text-red-700 border border-red-200' => in_array($run->status, ['error', 'stopped']),
                                             ])>{{ $run->status }}</span>
                                         </td>
-                                        <td class="py-2.5 px-4 text-gray-500">{{ $run->created_at->format('d/m/Y H:i') }}</td>
+                                        <td @click="openRun({{ $run->id }})" class="py-2.5 px-4 text-gray-500 cursor-pointer">{{ $run->created_at->format('d/m/Y H:i') }}</td>
+                                        <td class="py-2.5 px-4 text-right">
+                                            <div class="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition">
+                                                <button type="button" @click.stop="copyRunToClipboard({ id: {{ $run->id }} })" title="Copiar resultado completo" class="text-gray-400 hover:text-indigo-600 p-1 rounded transition">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 011.927-.184" /></svg>
+                                                </button>
+                                                <button type="button" @click.stop="deleteRun({{ $run->id }}, @js($run->name))" title="Excluir teste" class="text-gray-400 hover:text-red-600 p-1 rounded transition">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="text-center py-8 text-gray-400 text-xs">Nenhum teste rodado ainda.</td></tr>
+                                    <tr><td colspan="5" class="text-center py-8 text-gray-400 text-xs">Nenhum teste rodado ainda.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -523,11 +597,14 @@
                             <span x-show="modalData.status === 'completed'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Concluído</span>
                             <span x-show="modalData.status === 'error' || modalData.status === 'stopped'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200" x-text="modalData.status"></span>
                         </h3>
-                        <button type="button" @click="closeDetailModal()" class="text-gray-400 hover:text-gray-600">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" @click="copyRunToClipboard(modalData)" class="text-gray-500 hover:text-indigo-600 text-[11px] font-semibold px-2 py-1 rounded-md border border-gray-200 hover:border-indigo-300 transition">Copiar resultado</button>
+                            <button type="button" @click="closeDetailModal()" class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
                     </div>
-                    <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5">
+                    <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-5" x-ref="detailScrollArea">
                         <template x-if="modalData.report">
                             <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
                                 <p class="text-xs font-bold text-gray-700 mb-1">Resumo</p>
@@ -547,6 +624,12 @@
                                         </div>
                                         <p class="text-xs text-gray-700" x-text="f.description"></p>
                                         <p class="text-[11px] text-gray-400 italic mt-0.5" x-text="'&quot;' + f.evidence_quote + '&quot;'"></p>
+                                        <template x-if="f.suggested_fix">
+                                            <div class="mt-1 bg-white border border-gray-200 rounded-md px-2 py-1.5">
+                                                <span class="text-[9px] font-bold uppercase tracking-wide text-indigo-600" x-text="'Corrigir em: ' + (f.fix_location || '').replaceAll('_', ' ')"></span>
+                                                <p class="text-[11px] text-gray-600 mt-0.5" x-text="f.suggested_fix"></p>
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
                             </div>
