@@ -19,7 +19,7 @@
                  modalData: {},
                  showConnectionModal: false,
                  showWaModal: false,
-                 wa_provider: @js($harnessAssistant->whatsapp_provider ?? ''),
+                 wa_provider: 'uazapi',
                  wa_url: @js($harnessAssistant->whatsapp_url ?? ''),
                  wa_instance: @js($harnessAssistant->whatsapp_instance ?? ''),
                  wa_token: @js($harnessAssistant->whatsapp_token ?? ''),
