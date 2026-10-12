@@ -209,8 +209,10 @@
                      (full.scenarios || []).forEach((s, i) => {
                          lines.push('Cenário ' + (i + 1) + ': ' + s.title + ' (' + s.category + ')');
                          lines.push('Objetivo: ' + s.objective);
+                         const testerLabel = s.persona_name || 'TESTADOR';
+                         const targetLabel = full.target_label || 'ASSISTENTE TESTADO';
                          (full.transcript || []).filter(t => Number(t.scenario_index) === i).forEach(t => {
-                             const label = t.role === 'tester' ? 'TESTADOR' : (t.role === 'target' ? 'ASSISTENTE TESTADO' : 'SISTEMA');
+                             const label = t.role === 'tester' ? testerLabel : (t.role === 'target' ? targetLabel : 'SISTEMA');
                              lines.push('[' + label + '] ' + t.content);
                          });
                          lines.push('');
@@ -663,8 +665,9 @@
                                 <div class="space-y-1.5">
                                     <template x-for="(msg, mIdx) in scenario.messages" :key="mIdx">
                                         <p class="text-[11px]"
-                                           :class="msg.role === 'tester' ? 'text-right text-indigo-700' : (msg.role === 'target' ? 'text-left text-gray-700' : 'text-center text-gray-400 italic')"
-                                           x-text="msg.content"></p>
+                                           :class="msg.role === 'tester' ? 'text-right text-indigo-700' : (msg.role === 'target' ? 'text-left text-gray-700' : 'text-center text-gray-400 italic')">
+                                            <span class="font-semibold" x-show="msg.role !== 'system'" x-text="(msg.role === 'tester' ? (scenario.persona_name || 'Testador') : (modalData.target_label || 'Assistente')) + ': '"></span><span x-text="msg.content"></span>
+                                        </p>
                                     </template>
                                 </div>
                             </div>

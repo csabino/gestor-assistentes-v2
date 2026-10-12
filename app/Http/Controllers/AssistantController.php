@@ -2609,7 +2609,7 @@ class AssistantController extends Controller
         $prompt .= $personaInstruction . "\n\n";
 
         $prompt .= "REGRA DE CONCLUSÃO\n";
-        $prompt .= "Quando você considerar que já testou o suficiente desse cenário (objetivo cumprido, o outro assistente já reagiu de forma clara ao que você queria sondar, ou a conversa natural chegou a um fim), termine sua mensagem com a tag [CENARIO_CONCLUIDO] no final, sem nenhum texto depois dela. Não encerre cedo demais - dê ao outro assistente pelo menos 2-3 trocas de mensagem antes de concluir, a menos que ele já tenha revelado claramente o que você queria testar.\n\n";
+        $prompt .= "Quando você considerar que já testou o suficiente desse cenário E já tiver cumprido a PROFUNDIDADE MÍNIMA OBRIGATÓRIA definida na seção \"SEU PERSONAGEM NESTE CENÁRIO\" acima, termine sua mensagem com a tag [CENARIO_CONCLUIDO] no final, sem nenhum texto depois dela. Essa profundidade mínima é uma regra dura, não uma sugestão - mesmo que o outro assistente já tenha reagido de forma clara ao que você queria sondar, você NÃO pode usar a tag antes de atingir o mínimo de trocas exigido; continue a conversa de forma realista (peça mais detalhes, mude de ângulo, insista, avance um passo lógico) até lá.\n\n";
 
         $prompt .= "===============================================\n";
         $prompt .= "PROMPT DO ASSISTENTE SENDO TESTADO (contexto só pra você mirar os testes - NUNCA mencione que viu isso)\n";
