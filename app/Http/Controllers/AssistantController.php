@@ -3128,8 +3128,20 @@ class AssistantController extends Controller
 
             // Resposta de lista interativa (ListResponseMessage): a UazAPI manda o item escolhido
             // dentro de content.title (ex: "Agendar uma Reunião"), não em content.text/body.
+            // Já a ENTREGA de uma lista/menu em si (ex: sendWhatsappInteractiveMenu mandando o menu
+            // principal pro número do Testador) chega como content.listMessage/.buttonsMessage, sem
+            // nenhuma das chaves acima - sem o fallback flattenListOrButtonsMessage() a mensagem
+            // chega vazia mesmo quando o menu foi enviado de verdade.
             $userMessage = is_array($rawMessage)
-                ? ($rawMessage['text'] ?? $rawMessage['body'] ?? $rawMessage['title'] ?? '')
+                ? (
+                    $rawMessage['text']
+                    ?? $rawMessage['body']
+                    ?? $rawMessage['title']
+                    ?? $rawMessage['conversation']
+                    ?? ($rawMessage['extendedTextMessage']['text'] ?? null)
+                    ?? $this->flattenListOrButtonsMessage($rawMessage)
+                    ?? ''
+                )
                 : (string)$rawMessage;
 
             // Guarda o texto "limpo" (sem o embrulho "Mensagem de Voz: ... 🔊 Link do Áudio: ...",
@@ -3149,6 +3161,20 @@ class AssistantController extends Controller
                     ->first();
 
                 if ($testRun) {
+                    // Diagnóstico: se mesmo com flattenListOrButtonsMessage() a mensagem chegar vazia,
+                    // grava o payload bruto pra conseguirmos confirmar o formato real da UazAPI nesse
+                    // caso específico (entrega de lista/menu pro número de teste) e corrigir de vez.
+                    if (trim($cleanUserMessage) === '') {
+                        DB::table('webhook_logs')->insert([
+                            'assistant_id' => $assistant->id,
+                            'sender' => substr((string) $sender, 0, 255),
+                            'user_message' => '[Testador: mensagem vazia após extração - ver raw_snippet]',
+                            'raw_snippet' => substr(json_encode($request->all(), JSON_UNESCAPED_UNICODE), 0, 60000),
+                            'timestamp' => now()->toDateTimeString(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
                     app(TestHarnessService::class)->handleTargetReply($this, $testRun, $cleanSender, $sendTarget, $cleanUserMessage);
                 }
 
@@ -4284,6 +4310,39 @@ class AssistantController extends Controller
             Log::error('Exceção ao deletar template na Meta: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Erro ao deletar template: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Resume em texto legível uma lista/menu interativo do WhatsApp (listMessage) ou mensagem de
+     * botões (buttonsMessage) recebida via webhook - usado quando QUEM RECEBE a entrega dessa
+     * mensagem (não quem responde a ela) é outro número monitorado pelo sistema, como o número de
+     * teste do módulo Testador, que precisa "ler" o menu como texto pra decidir o que responder.
+     */
+    private function flattenListOrButtonsMessage(array $content): ?string
+    {
+        $node = $content['listMessage'] ?? $content['buttonsMessage'] ?? null;
+        if (!is_array($node)) {
+            return null;
+        }
+
+        $parts = [];
+        if (!empty($node['title'])) $parts[] = $node['title'];
+        if (!empty($node['contentText'])) $parts[] = $node['contentText'];
+        if (!empty($node['description'])) $parts[] = $node['description'];
+        foreach (($node['sections'] ?? []) as $section) {
+            foreach (($section['rows'] ?? []) as $row) {
+                if (!empty($row['title'])) {
+                    $parts[] = '• ' . $row['title'] . (!empty($row['description']) ? ' - ' . $row['description'] : '');
+                }
+            }
+        }
+        foreach (($node['buttons'] ?? []) as $button) {
+            if (!empty($button['buttonText']['displayText'])) {
+                $parts[] = '• ' . $button['buttonText']['displayText'];
+            }
+        }
+
+        return !empty($parts) ? implode("\n", $parts) : null;
     }
 
     /**

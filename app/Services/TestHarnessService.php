@@ -24,6 +24,21 @@ class TestHarnessService
     private const STALE_RUN_MINUTES = 30;
 
     /**
+     * Sentinel guardado em current_scenario_turn (coluna unsignedSmallInteger, não aceita -1)
+     * enquanto o teste está entre cenários: já mandou o pedido de encerramento pro alvo e está
+     * esperando a resposta dele antes de abrir o próximo cenário - ver handleClosingAck().
+     */
+    private const CLOSING_SENTINEL_TURN = 9999;
+
+    /**
+     * Mensagem mecânica (não gerada por IA) mandada ao concluir um cenário, pedindo pro assistente
+     * alvo encerrar o atendimento antes do próximo cenário abrir. Sem isso, o alvo trata todos os
+     * cenários como uma única conversa contínua (mesmo par de números o tempo todo) e mistura
+     * contexto/nome de um cenário com o seguinte.
+     */
+    private const SCENARIO_CLOSING_MESSAGE = 'Perfeito, muito obrigado pela ajuda! Pode encerrar esse atendimento por aqui, não preciso de mais nada por agora. 🙏';
+
+    /**
      * Fase A (planejamento) + Fase B (abre o cenário 0). Chamado uma vez, de dentro do POST que
      * inicia o teste (TesterController::startTestRun).
      */
@@ -55,6 +70,11 @@ class TestHarnessService
     public function handleTargetReply(AssistantController $ctrl, TestRun $testRun, string $cleanSender, string $sendTarget, string $replyText): void
     {
         if ($testRun->status !== 'running') {
+            return;
+        }
+
+        if ((int) $testRun->current_scenario_turn === self::CLOSING_SENTINEL_TURN) {
+            $this->handleClosingAck($ctrl, $testRun, $replyText);
             return;
         }
 
@@ -91,18 +111,17 @@ class TestHarnessService
                 $transcript[] = ['scenario_index' => $scenarioIndex, 'role' => 'tester', 'content' => $finalText, 'at' => now()->toIso8601String()];
             }
             $transcript[] = ['scenario_index' => $scenarioIndex, 'role' => 'system', 'content' => "Cenário concluído ({$reason}).", 'at' => now()->toIso8601String()];
-            $testRun->transcript = $transcript;
 
-            $nextIndex = $scenarioIndex + 1;
-            if ($nextIndex < count($testRun->scenarios)) {
-                $testRun->current_scenario_index = $nextIndex;
-                $testRun->current_scenario_turn = 0;
-                $testRun->save();
-                $this->sendScenarioOpening($ctrl, $testRun, $nextIndex);
-            } else {
-                $testRun->save();
-                $this->finishRun($ctrl, $testRun);
-            }
+            // Pede pro alvo encerrar o atendimento antes de abrir o próximo cenário - senão ele
+            // trata a conversa inteira como contínua (mesmo par de números em todos os cenários) e
+            // mistura nome/contexto de um cenário com o seguinte. Avança só depois da resposta
+            // dele, em handleClosingAck().
+            $ctrl->sendWhatsappMessage($testRun->harnessAssistant, $sendTarget, self::SCENARIO_CLOSING_MESSAGE);
+            $transcript[] = ['scenario_index' => $scenarioIndex, 'role' => 'tester', 'content' => self::SCENARIO_CLOSING_MESSAGE, 'at' => now()->toIso8601String()];
+            $testRun->transcript = $transcript;
+            $testRun->current_scenario_turn = self::CLOSING_SENTINEL_TURN;
+            $testRun->last_message_sent_at = now();
+            $testRun->save();
             return;
         }
 
@@ -112,6 +131,30 @@ class TestHarnessService
         $testRun->current_scenario_turn = $nextTurn;
         $testRun->last_message_sent_at = now();
         $testRun->save();
+    }
+
+    /**
+     * Resposta do alvo ao pedido de encerramento (ver SCENARIO_CLOSING_MESSAGE) - loga a resposta
+     * no cenário que estava sendo concluído e só então avança pro próximo cenário (ou finaliza o
+     * teste, se era o último), já com a conversa encerrada do lado do alvo.
+     */
+    private function handleClosingAck(AssistantController $ctrl, TestRun $testRun, string $replyText): void
+    {
+        $scenarioIndex = $testRun->current_scenario_index;
+        $transcript = $testRun->transcript ?? [];
+        $transcript[] = ['scenario_index' => $scenarioIndex, 'role' => 'target', 'content' => $replyText, 'at' => now()->toIso8601String()];
+        $testRun->transcript = $transcript;
+
+        $nextIndex = $scenarioIndex + 1;
+        if ($nextIndex < count($testRun->scenarios ?? [])) {
+            $testRun->current_scenario_index = $nextIndex;
+            $testRun->current_scenario_turn = 0;
+            $testRun->save();
+            $this->sendScenarioOpening($ctrl, $testRun, $nextIndex);
+        } else {
+            $testRun->save();
+            $this->finishRun($ctrl, $testRun);
+        }
     }
 
     /**
