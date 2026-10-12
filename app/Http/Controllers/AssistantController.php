@@ -3161,6 +3161,26 @@ class AssistantController extends Controller
                     ->first();
 
                 if ($testRun) {
+                    // 🚨 TRAVA DE SEGURANÇA: o número de teste pode ser um número de WhatsApp de
+                    // verdade (ex: o celular pessoal de quem está testando) - SEM essa checagem,
+                    // qualquer mensagem recebida nele enquanto um teste está "running" (um contato
+                    // pessoal mandando mensagem por outro motivo qualquer) era tratada como se
+                    // fosse a resposta do assistente alvo, e a IA do cenário de teste respondia de
+                    // volta pra esse contato sem relação nenhuma com o teste. Só processa se quem
+                    // mandou a mensagem é, de fato, o número configurado como alvo deste TestRun.
+                    $targetDigits = preg_replace('/\D/', '', (string) $testRun->target_phone_number);
+                    $senderDigits = preg_replace('/\D/', '', (string) $cleanSender);
+                    $isFromTarget = strlen($targetDigits) >= 8 && strlen($senderDigits) >= 8 && (
+                        $senderDigits === $targetDigits
+                        || str_ends_with($senderDigits, $targetDigits)
+                        || str_ends_with($targetDigits, $senderDigits)
+                    );
+
+                    if (!$isFromTarget) {
+                        Log::warning("Testador: mensagem recebida no número de teste de um remetente que NÃO é o alvo do teste em andamento - ignorada, nenhuma resposta automática foi enviada. sender={$cleanSender} alvo_esperado={$testRun->target_phone_number} test_run_id={$testRun->id}");
+                        return response()->json(['status' => 'test_harness_ignored_non_target_sender']);
+                    }
+
                     // Diagnóstico: se mesmo com flattenListOrButtonsMessage() a mensagem chegar vazia,
                     // grava o payload bruto pra conseguirmos confirmar o formato real da UazAPI nesse
                     // caso específico (entrega de lista/menu pro número de teste) e corrigir de vez.
