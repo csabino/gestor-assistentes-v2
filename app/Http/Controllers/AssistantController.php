@@ -3182,6 +3182,29 @@ class AssistantController extends Controller
                         return response()->json(['status' => 'test_harness_ignored_non_target_sender']);
                     }
 
+                    // DEBOUNCE: o alvo pode mandar a resposta dele em vários balões separados em
+                    // sequência rápida (ex: "🎫 Protocolo: 1033", depois "Olá! 😊", só depois o
+                    // conteúdo real) - sem agrupar isso, o testador reage a cada fragmento como se
+                    // fosse uma resposta completa, desperdiçando turnos e distorcendo a conversa.
+                    // Mesmo padrão (buffer + sleep + "última requisição vence") já usado pro
+                    // pipeline normal de clientes de verdade, só escopado pelo número de teste.
+                    $debounceToken = Str::random(20);
+                    $existingBuffer = PendingMessageBuffer::where('assistant_id', $assistant->id)->where('phone_number', $cleanSender)->first();
+                    $combinedText = $existingBuffer ? trim($existingBuffer->buffered_text . "\n" . $cleanUserMessage) : $cleanUserMessage;
+                    PendingMessageBuffer::updateOrCreate(
+                        ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender],
+                        ['buffered_text' => $combinedText, 'token' => $debounceToken]
+                    );
+                    sleep(self::DEBOUNCE_SECONDS);
+                    $currentBuffer = PendingMessageBuffer::where('assistant_id', $assistant->id)->where('phone_number', $cleanSender)->first();
+                    if (!$currentBuffer || $currentBuffer->token !== $debounceToken) {
+                        // Chegou mensagem mais nova durante a espera - essa requisição perdeu a
+                        // corrida, quem vai processar o lote é a mais recente.
+                        return response()->json(['status' => 'test_harness_debounced']);
+                    }
+                    $cleanUserMessage = trim($currentBuffer->buffered_text);
+                    $currentBuffer->delete();
+
                     // Diagnóstico: se mesmo com flattenListOrButtonsMessage() a mensagem chegar vazia,
                     // grava o payload bruto pra conseguirmos confirmar o formato real da UazAPI nesse
                     // caso específico (entrega de lista/menu pro número de teste) e corrigir de vez.
