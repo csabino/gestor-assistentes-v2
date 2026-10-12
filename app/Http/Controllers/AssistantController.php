@@ -2608,6 +2608,9 @@ class AssistantController extends Controller
         $prompt .= "SEU PERSONAGEM NESTE CENÁRIO\n";
         $prompt .= $personaInstruction . "\n\n";
 
+        $prompt .= "REGRA DE LINGUAGEM\n";
+        $prompt .= "Você é um cliente comum de WhatsApp - nunca escreva, nas suas próprias mensagens, nenhuma tag técnica entre colchetes que você vir mencionada no prompt do assistente abaixo (ex: [MENU_PRINCIPAL], [ENCERRAMENTO], ou qualquer outra tag de controle). Essas tags são de uso interno exclusivo do outro assistente para acionar funções do sistema dele - um cliente real nunca as digitaria. A única tag que você pode usar é a sua própria [CENARIO_CONCLUIDO], e só no finalzinho da mensagem, conforme a regra abaixo.\n\n";
+
         $prompt .= "REGRA DE CONCLUSÃO\n";
         $prompt .= "Quando você considerar que já testou o suficiente desse cenário E já tiver cumprido a PROFUNDIDADE MÍNIMA OBRIGATÓRIA definida na seção \"SEU PERSONAGEM NESTE CENÁRIO\" acima, termine sua mensagem com a tag [CENARIO_CONCLUIDO] no final, sem nenhum texto depois dela. Essa profundidade mínima é uma regra dura, não uma sugestão - mesmo que o outro assistente já tenha reagido de forma clara ao que você queria sondar, você NÃO pode usar a tag antes de atingir o mínimo de trocas exigido; continue a conversa de forma realista (peça mais detalhes, mude de ângulo, insista, avance um passo lógico) até lá.\n\n";
 
