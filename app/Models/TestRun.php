@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class TestRun extends Model
 {
     protected $fillable = [
-        'name', 'target_label', 'target_phone_number', 'harness_assistant_id',
+        'name', 'target_label', 'target_phone_number', 'confirmed_sender_identity', 'harness_assistant_id',
         'target_prompt_snapshot', 'target_knowledge_snapshot', 'status',
         'current_scenario_index', 'current_scenario_turn',
         'scenarios', 'transcript', 'report',

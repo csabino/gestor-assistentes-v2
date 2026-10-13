@@ -3168,14 +3168,32 @@ class AssistantController extends Controller
                     // pessoal mandando mensagem por outro motivo qualquer) era tratada como se
                     // fosse a resposta do assistente alvo, e a IA do cenário de teste respondia de
                     // volta pra esse contato sem relação nenhuma com o teste. Só processa se quem
-                    // mandou a mensagem é, de fato, o número configurado como alvo deste TestRun.
-                    $targetDigits = preg_replace('/\D/', '', (string) $testRun->target_phone_number);
-                    $senderDigits = preg_replace('/\D/', '', (string) $cleanSender);
-                    $isFromTarget = strlen($targetDigits) >= 8 && strlen($senderDigits) >= 8 && (
-                        $senderDigits === $targetDigits
-                        || str_ends_with($senderDigits, $targetDigits)
-                        || str_ends_with($targetDigits, $senderDigits)
-                    );
+                    // mandou a mensagem é, de fato, o alvo deste TestRun.
+                    //
+                    // Depois de confirmada uma vez (confirmed_sender_identity), toda mensagem
+                    // seguinte do teste compara contra ESSE valor, não contra target_phone_number -
+                    // porque um contato "LID" (ver comentário de $isLidSender mais acima) chega
+                    // identificado por um ID interno do WhatsApp, sem nenhuma relação numérica com
+                    // o telefone real, e a comparação por dígitos abaixo nunca bateria pra ele -
+                    // fixar na primeira resposta válida evita perder silenciosamente toda resposta
+                    // seguinte do alvo de verdade só porque o formato do identificador não "parece"
+                    // com o número cadastrado.
+                    if ($testRun->confirmed_sender_identity !== null) {
+                        $isFromTarget = $cleanSender === $testRun->confirmed_sender_identity;
+                    } else {
+                        $targetDigits = preg_replace('/\D/', '', (string) $testRun->target_phone_number);
+                        $senderDigits = preg_replace('/\D/', '', (string) $cleanSender);
+                        $digitsMatch = strlen($targetDigits) >= 8 && strlen($senderDigits) >= 8 && (
+                            $senderDigits === $targetDigits
+                            || str_ends_with($senderDigits, $targetDigits)
+                            || str_ends_with($targetDigits, $senderDigits)
+                        );
+                        $isFromTarget = $digitsMatch || $isLidSender;
+                        if ($isFromTarget) {
+                            $testRun->confirmed_sender_identity = $cleanSender;
+                            $testRun->save();
+                        }
+                    }
 
                     if (!$isFromTarget) {
                         Log::warning("Testador: mensagem recebida no número de teste de um remetente que NÃO é o alvo do teste em andamento - ignorada, nenhuma resposta automática foi enviada. sender={$cleanSender} alvo_esperado={$testRun->target_phone_number} test_run_id={$testRun->id}");
