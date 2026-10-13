@@ -3147,6 +3147,12 @@ class AssistantController extends Controller
                     ?? $rawMessage['title']
                     ?? $rawMessage['conversation']
                     ?? ($rawMessage['extendedTextMessage']['text'] ?? null)
+                    // A UazAPI manda, como irmão de "content", um "text" já resumido em texto puro
+                    // pra QUALQUER tipo de mensagem (confirmado via payload real de ListMessage:
+                    // message.content não tem chave "text" nenhuma, mas message.text tem o resumo
+                    // "Claro, Sabino! Aqui está o menu de opções:\n\nVer opções") - prioriza esse
+                    // resumo antes de tentar reconstruir a estrutura manualmente.
+                    ?? $request->input('message.text')
                     ?? $this->flattenListOrButtonsMessage($rawMessage)
                     ?? ''
                 )
@@ -4389,23 +4395,25 @@ class AssistantController extends Controller
      */
     private function flattenListOrButtonsMessage(array $content): ?string
     {
-        $node = $content['listMessage'] ?? $content['buttonsMessage'] ?? null;
-        if (!is_array($node)) {
+        // Confirmado via payload real da UazAPI (ListMessage): os campos ficam direto na raiz de
+        // message.content, sem nenhum wrapper "listMessage"/"buttonsMessage" por cima - ex:
+        // {"title": null, "description": "...", "buttonText": "...", "sections": [{"rows": [...]}]}.
+        if (!isset($content['sections']) && !isset($content['buttons'])) {
             return null;
         }
 
         $parts = [];
-        if (!empty($node['title'])) $parts[] = $node['title'];
-        if (!empty($node['contentText'])) $parts[] = $node['contentText'];
-        if (!empty($node['description'])) $parts[] = $node['description'];
-        foreach (($node['sections'] ?? []) as $section) {
+        if (!empty($content['title'])) $parts[] = $content['title'];
+        if (!empty($content['description'])) $parts[] = $content['description'];
+        if (!empty($content['contentText'])) $parts[] = $content['contentText'];
+        foreach (($content['sections'] ?? []) as $section) {
             foreach (($section['rows'] ?? []) as $row) {
                 if (!empty($row['title'])) {
                     $parts[] = '• ' . $row['title'] . (!empty($row['description']) ? ' - ' . $row['description'] : '');
                 }
             }
         }
-        foreach (($node['buttons'] ?? []) as $button) {
+        foreach (($content['buttons'] ?? []) as $button) {
             if (!empty($button['buttonText']['displayText'])) {
                 $parts[] = '• ' . $button['buttonText']['displayText'];
             }
