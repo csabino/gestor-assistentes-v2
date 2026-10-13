@@ -33,6 +33,13 @@ class AssistantController extends Controller
     // agrupadas num único turno de IA - ver bloco de debounce em webhook().
     private const DEBOUNCE_SECONDS = 5;
 
+    // Debounce específico do número de teste (módulo Testador): o alvo frequentemente manda um
+    // balão rápido (ex: "🎫 Protocolo: 1036") e só segundos depois a resposta real gerada por IA -
+    // 5s (o padrão usado pro cliente de verdade, onde a prioridade é parecer responsivo) não é
+    // suficiente pra esperar essa segunda mensagem, então o testador reage ao fragmento isolado.
+    // Não tem problema esperar mais aqui - o teste já é um processo mais lento por natureza.
+    private const TEST_HARNESS_DEBOUNCE_SECONDS = 12;
+
     private function getTimezone($assistantId = null): string
     {
         if ($assistantId) {
@@ -3213,7 +3220,7 @@ class AssistantController extends Controller
                         ['assistant_id' => $assistant->id, 'phone_number' => $cleanSender],
                         ['buffered_text' => $combinedText, 'token' => $debounceToken]
                     );
-                    sleep(self::DEBOUNCE_SECONDS);
+                    sleep(self::TEST_HARNESS_DEBOUNCE_SECONDS);
                     $currentBuffer = PendingMessageBuffer::where('assistant_id', $assistant->id)->where('phone_number', $cleanSender)->first();
                     if (!$currentBuffer || $currentBuffer->token !== $debounceToken) {
                         // Chegou mensagem mais nova durante a espera - essa requisição perdeu a
