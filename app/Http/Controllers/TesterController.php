@@ -163,7 +163,7 @@ class TesterController extends AssistantController
         $testRun->status = 'stopped';
         $testRun->save();
 
-        return redirect('/?view=tester')->with('success', 'Teste interrompido.');
+        return response()->json(['success' => true]);
     }
 
     private function uploadTestKbFile(Request $request)

@@ -97,7 +97,14 @@ class TestHarnessService
             $history = array_values(array_filter($transcript, fn($t) => ($t['scenario_index'] ?? null) === $scenarioIndex));
             $persona = $this->personaInstruction($scenario);
             $systemPrompt = $ctrl->buildTestHarnessPrompt($persona, $testRun->target_prompt_snapshot, $testRun->target_knowledge_snapshot, $history);
-            $aiReply = $ctrl->callAiApi($testRun->harnessAssistant, $systemPrompt, 'Gere sua próxima mensagem de teste agora.', []);
+            // Salva o progresso deste turno ANTES da chamada de IA (que pode falhar/demorar) -
+            // assim, mesmo se safeAiCall() marcar erro, a resposta do alvo que acabou de chegar não
+            // se perde do transcript.
+            $testRun->save();
+            $aiReply = $this->safeAiCall($ctrl, $testRun, $systemPrompt, 'Gere sua próxima mensagem de teste agora.', 'próximo turno');
+            if ($aiReply === null) {
+                return;
+            }
         }
 
         $concluded = $capReached || ($aiReply !== null && stripos($aiReply, '[CENARIO_CONCLUIDO]') !== false);
@@ -176,12 +183,39 @@ class TestHarnessService
         return $stale->count();
     }
 
+    /**
+     * Toda chamada de IA do módulo passa por aqui. Sem isso, uma falha da API (rate limit, erro de
+     * rede, chave inválida etc.) sobe como exceção não tratada de dentro do webhook() que entrega
+     * a resposta do alvo - a requisição morre, o TestRun nunca é salvo com o novo estado, e o teste
+     * fica "running" parado silenciosamente até o watchdog varrer (até 30min depois). Em vez disso,
+     * qualquer falha aqui marca o teste como 'error' na hora, com o motivo registrado.
+     */
+    private function safeAiCall(AssistantController $ctrl, TestRun $testRun, string $systemPrompt, string $userPrompt, string $context): ?string
+    {
+        try {
+            $reply = $ctrl->callAiApi($testRun->harnessAssistant, $systemPrompt, $userPrompt, []);
+            if (!is_string($reply) || trim($reply) === '') {
+                throw new \RuntimeException('IA retornou resposta vazia');
+            }
+            return $reply;
+        } catch (\Throwable $e) {
+            Log::error("Testador: falha na chamada de IA ({$context}) - marcando teste como erro. test_run_id={$testRun->id} erro=" . $e->getMessage());
+            $testRun->status = 'error';
+            $testRun->report = $testRun->report ?? ['findings' => [], 'summary' => "Teste interrompido por falha na chamada de IA ({$context}): " . $e->getMessage()];
+            $testRun->save();
+            return null;
+        }
+    }
+
     private function sendScenarioOpening(AssistantController $ctrl, TestRun $testRun, int $scenarioIndex): void
     {
         $scenario = $testRun->scenarios[$scenarioIndex];
         $persona = $this->personaInstruction($scenario);
         $systemPrompt = $ctrl->buildTestHarnessPrompt($persona, $testRun->target_prompt_snapshot, $testRun->target_knowledge_snapshot, []);
-        $opening = $ctrl->callAiApi($testRun->harnessAssistant, $systemPrompt, 'Gere a mensagem de abertura agora.', []);
+        $opening = $this->safeAiCall($ctrl, $testRun, $systemPrompt, 'Gere a mensagem de abertura agora.', 'abertura do cenário');
+        if ($opening === null) {
+            return;
+        }
         $opening = trim(preg_replace('/\[CENARIO_CONCLUIDO\]/i', '', $opening));
 
         $ctrl->sendWhatsappMessage($testRun->harnessAssistant, $testRun->target_phone_number, $opening);
@@ -218,7 +252,12 @@ class TestHarnessService
     private function generateScenarios(AssistantController $ctrl, TestRun $testRun): array
     {
         $planningPrompt = $this->buildScenarioPlanningPrompt($testRun->target_prompt_snapshot, $testRun->target_knowledge_snapshot);
-        $raw = $ctrl->callAiApi($testRun->harnessAssistant, $planningPrompt, 'Gere agora o plano de cenários em JSON.', []);
+        try {
+            $raw = $ctrl->callAiApi($testRun->harnessAssistant, $planningPrompt, 'Gere agora o plano de cenários em JSON.', []);
+        } catch (\Throwable $e) {
+            Log::error('Testador: falha na chamada de IA do planejamento de cenários: ' . $e->getMessage());
+            return [];
+        }
 
         $json = trim($raw);
         $json = preg_replace('/^```(json)?/i', '', $json);
@@ -296,7 +335,16 @@ class TestHarnessService
     private function finishRun(AssistantController $ctrl, TestRun $testRun): void
     {
         $reportPrompt = $this->buildReportPrompt($testRun);
-        $raw = $ctrl->callAiApi($testRun->harnessAssistant, $reportPrompt, 'Gere agora o relatório em JSON.', []);
+        try {
+            $raw = $ctrl->callAiApi($testRun->harnessAssistant, $reportPrompt, 'Gere agora o relatório em JSON.', []);
+        } catch (\Throwable $e) {
+            Log::error('Testador: falha na chamada de IA do relatório final: ' . $e->getMessage());
+            $testRun->status = 'completed';
+            $testRun->report = ['findings' => [], 'summary' => 'O teste rodou até o fim, mas a geração do relatório falhou (erro na chamada de IA) - consulte o transcript manualmente.'];
+            $testRun->completed_at = now();
+            $testRun->save();
+            return;
+        }
 
         $json = trim($raw);
         $json = preg_replace('/^```(json)?/i', '', $json);

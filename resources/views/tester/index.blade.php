@@ -224,6 +224,22 @@
                          Alpine.store('toast').show('Não foi possível copiar.', 'error');
                      }
                  },
+                 async stopRun(id) {
+                     if (!(await confirmModal('Parar esse teste agora? Ele fica marcado como interrompido e nenhuma mensagem automática será mandada depois disso.'))) return;
+                     try {
+                         const res = await fetch('/?view=tester', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ action: 'stop_test_run', test_run_id: id }) });
+                         const data = await res.json();
+                         if (data.success) {
+                             this.modalData.status = 'stopped';
+                             if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
+                             Alpine.store('toast').show('Teste interrompido.', 'success');
+                         } else {
+                             Alpine.store('toast').show(data.message || 'Não foi possível parar o teste.', 'error');
+                         }
+                     } catch (e) {
+                         Alpine.store('toast').show('Erro de conexão.', 'error');
+                     }
+                 },
                  async deleteRun(id, name) {
                      if (!(await confirmModal('Excluir o teste &quot;' + name + '&quot;? Essa ação não pode ser desfeita.'))) return;
                      try {
@@ -616,6 +632,7 @@
                             <span x-show="modalData.status === 'error' || modalData.status === 'stopped'" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200" x-text="modalData.status"></span>
                         </h3>
                         <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" x-show="modalData.status === 'running'" @click="stopRun(modalData.id)" class="text-red-500 hover:text-red-600 text-[11px] font-semibold px-2 py-1 rounded-md border border-red-200 hover:border-red-300 transition">Parar teste</button>
                             <button type="button" @click="copyRunToClipboard(modalData)" class="text-gray-500 hover:text-indigo-600 text-[11px] font-semibold px-2 py-1 rounded-md border border-gray-200 hover:border-indigo-300 transition">Copiar resultado</button>
                             <button type="button" @click="closeDetailModal()" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
