@@ -153,6 +153,7 @@
                      }
                  },
                  pollTimer: null,
+                 gridNeedsRefresh: false,
                  scrollDetailToBottom() {
                      this.$nextTick(() => {
                          const el = this.$refs.detailScrollArea;
@@ -163,6 +164,7 @@
                      const res = await fetch('/?view=tester&action=get_test_run_detail&test_run_id=' + id);
                      this.modalData = await res.json();
                      this.showModal = true;
+                     this.gridNeedsRefresh = false;
                      this.scrollDetailToBottom();
                      this.maybePoll();
                  },
@@ -171,7 +173,15 @@
                      if (this.showModal && this.modalData.status === 'running') {
                          this.pollTimer = setTimeout(async () => {
                              const res = await fetch('/?view=tester&action=get_test_run_detail&test_run_id=' + this.modalData.id);
-                             this.modalData = await res.json();
+                             const updated = await res.json();
+                             // O grid por trás do modal é renderizado pelo servidor no carregamento da
+                             // página - se o status mudou enquanto o modal estava aberto (teste
+                             // terminou/deu erro), o grid fica desatualizado até um F5. Marca pra
+                             // recarregar a página quando o modal fechar, só nesse caso.
+                             if (updated.status !== 'running') {
+                                 this.gridNeedsRefresh = true;
+                             }
+                             this.modalData = updated;
                              this.scrollDetailToBottom();
                              this.maybePoll();
                          }, 5000);
@@ -180,6 +190,9 @@
                  closeDetailModal() {
                      this.showModal = false;
                      if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
+                     if (this.gridNeedsRefresh) {
+                         window.location.reload();
+                     }
                  },
                  async copyRunToClipboard(run) {
                      let full = run;
@@ -231,6 +244,7 @@
                          const data = await res.json();
                          if (data.success) {
                              this.modalData.status = 'stopped';
+                             this.gridNeedsRefresh = true;
                              if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
                              Alpine.store('toast').show('Teste interrompido.', 'success');
                          } else {
