@@ -4160,7 +4160,7 @@ class AssistantController extends Controller
      * natureza acontecem fora dessa janela) sao OBRIGADAS a usar template. So existe pra Meta -
      * UazAPI nao tem esse conceito/restricao.
      */
-    private function sendWhatsappTemplate(Assistant $assistant, string $to, string $templateName, string $language, ?string $clientName = null): array
+    protected function sendWhatsappTemplate(Assistant $assistant, string $to, string $templateName, string $language, ?string $clientName = null): array
     {
         if (empty($assistant->whatsapp_instance) || empty($assistant->whatsapp_token)) {
             return ['success' => false, 'error' => 'WhatsApp (Meta) não configurado.'];

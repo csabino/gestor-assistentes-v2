@@ -14,6 +14,7 @@ use App\Http\Controllers\ThemeController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\AutomationController;
 use App\Http\Controllers\TesterController;
+use App\Http\Controllers\BroadcastingController;
 
 // Webhook do WhatsApp: chamado pelo provedor externo (Evolution/UazAPI), sem sessão de navegador.
 // A UazAPI (uazapiGO) acrescenta um sufixo com o tipo de evento na URL configurada
@@ -55,6 +56,20 @@ Route::get('/cron/test-runs-watchdog/{secret}', function (string $secret) {
     return response()->json(['status' => 'ok', 'swept' => $swept]);
 })->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
+// Disparo das campanhas do módulo Broadcasting: mesmo padrão das duas rotas de cron acima (serviço
+// externo chamando a cada poucos minutos, protegida por segredo na URL) - cada hit drena um lote
+// pequeno de cada campanha ativa, já que este app não tem fila/worker. Configure
+// BROADCASTING_CRON_SECRET no .env e aponte um serviço de cron externo pra esta URL.
+Route::get('/cron/broadcasting-dispatch/{secret}', function (string $secret) {
+    $expected = env('BROADCASTING_CRON_SECRET', '');
+    if (empty($expected) || !hash_equals($expected, $secret)) {
+        abort(404);
+    }
+    $result = app(\App\Services\BroadcastDispatchService::class)
+        ->processDueCampaigns(app(\App\Http\Controllers\BroadcastingController::class));
+    return response()->json(['status' => 'ok', 'result' => $result]);
+})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
 // Encaminhamento para o sistema Omni: endpoint público chamado por integração externa.
 Route::post('/omni/send', [OmniController::class, 'forwardToOmni'])
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
@@ -88,6 +103,7 @@ Route::middleware('auth')->group(function () {
         if ($request->input('view') === 'surveys') return app(SurveyController::class)->handle($request);
         if ($request->input('view') === 'automation') return app(AutomationController::class)->handle($request);
         if ($request->input('view') === 'tester') return app(TesterController::class)->handle($request);
+        if ($request->input('view') === 'broadcasting') return app(BroadcastingController::class)->handle($request);
 
         return app(AssistantController::class)->index($request);
     });
