@@ -23,6 +23,7 @@
                  metaTemplatesForCampaign: [],
                  metaTemplatesLoading: false,
                  metaTemplatesError: null,
+                 inlineMessageText: '',
 
                  showMessageModal: false,
                  messageAssistantId: '',
@@ -76,11 +77,13 @@
                  openNewCampaign() {
                      this.campaignForm = { id: null, name: '', assistant_id: '', raw_contacts_count: 0, valid_contacts_count: 0, invalid_contacts_count: 0, uploading: false, sanitizing: false, message_selector: '', message_preview: '' };
                      this.metaTemplatesForCampaign = [];
+                     this.inlineMessageText = '';
                      this.showCampaignModal = true;
                  },
                  editCampaign(c) {
                      this.campaignForm = { id: c.id, name: c.name, assistant_id: c.assistant_id, raw_contacts_count: c.raw_contacts_count, valid_contacts_count: c.valid_contacts_count, invalid_contacts_count: c.invalid_contacts_count, uploading: false, sanitizing: false, message_selector: c.message_selector || '', message_preview: c.message_preview || '' };
                      this.metaTemplatesForCampaign = [];
+                     this.inlineMessageText = '';
                      if (this.isMetaAssistant(c.assistant_id)) this.loadMetaTemplatesForCampaign();
                      this.showCampaignModal = true;
                  },
@@ -179,6 +182,22 @@
                          return;
                      }
                      Alpine.store('toast').show('Mensagem da campanha definida!', 'success');
+                 },
+                 async createAndSelectInlineMessage() {
+                     const text = this.inlineMessageText.trim();
+                     if (!text) {
+                         alertModal('Digite a mensagem padrão da campanha.');
+                         return;
+                     }
+                     const label = 'Campanha: ' + (this.campaignForm.name || ('#' + this.campaignForm.id));
+                     const { ok, data } = await this.postJson('/?view=broadcasting', { action: 'store_broadcast_message', name: label, body: text });
+                     if (!ok || !data.success) {
+                         Alpine.store('toast').show(data.message || 'Não foi possível salvar a mensagem.', 'error');
+                         return;
+                     }
+                     this.freeMessages.push(data.message);
+                     await this.selectTemplate('free:' + data.message.id, this.renderPreview(text));
+                     this.inlineMessageText = '';
                  },
                  renderPreview(body) {
                      return (body || '').replaceAll('@{{1}}', 'Maria').replaceAll('@{{nome}}', 'Maria');
@@ -429,12 +448,18 @@
                                         </div>
                                     </template>
                                     <template x-if="!isMetaAssistant(campaignForm.assistant_id)">
-                                        <select @change="selectTemplate($event.target.value, renderPreview(freeMessages.find(m => ('free:'+m.id) === $event.target.value)?.body))" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                                            <option value="">Escolha uma mensagem cadastrada</option>
-                                            <template x-for="m in freeMessages" :key="m.id">
-                                                <option :value="'free:' + m.id" :selected="campaignForm.message_selector === ('free:' + m.id)" x-text="m.name"></option>
-                                            </template>
-                                        </select>
+                                        <div class="space-y-2">
+                                            <select x-show="freeMessages.length > 0" @change="selectTemplate($event.target.value, renderPreview(freeMessages.find(m => ('free:'+m.id) === $event.target.value)?.body))" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                                <option value="">Ou escolha uma mensagem já cadastrada</option>
+                                                <template x-for="m in freeMessages" :key="m.id">
+                                                    <option :value="'free:' + m.id" :selected="campaignForm.message_selector === ('free:' + m.id)" x-text="m.name"></option>
+                                                </template>
+                                            </select>
+                                            <p class="text-[11px] text-gray-500">Digite a mensagem padrão desta campanha. Use @{{nome}} pra inserir o nome do cliente.</p>
+                                            <textarea x-model="inlineMessageText" rows="3" placeholder="Ex: Oi @{{nome}}! Temos uma novidade pra te contar..." class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+                                            <p class="text-[11px] text-gray-500">Antes de cada envio, a IA reescreve essa mensagem com uma pequena variação pra cada contato (sem mudar o sentido) - evita mandar o texto idêntico pra toda a lista, reduzindo o risco de bloqueio.</p>
+                                            <button type="button" @click="createAndSelectInlineMessage()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-1.5 px-4 rounded-lg text-xs transition">Usar esta mensagem</button>
+                                        </div>
                                     </template>
                                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600" x-show="campaignForm.message_preview">
                                         <span class="font-semibold text-gray-500">Preview (exemplo):</span>

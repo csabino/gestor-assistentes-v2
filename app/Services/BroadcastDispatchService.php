@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\AssistantController;
+use App\Models\Assistant;
 use App\Models\BroadcastCampaign;
 use App\Models\BroadcastContact;
 use App\Models\BroadcastMessage;
@@ -169,6 +170,7 @@ class BroadcastDispatchService
                     return ['success' => false, 'error' => 'Mensagem cadastrada não encontrada (id ' . $messageId . ').'];
                 }
                 $body = str_replace('{{nome}}', $contact->name ?: 'Cliente', $message->body);
+                $body = $this->varyMessageText($ctrl, $assistant, $body);
                 return $ctrl->sendWhatsappMessage($assistant, $contact->phone_normalized, $body);
             }
 
@@ -176,6 +178,27 @@ class BroadcastDispatchService
         } catch (\Throwable $e) {
             Log::error("Broadcasting: falha ao enviar pro contato {$contact->id} da campanha {$campaign->id}: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Mensagens de texto livre (número não-oficial) passam por uma reescrita leve via IA antes de
+     * cada envio, pra não mandar o texto byte-a-byte idêntico pra toda a lista - uma das
+     * recomendações do próprio usuário pra reduzir o risco de bloqueio por "envio em massa
+     * detectável". NUNCA se aplica a template da Meta (alterar o texto de um template aprovado
+     * quebra a aprovação e pode gerar banimento do WABA). Se a chamada de IA falhar por qualquer
+     * motivo, cai de volta pro texto original sem variação - nunca bloqueia o envio por isso.
+     */
+    private function varyMessageText(AssistantController $ctrl, Assistant $assistant, string $body): string
+    {
+        $systemPrompt = "Você reescreve mensagens de WhatsApp pra campanhas de envio em massa, mudando levemente a estrutura das frases e algumas palavras (sinônimos, ordem, pontuação, emojis), SEM mudar o significado, o tom nem nenhuma informação (nomes, números, links, datas, valores) - cada mensagem precisa parecer digitada na hora, não um texto idêntico repetido pra vários contatos. Responda SOMENTE com o texto final da mensagem, sem aspas, sem comentário, sem explicação.";
+
+        try {
+            $varied = trim($ctrl->callAiApi($assistant, $systemPrompt, $body, []));
+            return $varied !== '' ? $varied : $body;
+        } catch (\Throwable $e) {
+            Log::warning('Broadcasting: falha ao gerar variação por IA, usando texto original: ' . $e->getMessage());
+            return $body;
         }
     }
 }
