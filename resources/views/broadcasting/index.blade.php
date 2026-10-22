@@ -19,7 +19,7 @@
                  freeMessages: @js($messages->map(fn($m) => ['id' => $m->id, 'name' => $m->name, 'body' => $m->body])),
 
                  showCampaignModal: false,
-                 campaignForm: { id: null, name: '', assistant_id: '', raw_contacts_count: 0, valid_contacts_count: 0, invalid_contacts_count: 0, uploading: false, sanitizing: false, message_selector: '', message_preview: '' },
+                 campaignForm: { id: null, name: '', assistant_id: '', raw_contacts_count: 0, valid_contacts_count: 0, invalid_contacts_count: 0, uploading: false, sanitizing: false, uploadedFileName: null, message_selector: '', message_preview: '' },
                  metaTemplatesForCampaign: [],
                  metaTemplatesLoading: false,
                  metaTemplatesError: null,
@@ -75,13 +75,13 @@
                  },
 
                  openNewCampaign() {
-                     this.campaignForm = { id: null, name: '', assistant_id: '', raw_contacts_count: 0, valid_contacts_count: 0, invalid_contacts_count: 0, uploading: false, sanitizing: false, message_selector: '', message_preview: '' };
+                     this.campaignForm = { id: null, name: '', assistant_id: '', raw_contacts_count: 0, valid_contacts_count: 0, invalid_contacts_count: 0, uploading: false, sanitizing: false, uploadedFileName: null, message_selector: '', message_preview: '' };
                      this.metaTemplatesForCampaign = [];
                      this.inlineMessageText = '';
                      this.showCampaignModal = true;
                  },
                  editCampaign(c) {
-                     this.campaignForm = { id: c.id, name: c.name, assistant_id: c.assistant_id, raw_contacts_count: c.raw_contacts_count, valid_contacts_count: c.valid_contacts_count, invalid_contacts_count: c.invalid_contacts_count, uploading: false, sanitizing: false, message_selector: c.message_selector || '', message_preview: c.message_preview || '' };
+                     this.campaignForm = { id: c.id, name: c.name, assistant_id: c.assistant_id, raw_contacts_count: c.raw_contacts_count, valid_contacts_count: c.valid_contacts_count, invalid_contacts_count: c.invalid_contacts_count, uploading: false, sanitizing: false, uploadedFileName: null, message_selector: c.message_selector || '', message_preview: c.message_preview || '' };
                      this.metaTemplatesForCampaign = [];
                      this.inlineMessageText = '';
                      if (this.isMetaAssistant(c.assistant_id)) this.loadMetaTemplatesForCampaign();
@@ -125,18 +125,24 @@
                          const data = await res.json();
                          if (!res.ok || !data.success) {
                              Alpine.store('toast').show(data.message || 'Não foi possível subir o mailing.', 'error');
+                             event.target.value = '';
                              return;
                          }
+                         this.campaignForm.uploadedFileName = file.name;
                          this.campaignForm.raw_contacts_count = data.raw_contacts_count;
                          this.campaignForm.valid_contacts_count = 0;
                          this.campaignForm.invalid_contacts_count = 0;
                          Alpine.store('toast').show('Mailing enviado! Agora clique em Sanear.', 'success');
                      } catch (e) {
                          Alpine.store('toast').show('Erro de conexão.', 'error');
+                         event.target.value = '';
                      } finally {
                          this.campaignForm.uploading = false;
-                         event.target.value = '';
                      }
+                 },
+                 clearMailingFileDisplay() {
+                     this.campaignForm.uploadedFileName = null;
+                     this.$refs.mailingFileInput.value = '';
                  },
                  async sanitizeMailing() {
                      this.campaignForm.sanitizing = true;
@@ -414,8 +420,16 @@
                                 <div class="space-y-2">
                                     <p class="text-xs font-bold text-gray-500 uppercase">2. Mailing</p>
                                     <div class="flex items-center gap-3">
-                                        <input type="file" accept=".csv,.txt" @change="handleMailingUpload($event)" :disabled="campaignForm.uploading" class="text-xs">
+                                        <input type="file" accept=".csv,.txt" x-ref="mailingFileInput" @change="handleMailingUpload($event)" :disabled="campaignForm.uploading" class="text-xs">
                                         <a href="/?view=broadcasting&action=download_mailing_template" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold whitespace-nowrap">Baixar modelo</a>
+                                    </div>
+                                    <p class="text-[11px] text-gray-500" x-show="campaignForm.uploading">Enviando arquivo...</p>
+                                    <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 w-fit" x-show="campaignForm.uploadedFileName">
+                                        <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 0119.5 7.372L8.552 18.32m.009-.01l-.01.01" /></svg>
+                                        <span class="text-xs text-gray-700" x-text="campaignForm.uploadedFileName"></span>
+                                        <button type="button" @click="clearMailingFileDisplay()" class="text-gray-400 hover:text-red-600 shrink-0">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
                                     </div>
                                     <p class="text-[11px] text-gray-500">CSV com colunas "nome" e "telefone" (separador ;). Salve como UTF-8 pra não corromper acentos.</p>
                                     <p class="text-xs text-gray-600" x-show="campaignForm.raw_contacts_count > 0">
