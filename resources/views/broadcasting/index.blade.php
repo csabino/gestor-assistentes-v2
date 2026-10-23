@@ -54,6 +54,10 @@
                      const map = { draft: 'Rascunho', ready: 'Pronta', scheduled: 'Agendada', sending: 'Enviando', paused: 'Pausada', completed: 'Concluída', canceled: 'Cancelada' };
                      return map[status] || status;
                  },
+                 contactStatusLabel(status) {
+                     const map = { pending: 'Pendente', sending: 'Enviando', sent: 'Enviado', failed: 'Falhou', skipped: 'Ignorado' };
+                     return map[status] || status;
+                 },
                  statusClasses(status) {
                      const map = {
                          draft: 'bg-gray-100 text-gray-600 border-gray-200',
@@ -535,7 +539,7 @@
                                     <template x-for="key in ['pending','sending','sent','failed','skipped']" :key="key">
                                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-2">
                                             <p class="text-sm font-bold text-gray-700" x-text="resultData.status_counts?.[key] || 0"></p>
-                                            <p class="text-[10px] text-gray-500" x-text="key"></p>
+                                            <p class="text-[10px] text-gray-500" x-text="contactStatusLabel(key)"></p>
                                         </div>
                                     </template>
                                 </div>
@@ -548,7 +552,7 @@
                                             <tr class="border-t border-gray-100">
                                                 <td class="py-1" x-text="row.name || '—'"></td>
                                                 <td class="py-1" x-text="row.phone_raw"></td>
-                                                <td class="py-1" x-text="row.send_status"></td>
+                                                <td class="py-1" x-text="contactStatusLabel(row.send_status)"></td>
                                                 <td class="py-1 text-red-500" x-text="row.send_error || ''"></td>
                                             </tr>
                                         </template>
